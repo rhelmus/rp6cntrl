@@ -1,0 +1,41 @@
+Regular:
+
+avr-size m32/main-m32.hex
+   text    data     bss     dec     hex filename
+      0    5110       0    5110    13f6 m32/main-m32.hex
+avr-size main/main.hex
+   text    data     bss     dec     hex filename
+      0    7216       0    7216    1c30 main/main.hex
+
+----
+
+ffunction stuff:
+
+avr-size m32/main-m32.hex
+   text    data     bss     dec     hex filename
+      0    2476       0    2476     9ac m32/main-m32.hex
+avr-size main/main.hex
+   text    data     bss     dec     hex filename
+      0    5464       0    5464    1558 main/main.hex
+
+----
+
+ffunction + finline-limit=3
+
+avr-size m32/main-m32.hex                                                                    
+   text    data     bss     dec     hex filename                                             
+      0    2526       0    2526     9de m32/main-m32.hex                                     
+avr-size main/main.hex                                                                       
+   text    data     bss     dec     hex filename                                             
+      0    5504       0    5504    1580 main/main.hex
+
+----
+
+ffunction + relax
+avr-size m32/main-m32.hex
+   text    data     bss     dec     hex filename
+      0    2398       0    2398     95e m32/main-m32.hex
+avr-size main/main.hex
+   text    data     bss     dec     hex filename
+      0    5374       0    5374    14fe main/main.hex
+
