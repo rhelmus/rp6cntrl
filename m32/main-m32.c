@@ -39,6 +39,8 @@ int main(void)
     startStopwatch1(); // Refresh delay
     // Stopwatch 2: ping
     
+    dischargePeakDetector();
+    
     for (;;)
     {
         if ((getStopwatch1() > 50) && !I2CTWI_isBusy())
