@@ -32,6 +32,7 @@ enum
     
     I2C_ACS_POWER,
     
+    I2C_LASTRC5_ADR,
     I2C_LASTRC5_KEY,
         
     I2C_MAX_INDEX

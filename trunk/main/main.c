@@ -98,12 +98,14 @@ void updateI2CReadRegisters(void)
             
             case I2C_ACS_POWER: I2CTWI_readRegisters[i] = (uint8_t)ACSPowerState; break;
             
-            // Just transmit the key bits for now
+            case I2C_LASTRC5_ADR:
+                I2CTWI_readRegisters[i] = lastRC5Data.device;
+                if (lastRC5Data.toggle_bit)
+                    I2CTWI_readRegisters[i] |= TOGGLEBIT;
+                break;                
             case I2C_LASTRC5_KEY:
-                I2CTWI_readRegisters[i] = lastRC5Data.key_code ;
-                break;
-                
-            // ...
+                I2CTWI_readRegisters[i] = lastRC5Data.key_code;
+                break;                
         }
     }
 }
@@ -183,9 +185,11 @@ int main(void)
     initRobotBase();
     I2CTWI_initSlave(I2C_SLAVEADDRESS);
     
+    powerON(); // UNDONE
+    
     BUMPERS_setStateChangedHandler(bumperHandler);
     IRCOMM_setRC5DataReadyHandler(RC5Handler);
-       
+    
     setACSPwrOff();
    
     FlashLEDs();

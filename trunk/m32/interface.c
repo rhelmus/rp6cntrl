@@ -1,6 +1,7 @@
 #include "RP6ControlLib.h"
 #include "RP6I2CmasterTWI.h"
 #include "../shared/shared.h"
+#include "interface.h"
 
 enum { REQUEST_DUMP_BASE_DATA = 0 };
 
@@ -97,4 +98,13 @@ void rotate(uint8_t speed, uint8_t dir, uint16_t angle)
     uint8_t buf[6] = { I2C_CMD_REGISTER, I2C_CMD_ROTATE, speed, dir,
                        angle, (angle >> 8) };
     I2CTWI_transmitBytes(I2C_SLAVEADDRESS, buf, 6);
+}
+
+RC5data_t getLastRC5(void)
+{
+    RC5data_t ret;
+    ret.device = (slaveData[I2C_LASTRC5_ADR] & ~TOGGLEBIT);
+    ret.toggle_bit = ((slaveData[I2C_LASTRC5_ADR] & TOGGLEBIT) == TOGGLEBIT);
+    ret.key_code = slaveData[I2C_LASTRC5_KEY];
+    return ret;
 }

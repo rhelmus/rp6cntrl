@@ -1,6 +1,20 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
+// From RP6RobotBaseLib.h. Keep this in sync!
+#define TOGGLEBIT 32
+
+typedef union {
+    uint16_t data;
+    struct {
+        unsigned key_code:6;
+        unsigned device:5;
+        unsigned toggle_bit:1;
+        unsigned reserved:3;
+    };
+} RC5data_t;
+
+
 void initI2C(void);
 void pingBase(void);
 void requestBaseData(void);
@@ -37,11 +51,12 @@ extern inline uint16_t getRightMotorCurrent(void)
          (slaveData[I2C_MOTOR_CURRENT_RIGHT_HIGH] << 8); }
 extern inline uint16_t getBattery(void)
 { return slaveData[I2C_BATTERY_LOW] + (slaveData[I2C_BATTERY_HIGH] << 8); }
-extern inline uint8_t getLastRC5Key(void) { return slaveData[I2C_LASTRC5_KEY]; }
 extern inline EACSPowerState getACSPowerState(void) { return slaveData[I2C_ACS_POWER]; }
 
 extern uint16_t lastPing;
 extern inline uint16_t getLastPing(void) { return lastPing; }
 
+RC5data_t getLastRC5(void);
+    
 #endif
 
