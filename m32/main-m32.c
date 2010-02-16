@@ -1,11 +1,8 @@
-#include <string.h>
-
 #include "RP6ControlLib.h"
 #include "RP6I2CmasterTWI.h"
 #include "../shared/shared.h"
 #include "command.h"
 #include "interface.h"
-
 
 void FlashLEDs(void)
 {   
@@ -23,7 +20,6 @@ void FlashLEDs(void)
     externalPort.LEDS = 0;
     outputExt();
 }
-
 
 int main(void)
 {   
