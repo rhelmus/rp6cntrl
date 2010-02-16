@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "RP6ControlLib.h"
 #include "../shared/shared.h"
 #include "command.h"
