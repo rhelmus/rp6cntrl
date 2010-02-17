@@ -24,6 +24,7 @@ src_control = [
     "m32/command.c",
     "m32/main-m32.c",
     "m32/interface.c",
+    "m32/plugin.c",
     "m32-plugins/plugins.c",
 ]
 
@@ -85,21 +86,14 @@ def collectPlugins(context):
 */
 
 #include <avr/pgmspace.h>
-
-typedef struct
-{
-    void (*start)(void);
-    void (*stop)(void);
-    void (*think)(void);
-    const char *name;
-} SPluginEntry;
+#include "../m32/plugin.h"
 
 """)
     for file in src_control_plugins:
         name = os.path.splitext(os.path.basename(file))[0].replace("plugin_", "", 1)
         f.write("extern void %sStart(void);\n" % (name))
         f.write("extern void %sStop(void);\n" % (name))
-        f.write("extern void %sThink(void);\n\n" % (name))
+        f.write("extern void %sThink(void);\n" % (name))
 
     f.write("""
 SPluginEntry plugins[] PROGMEM =
@@ -108,8 +102,10 @@ SPluginEntry plugins[] PROGMEM =
     
     for file in src_control_plugins:
         name = os.path.splitext(os.path.basename(file))[0].replace("plugin_", "", 1)
-        f.write('   { &%sStart, &%sStop, &%sThink, "%s" }\n' % (name, name, name, name))
+        f.write('   { &%sStart, &%sStop, &%sThink, "%s" },\n' % (name, name, name, name))
 
+    # End marker
+    f.write("   { 0, 0, 0, 0 }\n")
     f.write("};\n")
     
     f.close()
