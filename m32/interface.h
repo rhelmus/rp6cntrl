@@ -1,6 +1,8 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
+#include "shared.h"
+
 // From RP6RobotBaseLib.h. Keep this in sync!
 #define TOGGLEBIT 32
 
@@ -16,7 +18,6 @@ typedef union {
 
 
 void initI2C(void);
-void pingBase(void);
 void requestBaseData(void);
 void setBasePower(uint8_t enable);
 void setBaseACS(EACSPowerState state);
@@ -56,7 +57,9 @@ inline EACSPowerState getACSPowerState(void) { return slaveData[I2C_ACS_POWER]; 
 extern uint16_t lastPing;
 inline uint16_t getLastPing(void) { return lastPing; }
 
-RC5data_t getLastRC5(void);
+extern RC5data_t lastRC5Data;
+inline RC5data_t getLastRC5(void) { return lastRC5Data; }
+inline void resetLastRC5(void) { lastRC5Data.data = 0; }
     
 #endif
 

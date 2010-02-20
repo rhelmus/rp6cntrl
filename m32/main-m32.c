@@ -42,7 +42,6 @@ int main(void)
     {
         if ((getStopwatch1() > 50) && !I2CTWI_isBusy())
         {
-            pingBase();
             requestBaseData();
             setStopwatch1(0);
         }

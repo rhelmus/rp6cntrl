@@ -6,9 +6,9 @@ import os
 # Settings
 # ---------------------------------------------
 rp6lib = "../RP6Lib"
-cpppath = [ rp6lib, rp6lib + "/RP6common" ]
+cpppath = [ rp6lib, rp6lib + "/RP6common", "shared/" ]
 cpppath_main = [ rp6lib + "/RP6base" ]
-cpppath_control = [ rp6lib + "/RP6control" ]
+cpppath_control = [ rp6lib + "/RP6control", "m32/" ]
 opt = "-Os"
 
 plugin_dir = "m32-plugins"
