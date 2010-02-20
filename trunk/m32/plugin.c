@@ -1,28 +1,28 @@
 #include "RP6ControlLib.h"
 #include "plugin.h"
 
-// UNDONE: Doesn't work! needs AVR prgm stuff
 static SPluginEntry *activePlugin;
-
-void stopPlugin(void);
 
 void startPlugin(const char *plugin)
 {
     stopPlugin();
     
     uint8_t i;
-    for (i=0; plugins[i].name; ++i)
+    for (i=0; ; ++i)
     {
-        if (!strcmp(plugins[i].name, plugin))
+        if (!pgm_read_word(&plugins[i].name))
+            break;
+        
+        if (!strcmp_P(plugin, (const char*)pgm_read_word(&plugins[i].name)))
         {
             activePlugin = &plugins[i];
-            activePlugin->start();
+            ((pluginFunc)pgm_read_word(&activePlugin->start))();
             return;
         }
     }
 
     writeString_P("No such plugin: ");
-    writeString(plugin);
+    writeString((char *)plugin);
     writeChar('\n');
 }
 
@@ -30,7 +30,7 @@ void stopPlugin(void)
 {
     if (activePlugin)
     {
-        activePlugin->stop();
+        ((pluginFunc)pgm_read_word(&activePlugin->stop))();
         activePlugin = NULL;
     }
 }
@@ -38,5 +38,19 @@ void stopPlugin(void)
 void pluginThink(void)
 {
     if (activePlugin)
-        activePlugin->think();
+        ((pluginFunc)pgm_read_word(&activePlugin->think))();
+}
+
+void listPlugins(void)
+{
+    uint8_t i;
+    for (i=0; ; ++i)
+    {
+        if (!pgm_read_word(&plugins[i].name))
+            break;
+
+        writeString_P("plugin: ");
+        writeNStringP((const char *)pgm_read_word(&plugins[i].name));
+        writeChar('\n');
+    }
 }
