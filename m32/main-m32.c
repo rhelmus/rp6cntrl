@@ -3,6 +3,7 @@
 #include "../shared/shared.h"
 #include "command.h"
 #include "interface.h"
+#include "plugin.h"
 
 void FlashLEDs(void)
 {   
@@ -36,7 +37,7 @@ int main(void)
     // Stopwatch 2: ping
     
     dischargePeakDetector();
-    
+   
     for (;;)
     {
         if ((getStopwatch1() > 50) && !I2CTWI_isBusy())
@@ -45,8 +46,9 @@ int main(void)
             requestBaseData();
             setStopwatch1(0);
         }
-        
+
         checkCommands();
+        pluginThink();
         
         task_I2CTWI();
     }

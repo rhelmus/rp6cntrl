@@ -4,6 +4,7 @@
 #include "../shared/shared.h"
 #include "command.h"
 #include "interface.h"
+#include "plugin.h"
 
 static const char usageStr[] PROGMEM =
     "Usage:\n"
@@ -39,6 +40,7 @@ static const char dumpUsageStr[] PROGMEM =
     "ping\t\tDumps last ping time\n"
     "mic\t\tDumps last mic value\n"
     "key\t\tDumps pressed key\n";
+
 
 // var MUST be in ROM!
 void dumpVarP(const char *var, uint16_t val, uint8_t base)
@@ -143,7 +145,7 @@ void handleDumpCommand(const char **cmd, uint8_t count)
         return;
     }
     
-    const uint8_t all = ((count < 1) || !strcmp_P(cmd[0], "all"));
+    const uint8_t all = ((count < 1) || !strcmp_P(cmd[0], PSTR("all")));
     
     if (all || !strcmp_P(cmd[0], PSTR("state")))
     {
@@ -215,6 +217,34 @@ void handleDumpCommand(const char **cmd, uint8_t count)
         dumpVar_P("Pressed key: ", getPressedKeyNumber(), DEC);
 }
 
+void handlePluginCommand(const char **cmd, uint8_t count)
+{
+    if (count && !strcmp_P(cmd[0], PSTR("help")))
+    {
+        // UNDONE
+        //writeNStringP(setUsageStr);
+        return;
+    }
+    
+    if (count < 1)
+    {
+        writeString_P("Error: dump needs atleast 1 arg.\n");
+        return;
+    }
+    
+    if (!strcmp_P(cmd[0], PSTR("load")))
+    {
+        if (count > 1)
+            startPlugin(cmd[1]);
+        else
+            writeString_P("Error: need 2 arguments\n");
+    }
+    else if (!strcmp_P(cmd[0], PSTR("stop")))
+        stopPlugin();
+    else if (!strcmp_P(cmd[0], PSTR("list")))
+        listPlugins();
+}
+
 // cmd[0] = command
 // cmd[1-n] = arg
 void handleCommand(const char **cmd, uint8_t count)
@@ -223,6 +253,8 @@ void handleCommand(const char **cmd, uint8_t count)
         handleSetCommand(&cmd[1], count-1);
     else if (!strcmp_P(cmd[0], PSTR("dump")))
         handleDumpCommand(&cmd[1], count-1);
+    else if (!strcmp_P(cmd[0], PSTR("plugin")))
+        handlePluginCommand(&cmd[1], count-1);
     else if (!strcmp_P(cmd[0], PSTR("move")))
     {
         if (count < 2)
@@ -283,7 +315,7 @@ void handleCommand(const char **cmd, uint8_t count)
             writeString_P("beep needs atleast 3 arguments");
         else
             sound(atoi(cmd[1]), atoi(cmd[2]), atoi(cmd[3]));
-    }
+    }        
     else if (!strcmp_P(cmd[0], PSTR("help")))
         writeNStringP(usageStr);
 }

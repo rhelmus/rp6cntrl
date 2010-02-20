@@ -30,31 +30,31 @@ void rotate(uint8_t speed, uint8_t dir, uint16_t angle);
 
 extern uint8_t slaveData[I2C_MAX_INDEX];
 
-extern inline EStateSensors getStateSensors(void)
+inline EStateSensors getStateSensors(void)
 { return (EStateSensors)slaveData[I2C_STATE_SENSORS]; }
-extern inline uint8_t getBaseLEDs(void) { return slaveData[I2C_LEDS]; }
-extern inline uint16_t getLeftLightSensor(void)
+inline uint8_t getBaseLEDs(void) { return slaveData[I2C_LEDS]; }
+inline uint16_t getLeftLightSensor(void)
 { return slaveData[I2C_LIGHT_LEFT_LOW] + (slaveData[I2C_LIGHT_LEFT_HIGH] << 8); }
-extern inline uint16_t getRightLightSensor(void)
+inline uint16_t getRightLightSensor(void)
 { return slaveData[I2C_LIGHT_RIGHT_LOW] + (slaveData[I2C_LIGHT_RIGHT_HIGH] << 8); }
-extern inline uint16_t getLeftMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_LEFT]; }
-extern inline uint16_t getRightMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_RIGHT]; }
-extern inline uint8_t getLeftDestMotorSpeed(void)
+inline uint16_t getLeftMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_LEFT]; }
+inline uint16_t getRightMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_RIGHT]; }
+inline uint8_t getLeftDestMotorSpeed(void)
 { return slaveData[I2C_MOTOR_DESTSPEED_LEFT]; }
-extern inline uint8_t getRightDestMotorSpeed(void)
+inline uint8_t getRightDestMotorSpeed(void)
 { return slaveData[I2C_MOTOR_DESTSPEED_RIGHT]; }
-extern inline uint16_t getLeftMotorCurrent(void)
+inline uint16_t getLeftMotorCurrent(void)
 { return slaveData[I2C_MOTOR_CURRENT_LEFT_LOW] +
          (slaveData[I2C_MOTOR_CURRENT_LEFT_HIGH] << 8); }
-extern inline uint16_t getRightMotorCurrent(void)
+inline uint16_t getRightMotorCurrent(void)
 { return slaveData[I2C_MOTOR_CURRENT_RIGHT_LOW] +
          (slaveData[I2C_MOTOR_CURRENT_RIGHT_HIGH] << 8); }
-extern inline uint16_t getBattery(void)
+inline uint16_t getBattery(void)
 { return slaveData[I2C_BATTERY_LOW] + (slaveData[I2C_BATTERY_HIGH] << 8); }
-extern inline EACSPowerState getACSPowerState(void) { return slaveData[I2C_ACS_POWER]; }
+inline EACSPowerState getACSPowerState(void) { return slaveData[I2C_ACS_POWER]; }
 
 extern uint16_t lastPing;
-extern inline uint16_t getLastPing(void) { return lastPing; }
+inline uint16_t getLastPing(void) { return lastPing; }
 
 RC5data_t getLastRC5(void);
     

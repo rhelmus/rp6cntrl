@@ -91,9 +91,10 @@ def collectPlugins(context):
 """)
     for file in src_control_plugins:
         name = os.path.splitext(os.path.basename(file))[0].replace("plugin_", "", 1)
-        f.write("extern void %sStart(void);\n" % (name))
-        f.write("extern void %sStop(void);\n" % (name))
-        f.write("extern void %sThink(void);\n" % (name))
+        f.write("void %sStart(void);\n" % (name))
+        f.write("void %sStop(void);\n" % (name))
+        f.write("void %sThink(void);\n" % (name))
+        f.write("\nstatic const char %sName[] PROGMEM = \"%s\";\n" % (name, name))
 
     f.write("""
 SPluginEntry plugins[] PROGMEM =
@@ -102,7 +103,7 @@ SPluginEntry plugins[] PROGMEM =
     
     for file in src_control_plugins:
         name = os.path.splitext(os.path.basename(file))[0].replace("plugin_", "", 1)
-        f.write('   { &%sStart, &%sStop, &%sThink, "%s" },\n' % (name, name, name, name))
+        f.write('   { &%sStart, &%sStop, &%sThink, %sName },\n' % (name, name, name, name))
 
     # End marker
     f.write("   { 0, 0, 0, 0 }\n")
