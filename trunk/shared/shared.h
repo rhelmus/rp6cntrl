@@ -62,7 +62,7 @@ typedef enum
 enum
 {
     I2C_CMD_NONE=0,
-    I2C_CMD_PING,
+    I2C_CMD_ACK,
     I2C_CMD_SETPOWER,
     I2C_CMD_SETACS,
     I2C_CMD_SETLEDS,

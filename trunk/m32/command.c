@@ -7,28 +7,30 @@
 #include "plugin.h"
 
 static const char usageStr[] PROGMEM =
-    "Usage:\n"
-    "\n"
+    "Usage:\n\n"
     "set\t\tChange settings. See set help.\n"
     "dump\t\tDumps settings. See dump help.\n"
+    "plugin\t\tPlugin commands. See plugin help.\n"
     "move\t\tMove the robot. Usage: dist <speed> <dir>\n"
     "rotate\t\tRotates the robot. Usage: angle <speed> <dir>\n"
     "irsend\t\tSend RC5 code. Usage: adr key\n"
     "stop\t\tStops all movement\n"
     "beep\t\tBeeps. Usage: pitch duration\n"
-    "sound\t\tBeeps (blocking). Usage: pitch duration delay\n";
+    "sound\t\tBeeps (blocking). Usage: pitch duration delay\n"
+    "eeprom\t\tReads EEPROM page. Usage: page.\n";
 
 static const char setUsageStr[] PROGMEM =
-    "set usage:\n"
+    "set usage:\n\n"
     "power\t\tPowers sensors on/off. Usage: boolean\n"
     "leds1\t\tSets leds from base. Usage: binary\n"
     "leds2\t\tSets leds from m32. Usage: binary\n"
     "acs\t\tSets ACS power. Usage: off, low, med or high\n"
     "speed\t\tSets move speed. Usage: left-speed right-speed\n"
-    "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n";
+    "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n"
+    "beep\t\tSets beeper pitch. Usage: pitch\n";
 
 static const char dumpUsageStr[] PROGMEM =
-    "dump usage:\n"
+    "dump usage:\n\n"
     "<nothing>, all\tDumps everything\n"
     "state\t\tDumps state sensors\n"
     "leds\t\tDumps led states as binary\n"
@@ -41,7 +43,14 @@ static const char dumpUsageStr[] PROGMEM =
     "mic\t\tDumps last mic value\n"
     "key\t\tDumps pressed key\n";
 
-
+static const char pluginUsageStr[] PROGMEM =
+    "plugin usage:\n\n"
+    "load\t\tLoads and starts a plugin. Usage: plugin-name\n"
+    "stop\t\tStops and unloads current plugin.\n"
+    "list\t\tList all available plugins.\n"
+    "bind\t\tBinds a plugin to a key. Usage: key-number plugin-name\n"
+    "unbind\t\tUnbinds a key. Usage: key-number\n";
+    
 // var MUST be in ROM!
 void dumpVarP(const char *var, uint16_t val, uint8_t base)
 {
@@ -221,8 +230,7 @@ void handlePluginCommand(const char **cmd, uint8_t count)
 {
     if (count && !strcmp_P(cmd[0], PSTR("help")))
     {
-        // UNDONE
-        //writeNStringP(setUsageStr);
+        writeNStringP(pluginUsageStr);
         return;
     }
     
@@ -243,6 +251,20 @@ void handlePluginCommand(const char **cmd, uint8_t count)
         stopPlugin();
     else if (!strcmp_P(cmd[0], PSTR("list")))
         listPlugins();
+    else if (!strcmp_P(cmd[0], PSTR("bind")))
+    {
+        if (count > 2)
+            bindPlugin(atoi(cmd[1]), cmd[2]);
+        else
+            writeString_P("Error: need 3 arguments\n");
+    }
+    else if (!strcmp_P(cmd[0], PSTR("unbind")))
+    {
+        if (count > 1)
+            unBindKey(atoi(cmd[1]));
+        else
+            writeString_P("Error: need 2 arguments\n");
+    }
 }
 
 // cmd[0] = command
@@ -305,17 +327,39 @@ void handleCommand(const char **cmd, uint8_t count)
     else if (!strcmp_P(cmd[0], PSTR("beep")))
     {
         if (count < 3)
-            writeString_P("beep needs atleast 2 arguments");
+            writeString_P("beep needs atleast 2 arguments\n");
         else
             beep(atoi(cmd[1]), atoi(cmd[2]));
     }
     else if (!strcmp_P(cmd[0], PSTR("sound")))
     {
         if (count < 4)
-            writeString_P("beep needs atleast 3 arguments");
+            writeString_P("sound needs atleast 3 arguments\n");
         else
             sound(atoi(cmd[1]), atoi(cmd[2]), atoi(cmd[3]));
-    }        
+    }
+    else if (!strcmp_P(cmd[0], PSTR("eeprom")))
+    {
+        if (count < 2)
+            writeString_P("eeprom needs atleast 1 argument\n");
+        else
+        {
+            const uint16_t page = atoi(cmd[1]);
+            uint8_t buffer[64];
+            
+            SPI_EEPROM_readBytes(page * 64, buffer, 64);
+
+            writeString_P("EEPROM page contents:\n");
+            
+            uint8_t i;
+            for (i=0; i<64; ++i)
+            {
+                writeInteger(buffer[i], DEC);
+                writeChar(',');
+            }
+            writeChar('\n');
+        }
+    }
     else if (!strcmp_P(cmd[0], PSTR("help")))
         writeNStringP(usageStr);
 }

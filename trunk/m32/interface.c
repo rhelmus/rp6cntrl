@@ -7,6 +7,7 @@ enum { REQUEST_DUMP_BASE_DATA = 0 };
 
 uint8_t slaveData[I2C_MAX_INDEX];
 uint16_t lastPing;
+RC5data_t lastRC5Data;
 
 void I2CError(uint8_t error)
 {
@@ -23,6 +24,18 @@ void I2CRequestReady(uint8_t id)
         lastPing = getStopwatch2();
         stopStopwatch2();
         setStopwatch2(0);
+
+        if (slaveData[I2C_LASTRC5_KEY]) // Got new RC5 data?
+        {
+            // Store it, as it won't be there anymore in the next update
+            lastRC5Data.device = (slaveData[I2C_LASTRC5_ADR] & ~TOGGLEBIT);
+            lastRC5Data.toggle_bit = ((slaveData[I2C_LASTRC5_ADR] & TOGGLEBIT) ==
+                                      TOGGLEBIT);
+            lastRC5Data.key_code = slaveData[I2C_LASTRC5_KEY];
+        }
+
+        // Send ACK. Neater would be to integrate this in the I2C lib code
+        I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_ACK);
     }
 }
 
@@ -34,14 +47,9 @@ void initI2C(void)
     I2CTWI_setRequestedDataReadyHandler(I2CRequestReady);
 }
 
-void pingBase(void)
-{
-    startStopwatch2();
-    I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_PING);
-}
-
 void requestBaseData(void)
 {
+    startStopwatch2();
     I2CTWI_requestRegisterFromDevice(I2C_SLAVEADDRESS, REQUEST_DUMP_BASE_DATA, 0,
                                      I2C_MAX_INDEX);                                     
 }
@@ -98,13 +106,4 @@ void rotate(uint8_t speed, uint8_t dir, uint16_t angle)
     uint8_t buf[6] = { I2C_CMD_REGISTER, I2C_CMD_ROTATE, speed, dir,
                        angle, (angle >> 8) };
     I2CTWI_transmitBytes(I2C_SLAVEADDRESS, buf, 6);
-}
-
-RC5data_t getLastRC5(void)
-{
-    RC5data_t ret;
-    ret.device = (slaveData[I2C_LASTRC5_ADR] & ~TOGGLEBIT);
-    ret.toggle_bit = ((slaveData[I2C_LASTRC5_ADR] & TOGGLEBIT) == TOGGLEBIT);
-    ret.key_code = slaveData[I2C_LASTRC5_KEY];
-    return ret;
 }

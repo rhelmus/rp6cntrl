@@ -123,10 +123,13 @@ void handleCommands(void)
         
         switch (cmd)
         {
-            case I2C_CMD_PING:
+            case I2C_CMD_ACK:
                 if (!isStopwatch1Running())
                     startStopwatch1();
                 setStopwatch1(0);
+                
+                // Reset stuff
+                lastRC5Data.data = 0;
                 break;
             case I2C_CMD_SETPOWER:
                 if (args[0])
@@ -185,7 +188,7 @@ int main(void)
     initRobotBase();
     I2CTWI_initSlave(I2C_SLAVEADDRESS);
     
-    powerON(); // UNDONE
+    //powerON(); // UNDONE
     
     BUMPERS_setStateChangedHandler(bumperHandler);
     IRCOMM_setRC5DataReadyHandler(RC5Handler);
@@ -205,6 +208,7 @@ int main(void)
         {
             fullStop();
             stopStopwatch1();
+            setStopwatch1(0);
         }
         
         updateStateSensors();
