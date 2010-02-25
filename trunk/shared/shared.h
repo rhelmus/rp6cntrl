@@ -75,22 +75,6 @@ enum
     I2C_CMD_MAX_INDEX
 };
 
-// Directions for m32 code
-#ifndef FWD
-#define FWD 0
-#endif
-
-#ifndef BWD
-#define BWD 1
-#endif
-
-#ifndef LEFT
-#define LEFT 2
-#endif
-
-#ifndef RIGHT
-#define RIGHT 3
-#endif
 
 #endif
 
