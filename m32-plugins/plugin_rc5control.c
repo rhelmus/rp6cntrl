@@ -22,6 +22,28 @@ enum
     KEY_COLOR_2 = 0x2C,
     KEY_COLOR_3 = 0x2D,
     KEY_COLOR_4 = 0x2E,
+    KEY_TV = 0x3F,
+    KEY_VIDEO = 0x38,
+    KEY_CHSCAN = 0x1E,
+    KEY_PRECH = 0x31,
+    KEY_MIN = 0x0A,
+    KEY_HELP = 0x2F,
+    KEY_DISPLAY = 0x0F,
+    KEY_MENU = 0x12,
+
+    // Some generic settings and stuff :)
+    KEY_SETTINGS_1 = 0x28,
+    KEY_SETTINGS_2 = 0x2F, // Double with KEY_HELP
+    KEY_SETTINGS_3 = 0x2B, // Double with KEY_COLOR_1
+    KEY_SETTINGS_4 = 0x3C,
+    KEY_SETTINGS_5 = 0x3A,
+    KEY_SETTINGS_6 = 0x2D, // Double with KEY_COLOR_3
+    KEY_SETTINGS_7 = 0x29,
+    KEY_SETTINGS_8 = 0x2A,
+    KEY_SETTINGS_9 = 0x0E,
+    KEY_SETTINGS_10 = 0x26,
+    KEY_SETTINGS_11 = 0x0D,
+    KEY_SETTINGS_12 = 0x16, // Double with KEY_VOLUP
 };
 
 enum
@@ -32,74 +54,111 @@ enum
     SPEED_MIN = 30, // Minimal speed before changing direction
 };
 
-static int16_t controlSpeed;
+static int16_t controlForwardSpeed, controlRotateSpeed;
 static uint8_t controlRotate;
+
+void modifySpeedVar(int16_t *var, int8_t delta)
+{
+    *var += delta;
+
+    if (delta > 0)
+    {
+        if ((*var < 0) && (-(*var) < SPEED_MIN))
+            *var = -(*var);
+        else if ((*var > 0) && (*var < SPEED_MIN))
+            *var = SPEED_MIN;
+    }
+    else
+    {
+        if ((*var > 0) && (*var < SPEED_MIN))
+            *var = -(*var);
+        else if ((*var < 0) && (-(*var) < SPEED_MIN))
+            *var = -SPEED_MIN;
+    }
+
+    if (*var < -MAX_SPEED)
+        *var = -MAX_SPEED;
+    else if (*var > MAX_SPEED)
+        *var = MAX_SPEED;
+}
 
 void updateSpeed(uint8_t dir)
 {
     if (getStateSensors().bumperLeft || getStateSensors().bumperRight)
         return;
 
-    // Change from up/down to left/right ?
+    // Change from left/right to up/down?   
     if (((dir == FWD) || (dir == BWD)) && controlRotate)
-    {
-        if (dir == FWD)
-            controlSpeed = START_SPEED;
-        else
-            controlSpeed = -START_SPEED;
-    }
-    // Change from left/right to up/down?
-    else if (((dir == LEFT) || (dir == RIGHT)) && !controlRotate)
-    {
-        if (dir == RIGHT)
-            controlSpeed = START_SPEED;
-        else
-            controlSpeed = -START_SPEED;  
-    }
-    else // Increase/Decrease speed
-    {
-        if ((dir == FWD) || (dir == RIGHT))
-        {
-            controlSpeed += SPEED_CHANGE;
-            if ((controlSpeed < 0) && (-controlSpeed < SPEED_MIN))
-                controlSpeed = -controlSpeed;
-        }
-        else
-        {
-            controlSpeed -= SPEED_CHANGE;
-            if ((controlSpeed > 0) && (controlSpeed < SPEED_MIN))
-                controlSpeed = -controlSpeed;
-        }
-    }
-
-    if (controlSpeed < -MAX_SPEED)
-        controlSpeed = -MAX_SPEED;
-    else if (controlSpeed > MAX_SPEED)
-        controlSpeed = MAX_SPEED;
-
+        controlRotateSpeed = 0;
+    
+    if (dir == FWD)
+        modifySpeedVar(&controlForwardSpeed, SPEED_CHANGE);
+    else if (dir == BWD)
+        modifySpeedVar(&controlForwardSpeed, -SPEED_CHANGE);
+    else if (dir == RIGHT)
+        modifySpeedVar(&controlRotateSpeed, SPEED_CHANGE);
+    else if (dir == LEFT)
+        modifySpeedVar(&controlRotateSpeed, -SPEED_CHANGE);
+   
     controlRotate = ((dir == LEFT) || (dir == RIGHT));
+    
+    if (controlForwardSpeed < 0)
+        setMoveDirection(BWD);
+    else
+        setMoveDirection(FWD);
+    
 
     if (controlRotate)
     {
-        if (controlSpeed < 0)
-            setMoveDirection(LEFT);
-        else
-            setMoveDirection(RIGHT);
+        const uint8_t speed = abs(controlForwardSpeed);
+        uint8_t left, right;
+
+        if (controlRotateSpeed < 0) // Left
+        {
+             left = speed - ((speed < -controlRotateSpeed) ? speed : -controlRotateSpeed);
+             right = speed;
+        }
+        else // right
+        {
+            left = speed;
+            right = speed - ((speed < controlRotateSpeed) ? speed : controlRotateSpeed);
+        }
+
+        setMoveSpeed(left, right);
     }
     else
     {
-        if (controlSpeed < 0)
-            setMoveDirection(BWD);
-        else
-            setMoveDirection(FWD);
+        const uint8_t speed = abs(controlForwardSpeed);
+        setMoveSpeed(speed, speed);
     }
-
-    const uint8_t speed = abs(controlSpeed);
-    setMoveSpeed(speed, speed);
     
     writeString_P("Updated speed: ");
-    writeInteger(controlSpeed, DEC);
+    writeInteger(controlForwardSpeed, DEC);
+    writeString_P(", ");
+    writeInteger(controlRotateSpeed, DEC);
     writeChar('\n');
+}
+
+void doRotate(int16_t angle)
+{
+    // Reset manual speed settings
+    controlForwardSpeed = START_SPEED;
+    controlRotateSpeed = 0;
+    controlRotate = false;
+
+    rotate(80, (angle < 0) ? LEFT : RIGHT, abs(angle));
+}
+
+void toggleBaseLeds(void)
+{
+    setBaseLEDs(~getBaseLEDs()); // UNDONE
+}
+
+void toggleCntrlLeds(void)
+{
+    // UNDONE
+    externalPort.byte = ~externalPort.byte;
+    outputExt();
 }
 
 void parseRC5Key(uint8_t key)
@@ -115,6 +174,24 @@ void parseRC5Key(uint8_t key)
         case KEY_VOLUP: updateSpeed(RIGHT); break;
         case KEY_VOLDOWN: updateSpeed(LEFT); break;
         case KEY_POWER: stopMovement(); break;
+        
+        case KEY_1: beep(50, 200); break;
+        case KEY_2: beep(75, 200); break;
+        case KEY_3: beep(100, 200); break;
+        case KEY_4: beep(125, 200); break;
+        case KEY_5: beep(150, 200); break;
+        case KEY_6: beep(175, 200); break;
+        case KEY_7: beep(200, 200); break;
+        case KEY_8: beep(225, 200); break;
+        case KEY_9: beep(255, 200); break;
+
+        case KEY_COLOR_1: doRotate(-45); break;
+        case KEY_COLOR_2: doRotate(-90); break;
+        case KEY_COLOR_3: doRotate(90); break;
+        case KEY_COLOR_4: doRotate(45); break;
+
+        case KEY_TV: toggleBaseLeds(); break;
+        case KEY_VIDEO: toggleCntrlLeds(); break;
     }
 }
 
@@ -127,7 +204,8 @@ void rc5controlStart(void)
     setBaseACS(ACS_POWER_HIGH);
     setStopwatch3(0);
     startStopwatch3();
-    controlSpeed = START_SPEED;
+    controlForwardSpeed = START_SPEED;
+    controlRotateSpeed = 0;
     controlRotate = false;
     writeString_P("Started RC5 Control plugin!\n");
 }

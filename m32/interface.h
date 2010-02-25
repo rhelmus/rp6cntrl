@@ -5,6 +5,10 @@
 
 // From RP6RobotBaseLib.h. Keep this in sync!
 #define TOGGLEBIT 32
+#define FWD 0
+#define BWD 1
+#define LEFT 2
+#define RIGHT 3
 
 typedef union {
     uint16_t data;
@@ -15,6 +19,7 @@ typedef union {
         unsigned reserved:3;
     };
 } RC5data_t;
+// --- End RP6 base code
 
 
 void initI2C(void);
