@@ -54,8 +54,17 @@ enum
     SPEED_MIN = 30, // Minimal speed before changing direction
 };
 
+typedef enum
+{
+    LEDS_OFF,
+    LEDS_BASE_TOGGLED,
+    LEDS_CNTRL_TOGGLED,
+    LEDS_RUNNING,
+} ELEDState;
+
 static int16_t controlForwardSpeed, controlRotateSpeed;
 static uint8_t controlRotate;
+static ELEDState LEDState;
 
 void modifySpeedVar(int16_t *var, int8_t delta)
 {
@@ -149,24 +158,35 @@ void doRotate(int16_t angle)
     rotate(80, (angle < 0) ? LEFT : RIGHT, abs(angle));
 }
 
-void toggleBaseLeds(void)
+void updateLEDs(ELEDState state)
 {
-    setBaseLEDs(~getBaseLEDs()); // UNDONE
-}
+    if (state == LEDState) // Toggle
+    {
+        LEDState = LEDS_OFF;
+        setLEDs(0);
+        setBaseLEDs(0);
+        stopStopwatch4();
+        setStopwatch4(0);
+    }
+    else
+    {
+        LEDState = state;
 
-void toggleCntrlLeds(void)
-{
-    // UNDONE
-    externalPort.byte = ~externalPort.byte;
-    outputExt();
+        if (state == LEDS_BASE_TOGGLED)
+            setBaseLEDs(255);
+        else if (state == LEDS_CNTRL_TOGGLED)
+            setLEDs(255);
+        else if (state == LEDS_RUNNING)
+        {
+            setLEDs(0);
+            setBaseLEDs(0);
+            startStopwatch4();
+        }
+    }
 }
 
 void parseRC5Key(uint8_t key)
 {
-    writeString_P("Received RC5 key: ");
-    writeInteger(key, HEX);
-    writeChar('\n');
-
     switch (key)
     {
         case KEY_CHUP: updateSpeed(FWD); break;
@@ -190,8 +210,9 @@ void parseRC5Key(uint8_t key)
         case KEY_COLOR_3: doRotate(90); break;
         case KEY_COLOR_4: doRotate(45); break;
 
-        case KEY_TV: toggleBaseLeds(); break;
-        case KEY_VIDEO: toggleCntrlLeds(); break;
+        case KEY_TV: updateLEDs(LEDS_BASE_TOGGLED); break;
+        case KEY_VIDEO: updateLEDs(LEDS_CNTRL_TOGGLED); break;
+        case KEY_CHSCAN: updateLEDs(LEDS_RUNNING); break;
     }
 }
 
@@ -202,11 +223,18 @@ void rc5controlStart(void)
     mSleep(15); // Let bot power up
     
     setBaseACS(ACS_POWER_HIGH);
-    setStopwatch3(0);
-    startStopwatch3();
     controlForwardSpeed = START_SPEED;
     controlRotateSpeed = 0;
     controlRotate = false;
+    LEDState = LEDS_OFF;
+
+    // RC5 poll timer
+    setStopwatch3(0);
+    startStopwatch3();
+
+    // LEDs update timer
+    setStopwatch4(0);
+    
     writeString_P("Started RC5 Control plugin!\n");
 }
 
@@ -215,8 +243,15 @@ void rc5controlStop(void)
     stopMovement();
     setBasePower(false);
     setBaseACS(ACS_POWER_OFF);
-    setStopwatch3(0);
+    setBaseLEDs(0);
+    setLEDs(0);
+    LEDState = LEDS_OFF;
+
     stopStopwatch3();
+    setStopwatch3(0);
+    stopStopwatch4();
+    setStopwatch4(0);
+    
     writeString_P("Stopped RC5 Control plugin.\n");
 }
 
@@ -227,10 +262,51 @@ void rc5controlThink(void)
         RC5data_t rc5 = getLastRC5();
         if (rc5.key_code)
         {
+            writeString_P("Received RC5 (device, toggle, key): ");
+            writeInteger(rc5.device, HEX);
+            writeString_P(", ");
+            writeInteger(rc5.toggle_bit, DEC);
+            writeString_P(", ");
+            writeInteger(rc5.key_code, HEX);
+            writeChar('\n');
+            
             parseRC5Key(rc5.key_code);
             resetLastRC5();
         }
 
         setStopwatch3(0);
+    }
+
+    if ((LEDState == LEDS_RUNNING) && (getStopwatch4() > 150))
+    {
+        if (externalPort.byte)
+        {
+            externalPort.byte <<= 1;
+            if (externalPort.byte > 8)
+            {
+                externalPort.byte = 0;
+                setBaseLEDs(1);
+            }
+            outputExt();
+        }
+        else
+        {
+            uint8_t baseleds = getBaseLEDs();
+            if (!baseleds)
+                baseleds = 1;
+            else
+            {
+                baseleds <<= 1;
+                if (baseleds > 32)
+                {
+                    baseleds = 0;
+                    setLEDs(1);
+                }
+            }
+
+            setBaseLEDs(baseleds);
+        }
+
+        setStopwatch4(0);
     }
 }
