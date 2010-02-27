@@ -8,12 +8,17 @@ enum { REQUEST_DUMP_BASE_DATA = 0 };
 uint8_t slaveData[I2C_MAX_INDEX];
 uint16_t lastPing;
 RC5data_t lastRC5Data;
+static uint8_t pollingFromInterrupt;
 
 void I2CError(uint8_t error)
 {
     writeString_P("\nI2C ERROR - TWI STATE: 0x");
     writeInteger(error, HEX);
     writeChar('\n');
+    
+    pollingFromInterrupt = false;
+    stopStopwatch2();
+    setStopwatch2(0);
 }
 
 void I2CRequestReady(uint8_t id)
@@ -36,6 +41,7 @@ void I2CRequestReady(uint8_t id)
 
         // Send ACK. Neater would be to integrate this in the I2C lib code
         I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_ACK);
+        pollingFromInterrupt = false;
     }
 }
 
@@ -106,4 +112,35 @@ void rotate(uint8_t speed, uint8_t dir, uint16_t angle)
     uint8_t buf[6] = { I2C_CMD_REGISTER, I2C_CMD_ROTATE, speed, dir,
                        angle, (angle >> 8) };
     I2CTWI_transmitBytes(I2C_SLAVEADDRESS, buf, 6);
+}
+
+void setRotationFactor(uint16_t factor)
+{
+    I2CTWI_transmit4Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ROTATE_FACTOR, factor, (factor >> 8));
+}
+
+void updateInterface(void)
+{
+    if (!isStopwatch1Running())
+        startStopwatch1();
+    
+    if (!I2CTWI_isBusy())
+    {
+        uint8_t doupdate = false;
+
+        if (!pollingFromInterrupt && (PIND & EINT1))
+        {
+            pollingFromInterrupt = true;
+            doupdate = true;
+        }
+        else if (getStopwatch1() > 50)
+            doupdate = true;
+
+        if (doupdate)
+        {
+            requestBaseData();
+            setStopwatch1(0);
+        }
+    }
 }

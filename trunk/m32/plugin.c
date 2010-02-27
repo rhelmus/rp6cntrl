@@ -41,7 +41,7 @@ void stopPlugin(void)
 }
 
 void pluginThink(void)
-{
+{    
     // Check if bound button was pressed
     const uint8_t key = checkReleasedKeyEvent();
     if (key)

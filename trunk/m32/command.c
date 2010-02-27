@@ -27,6 +27,7 @@ static const char setUsageStr[] PROGMEM =
     "acs\t\tSets ACS power. Usage: off, low, med or high\n"
     "speed\t\tSets move speed. Usage: left-speed right-speed\n"
     "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n"
+    "rotf\t\tSets rotation error factor. Usage: factor\n"
     "beep\t\tSets beeper pitch. Usage: pitch\n";
 
 static const char dumpUsageStr[] PROGMEM =
@@ -142,6 +143,8 @@ void handleSetCommand(const char **cmd, uint8_t count)
     }
     else if (!strcmp_P(cmd[0], PSTR("dir")))
         setMoveDirection(getDir(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("rotf")))
+        setRotationFactor(atoi(cmd[1]));
     else if (!strcmp_P(cmd[0], PSTR("beep")))
         setBeeperPitch(atoi(cmd[1]));
 }
@@ -158,7 +161,7 @@ void handleDumpCommand(const char **cmd, uint8_t count)
     
     if (all || !strcmp_P(cmd[0], PSTR("state")))
     {
-        EStateSensors state = getStateSensors();
+        SStateSensors state = getStateSensors();
         dumpVar_P("Left bumper: ", state.bumperLeft, DEC);
         dumpVar_P("Right bumper: ", state.bumperRight, DEC);
         dumpVar_P("Left ACS: ", state.ACSLeft, DEC);
@@ -189,6 +192,7 @@ void handleDumpCommand(const char **cmd, uint8_t count)
         dumpVar_P("Motor dest right: ", getRightDestMotorSpeed(), DEC);
         dumpVar_P("Motor left current: ", getLeftMotorCurrent(), DEC);
         dumpVar_P("Motor right current: ", getRightMotorCurrent(), DEC);
+        dumpVar_P("Rotation factor error: ", getRotationFactor(), DEC);
     }
     
     if (all || !strcmp_P(cmd[0], PSTR("acs")))

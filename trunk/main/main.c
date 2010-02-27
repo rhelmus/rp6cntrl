@@ -2,9 +2,16 @@
 #include "RP6I2CslaveTWI.h" 
 #include "../shared/shared.h"
 
-EStateSensors stateSensors;
+SStateSensors stateSensors;
 EACSPowerState ACSPowerState;
 RC5data_t lastRC5Data;
+
+// Modified lib source so that ROTATION_FACTOR points to this var
+uint16_t rotationFactor = 750; // Originally 688
+
+// From lib
+extern uint16_t distanceToMove_L;
+extern uint16_t distanceToMove_R;
 
 void FlashLEDs(void)
 {   
@@ -44,11 +51,18 @@ void setACSState(EACSPowerState state)
 
 void updateStateSensors(void)
 {
-    stateSensors.bumperLeft = bumper_left;
-    stateSensors.bumperRight = bumper_right;
-    stateSensors.ACSLeft = obstacle_left;
-    stateSensors.ACSRight = obstacle_right;
-    stateSensors.movementComplete = isMovementComplete();
+    SStateSensors temp;
+    temp.byte = 0;
+    temp.bumperLeft = bumper_left;
+    temp.bumperRight = bumper_right;
+    temp.ACSLeft = obstacle_left;
+    temp.ACSRight = obstacle_right;
+    temp.movementComplete = isMovementComplete();
+
+    if (temp.byte != stateSensors.byte)
+        extIntON(); // Signal external interrupt to notify change
+
+    stateSensors = temp;    
 }
 
 void updateI2CReadRegisters(void)
@@ -92,7 +106,40 @@ void updateI2CReadRegisters(void)
             case I2C_MOTOR_CURRENT_RIGHT_HIGH:
                 I2CTWI_readRegisters[i] = adcMotorCurrentRight >> 8;
                 break;
-            
+
+            case I2C_MOTOR_LEFT_DIST_LOW:
+                I2CTWI_readRegisters[i] = getLeftDistance();
+                break;
+            case I2C_MOTOR_LEFT_DIST_HIGH:
+                I2CTWI_readRegisters[i] = getLeftDistance() >> 8;
+                break;
+            case I2C_MOTOR_RIGHT_DIST_LOW:
+                I2CTWI_readRegisters[i] = getRightDistance();
+                break;
+            case I2C_MOTOR_RIGHT_DIST_HIGH:
+                I2CTWI_readRegisters[i] = getRightDistance() >> 8;
+                break;
+
+            case I2C_MOTOR_LEFT_DESTDIST_LOW:
+                I2CTWI_readRegisters[i] = distanceToMove_L;
+                break;
+            case I2C_MOTOR_LEFT_DESTDIST_HIGH:
+                I2CTWI_readRegisters[i] = distanceToMove_L >> 8;
+                break;
+            case I2C_MOTOR_RIGHT_DESTDIST_LOW:
+                I2CTWI_readRegisters[i] = distanceToMove_R;
+                break;
+            case I2C_MOTOR_RIGHT_DESTDIST_HIGH:
+                I2CTWI_readRegisters[i] = distanceToMove_R >> 8;
+                break;
+                
+            case I2C_ROTATE_FACTOR_LOW:
+                I2CTWI_readRegisters[i] = rotationFactor;
+                break;
+            case I2C_ROTATE_FACTOR_HIGH:
+                I2CTWI_readRegisters[i] = rotationFactor >> 8;
+                break;
+                
             case I2C_BATTERY_LOW: I2CTWI_readRegisters[i] = adcBat; break;
             case I2C_BATTERY_HIGH: I2CTWI_readRegisters[i] = adcBat>>8; break;
             
@@ -105,7 +152,7 @@ void updateI2CReadRegisters(void)
                 break;                
             case I2C_LASTRC5_KEY:
                 I2CTWI_readRegisters[i] = lastRC5Data.key_code;
-                break;                
+                break;
         }
     }
 }
@@ -130,6 +177,7 @@ void handleCommands(void)
                 
                 // Reset stuff
                 lastRC5Data.data = 0;
+                extIntOFF();
                 break;
             case I2C_CMD_SETPOWER:
                 if (args[0])
@@ -161,6 +209,9 @@ void handleCommands(void)
                 break;
             case I2C_CMD_ROTATE:
                 rotate(args[0], args[1], args[2] + (args[3] << 8), false);
+                break;
+            case I2C_CMD_ROTATE_FACTOR:
+                rotationFactor = (uint16_t)args[0] + ((uint16_t)args[1] << 8);
                 break;
         }
     }
