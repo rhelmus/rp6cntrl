@@ -33,18 +33,14 @@ int main(void)
     
     FlashLEDs();
 
-    startStopwatch1(); // Refresh delay
+    // Stopwatch 1: Refresh delay
     // Stopwatch 2: ping
     
     dischargePeakDetector();
    
     for (;;)
     {
-        if ((getStopwatch1() > 50) && !I2CTWI_isBusy())
-        {
-            requestBaseData();
-            setStopwatch1(0);
-        }
+        updateInterface();
 
         checkCommands();
         pluginThink();
