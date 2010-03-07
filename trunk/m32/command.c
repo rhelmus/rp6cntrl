@@ -25,6 +25,12 @@ static const char setUsageStr[] PROGMEM =
     "leds1\t\tSets leds from base. Usage: binary\n"
     "leds2\t\tSets leds from m32. Usage: binary\n"
     "acs\t\tSets ACS power. Usage: off, low, med or high\n"
+    "acsup\t\tSets ACS update interval. Usage: interval\n"
+    "acsir\t\tSets ACS IRCOMM delay. Usage: delay\n"
+    "acssend\t\tSets ACS pulses send. Usage: pulses\n"
+    "acsrec\t\tSets ACS minimal pulses received. Usage: pulses\n"
+    "acsrect\t\tSets ACS minimal pulses received threshold. Usage: pulses\n"
+    "acsto\t\tSets ACS pulses timeout. Usage: timeout\n"
     "speed\t\tSets move speed. Usage: left-speed right-speed\n"
     "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n"
     "rotf\t\tSets rotation error factor. Usage: factor\n"
@@ -39,6 +45,7 @@ static const char dumpUsageStr[] PROGMEM =
     "light\t\tDumps light sensors\n"
     "motor\t\tDumps motor info\n"
     "acs\t\tDumps ACS power state\n"
+    "acsset\t\tDumps ACS tweaks\n"
     "rc5\t\tDumps last received ir (rc5) info\n"
     "ping\t\tDumps last ping time\n"
     "mic\t\tDumps last mic value\n"
@@ -134,6 +141,18 @@ void handleSetCommand(const char **cmd, uint8_t count)
         }
         setBaseACS(state);
     }
+    else if (!strcmp_P(cmd[0], PSTR("acsup")))
+        setACSUpdateInterval(atoi(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("acsir")))
+        setACSIRCOMMWait(atoi(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("acssend")))
+        setACSPulsesSend(atoi(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("acsrec")))
+        setACSPulsesRec(atoi(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("acsrect")))
+        setACSPulsesRecThreshold(atoi(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("acsto")))
+        setACSPulsesTimeout(atoi(cmd[1]));    
     else if (!strcmp_P(cmd[0], PSTR("speed")))
     {
         if (count < 3)
@@ -167,6 +186,7 @@ void handleDumpCommand(const char **cmd, uint8_t count)
         dumpVar_P("Left ACS: ", state.ACSLeft, DEC);
         dumpVar_P("Right ACS: ", state.ACSRight, DEC);
         dumpVar_P("Movement complete: ", state.movementComplete, DEC);
+        dumpVar_P("ACS State: ", state.ACSState, DEC);
     }
     
     if (all || !strcmp_P(cmd[0], PSTR("leds")))
@@ -192,6 +212,10 @@ void handleDumpCommand(const char **cmd, uint8_t count)
         dumpVar_P("Motor dest right: ", getRightDestMotorSpeed(), DEC);
         dumpVar_P("Motor left current: ", getLeftMotorCurrent(), DEC);
         dumpVar_P("Motor right current: ", getRightMotorCurrent(), DEC);
+        dumpVar_P("Motor left distance: ", getLeftMotorDist(), DEC);
+        dumpVar_P("Motor right distance: ", getRightMotorDist(), DEC);
+        dumpVar_P("Motor left destination distance: ", getLeftMotorDestDist(), DEC);
+        dumpVar_P("Motor right destination distance: ", getRightMotorDestDist(), DEC);        
         dumpVar_P("Rotation factor error: ", getRotationFactor(), DEC);
     }
     
@@ -205,6 +229,18 @@ void handleDumpCommand(const char **cmd, uint8_t count)
             case ACS_POWER_MED: writeString_P("medium"); break;
             case ACS_POWER_HIGH: writeString_P("high"); break;
         }
+        writeChar('\n');
+    }
+
+    if (all || !strcmp_P(cmd[0], PSTR("acsset")))
+    {
+        writeString_P("ACS tweaks:\n");
+        dumpVar_P("ACS update interval: ", getACSUpdateInterval(), DEC);
+        dumpVar_P("ACS IRCOMM wait: ", getACSIRCOMMWait(), DEC);
+        dumpVar_P("ACS pulses send: ", getACSPulsesSend(), DEC);
+        dumpVar_P("ACS pulses received: ", getACSPulsesRec(), DEC);
+        dumpVar_P("ACS pulses received threshold: ", getACSPulsesRecThreshold(), DEC);
+        dumpVar_P("ACS pulses timeout: ", getACSPulsesTimeout(), DEC);
         writeChar('\n');
     }
     

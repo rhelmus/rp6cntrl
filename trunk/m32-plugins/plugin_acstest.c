@@ -11,7 +11,7 @@ void acstestStart(void)
     
     setBaseACS(ACS_POWER_HIGH);
     startStopwatch3();
-    setStopwatch3(0);
+    setStopwatch3(0);    
     
     writeString_P("Started ACS test plugin!\n");
 }
@@ -24,7 +24,9 @@ void acstestStop(void)
     
     stopStopwatch3();
     setStopwatch3(0);
-
+    stopStopwatch4();
+    setStopwatch4(0);
+    
     rotating = false;
     
     writeString_P("Stopped ACS test plugin.\n");
@@ -45,7 +47,6 @@ void rotateThink(void)
         {
             if (index < MAX_SCAN_SIZE)
             {
-                // UNDONE
                 scanBuffer[index] = (uint16_t)((uint32_t)getLeftMotorDist() * 360 / getLeftMotorDestDist());
                 ++index;
             }
@@ -75,18 +76,20 @@ void rotateThink(void)
 
 void acstestThink(void)
 {
-    if (getStopwatch3() > 10)
+    static uint8_t statecycles = 0, prevacsstate;
+    uint8_t acs = getACSPowerState();
+
+    if (getStopwatch3() > 5)
     {
-        const uint8_t acs = getACSPowerState();
         uint8_t leds = 0;
-       
+
         if (acs != ACS_POWER_OFF)
         {
             if (getStateSensors().ACSLeft)
             {
                 if (acs == ACS_POWER_LOW)
                     leds |= (1<<5);
-                else if (acs == ACS_POWER_LOW)
+                else if (acs == ACS_POWER_MED)
                     leds |= (1<<4);
                 else
                     leds |= (1<<3);
@@ -96,17 +99,43 @@ void acstestThink(void)
             {
                 if (acs == ACS_POWER_LOW)
                     leds |= (1<<2);
-                else if (acs == ACS_POWER_LOW)
+                else if (acs == ACS_POWER_MED)
                     leds |= (1<<1);
                 else
                     leds |= (1<<0);
             }
         }
 
-        setBaseLEDs(leds);
+        if (getBaseLEDs() != leds)
+            setBaseLEDs(leds);
         setStopwatch3(0);
     }
 
+    if (getStopwatch4() > 100)
+    {
+        if (!statecycles && (getStateSensors().ACSState < 2))
+        {
+            if (acs == ACS_POWER_HIGH)
+                acs = ACS_POWER_LOW;
+            else
+                ++acs;
+            setBaseACS(acs);
+            statecycles = 2; // Amount of ACS cycles required before next switch
+            setStopwatch4(0);
+        }
+    }
+
+    if (statecycles && (prevacsstate != ACS_STATE_WAIT_RIGHT) &&
+        (getStateSensors().ACSState == ACS_STATE_WAIT_RIGHT))
+    {
+        --statecycles; // Reached another state cycle
+        writeString_P("cycle time: ");
+        writeInteger(getStopwatch4(), DEC);
+        writeString_P("ms <= ");
+        writeInteger(statecycles, DEC);
+        writeChar('\n');
+    }
+        
     if (rotating)
         rotateThink();
     else if (getPressedKeyNumber() == 5)
@@ -114,4 +143,11 @@ void acstestThink(void)
         rotate(75, RIGHT, 360);
         rotating = true;
     }
+    else if ((getPressedKeyNumber() == 4) && !isStopwatch4Running())
+    {
+        startStopwatch4();
+        setStopwatch4(0);
+    }
+
+    prevacsstate = getStateSensors().ACSState;
 }

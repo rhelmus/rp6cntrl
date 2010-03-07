@@ -19,13 +19,26 @@ typedef union {
         unsigned reserved:3;
     };
 } RC5data_t;
+
+#define ACS_STATE_IDLE 0
+#define ACS_STATE_IRCOMM_DELAY 1
+#define ACS_STATE_SEND_LEFT 2
+#define ACS_STATE_WAIT_LEFT 3
+#define ACS_STATE_SEND_RIGHT 5
+#define ACS_STATE_WAIT_RIGHT 6
+
 // --- End RP6 base code
 
 
 void initI2C(void);
-void requestBaseData(void);
 void setBasePower(uint8_t enable);
 void setBaseACS(EACSPowerState state);
+void setACSUpdateInterval(uint8_t interval);
+void setACSIRCOMMWait(uint8_t time);
+void setACSPulsesSend(uint8_t pulses);
+void setACSPulsesRec(uint8_t pulses);
+void setACSPulsesRecThreshold(uint8_t pulses);
+void setACSPulsesTimeout(uint8_t time);
 void setBaseLEDs(uint8_t leds);
 void sendRC5(uint8_t adr, uint8_t data);
 void setMoveSpeed(uint8_t left, uint8_t right);
@@ -80,7 +93,15 @@ inline uint16_t getRotationFactor(void)
          
 inline uint16_t getBattery(void)
 { return slaveData[I2C_BATTERY_LOW] + (slaveData[I2C_BATTERY_HIGH] << 8); }
+
 inline EACSPowerState getACSPowerState(void) { return slaveData[I2C_ACS_POWER]; }
+inline uint8_t getACSUpdateInterval(void) { return slaveData[I2C_ACS_UPDATE_INTERVAL]; }
+inline uint8_t getACSIRCOMMWait(void) { return slaveData[I2C_ACS_IRCOMM_WAIT]; }
+inline uint8_t getACSPulsesSend(void) { return slaveData[I2C_ACS_PULSES_SEND]; }
+inline uint8_t getACSPulsesRec(void) { return slaveData[I2C_ACS_PULSES_REC]; }
+inline uint8_t getACSPulsesRecThreshold(void)
+{ return slaveData[I2C_ACS_PULSES_REC_THRESHOLD]; }
+inline uint8_t getACSPulsesTimeout(void) { return slaveData[I2C_ACS_PULSES_TIMEOUT]; }
 
 extern uint16_t lastPing;
 inline uint16_t getLastPing(void) { return lastPing; }
