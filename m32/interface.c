@@ -8,7 +8,6 @@ enum { REQUEST_DUMP_BASE_DATA = 0 };
 uint8_t slaveData[I2C_MAX_INDEX];
 uint16_t lastPing;
 RC5data_t lastRC5Data;
-static uint8_t pollingFromInterrupt;
 
 void I2CError(uint8_t error)
 {
@@ -16,7 +15,6 @@ void I2CError(uint8_t error)
     writeInteger(error, HEX);
     writeChar('\n');
     
-    pollingFromInterrupt = false;
     stopStopwatch2();
     setStopwatch2(0);
 }
@@ -25,7 +23,7 @@ void I2CRequestReady(uint8_t id)
 {
     if (id == REQUEST_DUMP_BASE_DATA)
     {
-        I2CTWI_getReceivedData(slaveData, I2C_MAX_INDEX);
+        I2CTWI_getReceivedData(&slaveData[I2C_LEDS], I2C_MAX_INDEX-I2C_LEDS);
         lastPing = getStopwatch2();
         stopStopwatch2();
         setStopwatch2(0);
@@ -41,7 +39,6 @@ void I2CRequestReady(uint8_t id)
 
         // Send ACK. Neater would be to integrate this in the I2C lib code
         I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_ACK);
-        pollingFromInterrupt = false;
     }
 }
 
@@ -51,13 +48,6 @@ void initI2C(void)
     I2CTWI_initMaster(200);
     I2CTWI_setTransmissionErrorHandler(I2CError);
     I2CTWI_setRequestedDataReadyHandler(I2CRequestReady);
-}
-
-void requestBaseData(void)
-{
-    startStopwatch2();
-    I2CTWI_requestRegisterFromDevice(I2C_SLAVEADDRESS, REQUEST_DUMP_BASE_DATA, 0,
-                                     I2C_MAX_INDEX);                                     
 }
 
 void setBasePower(uint8_t enable)
@@ -70,6 +60,42 @@ void setBaseACS(EACSPowerState state)
 {
     I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
                           I2C_CMD_SETACS, state);                          
+}
+
+void setACSUpdateInterval(uint8_t interval)
+{
+    I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ACS_UPDATE_INTERVAL, interval);
+}
+
+void setACSIRCOMMWait(uint8_t time)
+{
+    I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ACS_IRCOMM_WAIT, time);
+}
+
+void setACSPulsesSend(uint8_t pulses)
+{
+    I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ACS_PULSES_SEND, pulses);
+}
+
+void setACSPulsesRec(uint8_t pulses)
+{
+    I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ACS_PULSES_REC, pulses);
+}
+
+void setACSPulsesRecThreshold(uint8_t pulses)
+{
+    I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ACS_PULSES_REC_THRESHOLD, pulses);
+}
+
+void setACSPulsesTimeout(uint8_t time)
+{
+    I2CTWI_transmit3Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER,
+                          I2C_CMD_ACS_PULSES_TIMEOUT, time);
 }
 
 void setBaseLEDs(uint8_t leds)
@@ -124,23 +150,21 @@ void updateInterface(void)
 {
     if (!isStopwatch1Running())
         startStopwatch1();
-    
+
     if (!I2CTWI_isBusy())
     {
-        uint8_t doupdate = false;
-
-        if (!pollingFromInterrupt && (PIND & EINT1))
+        if (PIND & EINT1)
         {
-            pollingFromInterrupt = true;
-            doupdate = true;
+            I2CTWI_transmitByte(I2C_SLAVEADDRESS, I2C_STATE_SENSORS);
+            slaveData[I2C_STATE_SENSORS] = I2CTWI_readByte(I2C_SLAVEADDRESS);
+            I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_STATEACK);
         }
         else if (getStopwatch1() > 50)
-            doupdate = true;
-
-        if (doupdate)
         {
-            requestBaseData();
+            I2CTWI_requestRegisterFromDevice(I2C_SLAVEADDRESS, REQUEST_DUMP_BASE_DATA,
+                                             I2C_LEDS, I2C_MAX_INDEX-I2C_LEDS);
             setStopwatch1(0);
+            startStopwatch2();
         }
     }
 }

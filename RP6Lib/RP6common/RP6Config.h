@@ -109,8 +109,10 @@ extern uint16_t rotationFactor;
 
 // You can only uncomment ONE of these two defines at a time. 
 // use ACS_CONFIG_CUSTOM for your own ACS settings!
-#define ACS_CONFIG_DEFAULT
-//#define ACS_CONFIG_CUSTOM
+
+// Rick...
+//#define ACS_CONFIG_DEFAULT
+#define ACS_CONFIG_CUSTOM
 
 // General hints:
 // Only values > 0 will work for ALL values!
@@ -151,35 +153,50 @@ extern uint16_t rotationFactor;
 
 // Use this for your own ACS settings! 
 #ifdef ACS_CONFIG_CUSTOM
+    // Modified: Use external variables instead of hardcoded values, so they can be
+    // changed during runtime.
+    extern uint8_t ACSUpdateInterval;
+    extern uint8_t ACSIRCOMMWaitTime;
+    
+    extern uint8_t ACSSendPulsesLeft;
+    extern uint8_t ACSRecPulsesLeft;
+    extern uint8_t ACSRecPulsesLeftThreshold;
+    extern uint8_t ACSTimeOutLeft;
+
+    extern uint8_t ACSSendPulsesRight;
+    extern uint8_t ACSRecPulsesRight;
+    extern uint8_t ACSRecPulsesRightThreshold;
+    extern uint8_t ACSTimeOutRight;
+    
 	// ACS General update interval:
-	#define ACS_UPDATE_INTERVAL 2  // ms
+	#define ACS_UPDATE_INTERVAL ACSUpdateInterval  // ms
 	
 	// ACS Wait for IRCOMM transmissions time:
-	#define ACS_IRCOMM_WAIT_TIME 20  // ACS_IRCOMM_WAIT_TIME * ACS_UPDATE_INTERVAL ms
+	#define ACS_IRCOMM_WAIT_TIME ACSIRCOMMWaitTime  // ACS_IRCOMM_WAIT_TIME * ACS_UPDATE_INTERVAL ms
 	
 	// ------------------
 	// ACS Left Channel:
-	#define ACS_SEND_PULSES_LEFT 36     // Number of pulses to send must be much higher than...
-	#define ACS_REC_PULSES_LEFT 5       // ... number of pulses that must be received!
-	#define ACS_REC_PULSES_LEFT_THRESHOLD 1 
+	#define ACS_SEND_PULSES_LEFT ACSSendPulsesLeft     // Number of pulses to send must be much higher than...
+	#define ACS_REC_PULSES_LEFT ACSRecPulsesLeft       // ... number of pulses that must be received!
+	#define ACS_REC_PULSES_LEFT_THRESHOLD ACSRecPulsesLeftThreshold 
 										// Once an object has been detected, it is 
 										// required to get lower than this threshold value
 										// to turn of the "obstacle_left" flag.
 										// If you set this equal to ACS_REC_PULSES_LEFT
 										// it will have no influence on the behaviour.
-	#define ACS_TIMEOUT_LEFT 16		    // ACS_TIMEOUT_LEFT * ACS_UPDATE_INTERVAL ms
+	#define ACS_TIMEOUT_LEFT ACSTimeOutLeft		    // ACS_TIMEOUT_LEFT * ACS_UPDATE_INTERVAL ms
 	
 	// ------------------
 	// ACS Right Channel:
-	#define ACS_SEND_PULSES_RIGHT 36 // Number of pulses to send must be much higher than...
-	#define ACS_REC_PULSES_RIGHT 5   // ... number of pulses that must be received! 
-	#define ACS_REC_PULSES_RIGHT_THRESHOLD 1 
+	#define ACS_SEND_PULSES_RIGHT ACSSendPulsesRight // Number of pulses to send must be much higher than...
+	#define ACS_REC_PULSES_RIGHT ACSRecPulsesRight   // ... number of pulses that must be received! 
+	#define ACS_REC_PULSES_RIGHT_THRESHOLD ACSRecPulsesRightThreshold 
 										// Once an object has been detected, it is 
 										// required to get lower than this threshold value
 										// to turn of the "obstacle_right" flag.
 										// If you set this equal to ACS_REC_PULSES_RIGHT
 										// it will have no influence on the behaviour.
-	#define ACS_TIMEOUT_RIGHT 16     // ACS_TIMEOUT_RIGHT * ACS_UPDATE_INTERVAL ms
+	#define ACS_TIMEOUT_RIGHT ACSTimeOutRight     // ACS_TIMEOUT_RIGHT * ACS_UPDATE_INTERVAL ms
 #endif
 
 

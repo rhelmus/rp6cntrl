@@ -42,9 +42,17 @@ enum
 
     I2C_BATTERY_LOW,
     I2C_BATTERY_HIGH,
-    
+
     I2C_ACS_POWER,
     
+    // ACS/IRCOMM tweaks
+    I2C_ACS_UPDATE_INTERVAL,
+    I2C_ACS_IRCOMM_WAIT,
+    I2C_ACS_PULSES_SEND,
+    I2C_ACS_PULSES_REC,
+    I2C_ACS_PULSES_REC_THRESHOLD,
+    I2C_ACS_PULSES_TIMEOUT,
+
     I2C_LASTRC5_ADR,
     I2C_LASTRC5_KEY,
         
@@ -61,6 +69,7 @@ typedef union
         uint8_t ACSLeft:1;
         uint8_t ACSRight:1;
         uint8_t movementComplete:1;
+        uint8_t ACSState:3;
     };
 } SStateSensors;
 
@@ -69,15 +78,22 @@ typedef enum
     ACS_POWER_OFF=0,
     ACS_POWER_LOW,
     ACS_POWER_MED,
-    ACS_POWER_HIGH
+    ACS_POWER_HIGH,
 } EACSPowerState;
 
 enum
 {
     I2C_CMD_NONE=0,
+    I2C_CMD_STATEACK,
     I2C_CMD_ACK,
     I2C_CMD_SETPOWER,
     I2C_CMD_SETACS,
+    I2C_CMD_ACS_UPDATE_INTERVAL,
+    I2C_CMD_ACS_IRCOMM_WAIT,
+    I2C_CMD_ACS_PULSES_SEND,
+    I2C_CMD_ACS_PULSES_REC,
+    I2C_CMD_ACS_PULSES_REC_THRESHOLD,
+    I2C_CMD_ACS_PULSES_TIMEOUT,
     I2C_CMD_SETLEDS,
     I2C_CMD_SENDRC5,
     I2C_CMD_SETSPEED,
