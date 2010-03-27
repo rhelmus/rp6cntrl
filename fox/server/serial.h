@@ -21,6 +21,10 @@ public:
     void resetRP6(void);
     void sendCommand(const QString &command);
     void launchRP6(void) { sendCommand("s"); }
+    
+
+signals:
+    void textAvailable(const QString &text);
 };
 
 #endif

@@ -2,19 +2,18 @@
 
 #include "serial.h"
 #include "server.h"
+#include "tcp.h"
 
 CControl::CControl(QObject *parent) : QObject(parent)
 {
     serialPort = new CSerialPort(this);
-    serialPort->launchRP6();
+    connect(serialPort, SIGNAL(textAvailable(const QString &)), this,
+            SLOT(parseSerial(const QString &)));
 
-    // Test
-    QTimer *timer = new QTimer(this);
-    connect(timer, SIGNAL(timeout()), this, SLOT(beep()));
-    timer->start(1000);
+    tcpServer = new CTcpServer(this);
 }
 
-void CControl::beep()
+void CControl::parseSerial(const QString &text)
 {
-    serialPort->sendCommand("beep 100 10");
+    tcpServer->sendText("rawserial", text);
 }
