@@ -35,6 +35,7 @@ void CSerialPort::onReadyRead()
     bytes.resize(a);
     serialPort->read(bytes.data(), bytes.size());
     qDebug() << bytes;
+    emit textAvailable(bytes);
     /*    qDebug() << (QString("bytes read: %1\n").arg(bytes.size()));
     qDebug() << (QString("bytes: %1\n").arg(QString(bytes)));*/
 }
