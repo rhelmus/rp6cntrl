@@ -11,6 +11,8 @@ class QLineEdit;
 class QPlainTextEdit;
 class QSlider;
 
+class CSensorPlot;
+
 class CQtClient: public QMainWindow
 {
     Q_OBJECT
@@ -20,6 +22,7 @@ class CQtClient: public QMainWindow
     QLineEdit *serverEdit;
     QPlainTextEdit *logWidget;
     
+    // Overview widget
     QLCDNumber *motorSpeedLCD[2];
     QLCDNumber *motorDistanceLCD[2];
     QLCDNumber *motorCurrentLCD[2];
@@ -28,6 +31,20 @@ class CQtClient: public QMainWindow
     QCheckBox *RC5ToggleBitBox;
     QCheckBox *ACSCollisionBox[2];
     QSlider *ACSPowerSlider;
+    QCheckBox *MainLEDsBox[6];
+    QCheckBox *m32LEDsBox[4];
+    QLCDNumber *batteryLCD;
+    QCheckBox *bumperBox[2];
+    QLabel *m32KeyLabel;
+    
+    // Plots
+    CSensorPlot *motorSpeedPlot;
+    CSensorPlot *motorDistancePlot;
+    CSensorPlot *motorCurrentPlot;
+    CSensorPlot *lightSensorsPlot;
+    CSensorPlot *ACSPlot;
+    CSensorPlot *batteryPlot;
+    CSensorPlot *micPlot;
     
     QWidget *createOverviewWidget(void);
     QWidget *createSpeedWidget(void);
