@@ -1,6 +1,7 @@
-
 #ifndef SHARED_H
 #define SHARED_H
+
+#include <stdint.h>
 
 #define I2C_SLAVEADDRESS 10
 #define I2C_CMD_REGISTER 0
@@ -104,6 +105,34 @@ enum
     I2C_CMD_ROTATE_FACTOR,
     I2C_CMD_MAX_INDEX
 };
+
+// Slave serial update messages
+typedef enum
+{
+    // To mark serial output as update msg.
+    // Using 0 wouldn't make things easier with 0 terminated strings :)
+    SERIAL_MSG_START=1,
+    
+    SERIAL_STATE_SENSORS,
+    
+    SERIAL_LIGHT_LEFT,
+    SERIAL_LIGHT_RIGHT,
+    
+    SERIAL_MOTOR_SPEED_LEFT,
+    SERIAL_MOTOR_SPEED_RIGHT,
+    SERIAL_MOTOR_DESTSPEED_LEFT,
+    SERIAL_MOTOR_DESTSPEED_RIGHT,
+    SERIAL_MOTOR_DIST_LEFT,
+    SERIAL_MOTOR_DIST_RIGHT,
+    SERIAL_MOTOR_DESTDIST_LEFT,
+    SERIAL_MOTOR_DESTDIST_RIGHT,
+    SERIAL_MOTOR_CURRENT_LEFT,
+    SERIAL_MOTOR_CURRENT_RIGHT,
+
+    SERIAL_BATTERY,
+
+    SERIAL_ACS_POWER,
+} ESerialMessage;
 
 
 #endif

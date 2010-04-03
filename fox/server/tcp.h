@@ -1,7 +1,9 @@
 #ifndef TCP_H
 #define TCP_H
 
-#include <QList>
+#include <stdint.h>
+
+#include <QMap>
 #include <QObject>
 
 class QSignalMapper;
@@ -14,7 +16,7 @@ class CTcpServer: public QObject
 
     QTcpServer *tcpServer;
     QSignalMapper *disconnectMapper, *clientDataMapper;
-    QList<QTcpSocket *> clients;
+    QMap<QTcpSocket *, quint32> clientInfo;
 
 private slots:
     void clientConnected(void);
@@ -25,6 +27,10 @@ public:
     CTcpServer(QObject *parent);
 
     void sendText(const QString &key, const QString &text);
+    void sendKeyValue(const QString &key, QVariant value);
+
+signals:
+    void clientTcpReceived(QDataStream &stream);
 };
 
 #endif

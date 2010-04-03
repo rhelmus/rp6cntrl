@@ -1,8 +1,11 @@
+#include <stdint.h>
+
 #include <QtGui>
 #include <QtNetwork>
 
 #include "client.h"
 #include "sensorplot.h"
+#include "tcputil.h"
 
 namespace {
 
@@ -22,10 +25,25 @@ CQtClient::CQtClient() : tcpReadBlockSize(0)
     mainTab->setTabPosition(QTabWidget::West);
     setCentralWidget(mainTab);
     
-    QWidget *w = new QWidget;
-    mainTab->addTab(w, "Main");
+    mainTab->addTab(createMainTab(), "Main");
+    mainTab->addTab(createConsoleTab(), "Console");
+    mainTab->addTab(createLogTab(), "Log");
     
-    QVBoxLayout *vbox = new QVBoxLayout(w);
+    clientSocket = new QTcpSocket(this);
+    connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
+    connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
+            this, SLOT(socketError(QAbstractSocket::SocketError)));
+    
+    QTimer *uptimer = new QTimer(this);
+    connect(uptimer, SIGNAL(timeout()), this, SLOT(updateSensors()));
+    uptimer->start(500);
+}
+
+QWidget *CQtClient::createMainTab()
+{
+    QWidget *ret = new QWidget;
+    
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
     
     QSplitter *splitter = new QSplitter(Qt::Vertical);
     vbox->addWidget(splitter);
@@ -42,15 +60,49 @@ CQtClient::CQtClient() : tcpReadBlockSize(0)
     tabWidget->addTab(createBatteryWidget(), "Battery");
     tabWidget->addTab(createMicWidget(), "Microphone");
 
-    /*
+    
     vbox->addWidget(serverEdit = new QLineEdit);
+    serverEdit->setText("localhost");
     
     QPushButton *button = new QPushButton("Connect");
     connect(button, SIGNAL(clicked()), this, SLOT(connectToServer()));
-    vbox->addWidget(button);*/
+    vbox->addWidget(button);
     
-    mainTab->addTab(w = new QWidget, "Log");
-    vbox = new QVBoxLayout(w);
+    return ret;
+}
+
+QWidget *CQtClient::createConsoleTab()
+{
+    QWidget *ret = new QWidget;
+    
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+    
+    vbox->addWidget(consoleOut = new QPlainTextEdit);
+    consoleOut->setReadOnly(true);
+    consoleOut->setCenterOnScroll(true);
+    
+    QHBoxLayout *hbox = new QHBoxLayout;
+    vbox->addLayout(hbox);
+    
+    hbox->addWidget(consoleIn = new QLineEdit);
+    
+    QPushButton *button = new QPushButton("Send");
+    connect(button, SIGNAL(clicked()), this, SLOT(sendConsoleCommand()));
+    connect(consoleIn, SIGNAL(returnPressed()), button, SLOT(click()));
+    hbox->addWidget(button);
+
+    button = new QPushButton("Clear console");
+    connect(button, SIGNAL(clicked()), consoleOut, SLOT(clear()));
+    hbox->addWidget(button);
+
+    return ret;
+}
+
+QWidget *CQtClient::createLogTab()
+{
+    QWidget *ret = new QWidget;
+    
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
     
     vbox->addWidget(logWidget = new QPlainTextEdit);
     logWidget->setReadOnly(true);
@@ -61,10 +113,7 @@ CQtClient::CQtClient() : tcpReadBlockSize(0)
     connect(button, SIGNAL(clicked()), logWidget, SLOT(clear()));
     vbox->addWidget(button, 0, Qt::AlignCenter);
     
-    clientSocket = new QTcpSocket(this);
-    connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
-    connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
-            this, SLOT(socketError(QAbstractSocket::SocketError)));
+    return ret;
 }
 
 QWidget *CQtClient::createOverviewWidget(void)
@@ -248,8 +297,8 @@ QWidget *CQtClient::createACSWidget(void)
     QHBoxLayout *hbox = new QHBoxLayout(ret);
 
     ACSPlot = new CSensorPlot("Anti Collision Sensors");
-    ACSPlot->addSensor("Left", Qt::red);
-    ACSPlot->addSensor("Right", Qt::blue);
+    ACSPlot->addSensor("Left", Qt::red, QwtPlotCurve::Steps);
+    ACSPlot->addSensor("Right", Qt::blue, QwtPlotCurve::Steps);
 
     hbox->addWidget(ACSPlot);
 
@@ -284,12 +333,126 @@ QWidget *CQtClient::createMicWidget(void)
     return ret;
 }
 
+void CQtClient::appendConsoleText(const QString &text)
+{
+    QTextCursor cur = consoleOut->textCursor();
+    cur.movePosition(QTextCursor::End);
+    consoleOut->setTextCursor(cur);
+    consoleOut->insertPlainText(text);
+}
+
 void CQtClient::appendLogText(const QString &text)
 {
     QTextCursor cur = logWidget->textCursor();
     cur.movePosition(QTextCursor::End);
     logWidget->setTextCursor(cur);
     logWidget->insertPlainText(text);
+}
+
+void CQtClient::parseTcp(QDataStream &stream)
+{
+    QString msg;
+    stream >> msg;
+
+    if (msg == "rawserial")
+    {
+        QString output;
+        stream >> output;
+        appendConsoleText(output + "\n");
+    }
+    else if (msg == "state")
+    {
+        QVariant var;
+        stream >> var;
+        SStateSensors state;
+        state.byte = var.toInt();
+        updateStateSensors(state);
+    }
+    else
+    {
+        QVariant var;
+        stream >> var;
+/*        int data = var.toInt();*/
+        sensorDataMap[msg].total += var.toUInt();
+        sensorDataMap[msg].count++;
+#if 0
+        if (msg == "lightleft")
+        {
+            lightSensorsLCD[0]->display(data);
+            lightSensorsPlot->addData("Left", data);
+        }
+        else if (msg == "lightright")
+        {
+            lightSensorsLCD[1]->display(data);
+            lightSensorsPlot->addData("Right", data);
+        }
+        else if (msg == "speedleft")
+        {
+            motorSpeedLCD[0]->display(data);
+            motorSpeedPlot->addData("Left (actual)", data);
+        }
+        else if (msg == "speedright")
+        {
+            motorSpeedLCD[1]->display(data);
+            motorSpeedPlot->addData("Right (actual)", data);
+        }
+        else if (msg == "destspeedleft")
+        {
+            motorSpeedPlot->addData("Left (destination)", data);
+        }
+        else if (msg == "destspeedright")
+        {
+            motorSpeedPlot->addData("Right (destination)", data);
+        }
+        else if (msg == "distleft")
+        {
+            motorDistanceLCD[0]->display(data);
+            motorDistancePlot->addData("Left", data);
+        }
+        else if (msg == "distright")
+        {
+            motorDistanceLCD[1]->display(data);
+            motorDistancePlot->addData("Right", data);
+        }
+        else if (msg == "destdistleft")
+        {
+        }
+        else if (msg == "destdistright")
+        {
+        }
+        else if (msg == "motorcurrentleft")
+        {
+            motorCurrentLCD[0]->display(data);
+            motorCurrentPlot->addData("Left", data);
+        }
+        else if (msg == "motorcurrentright")
+        {
+            motorCurrentLCD[1]->display(data);
+            motorCurrentPlot->addData("Right", data);
+        }
+        else if (msg == "battery")
+        {
+            batteryLCD->display(data);
+            batteryPlot->addData("Battery", data);
+        }
+        else if (msg == "acspower")
+        {
+            ACSPowerSlider->setValue(data);
+        }
+#endif
+    }
+}
+
+void CQtClient::updateStateSensors(const SStateSensors &state)
+{
+    bumperBox[0]->setChecked(state.bumperLeft);
+    bumperBox[1]->setChecked(state.bumperRight);
+    
+    ACSCollisionBox[0]->setChecked(state.ACSLeft);
+    ACSCollisionBox[1]->setChecked(state.ACSRight);
+    
+    ACSPlot->addData("Left", state.ACSLeft);
+    ACSPlot->addData("Right", state.ACSRight);
 }
 
 void CQtClient::serverHasData()
@@ -310,10 +473,7 @@ void CQtClient::serverHasData()
         if (clientSocket->bytesAvailable() < tcpReadBlockSize)
             return;
 
-        QString key, text;
-        in >> key >> text;
-        appendLogText(QString("Key: %1\nText: %2\n").arg(key).arg(text));
-//         parseTcp(in);
+        parseTcp(in);
         tcpReadBlockSize = 0;
     }
 }
@@ -323,8 +483,99 @@ void CQtClient::socketError(QAbstractSocket::SocketError error)
     QMessageBox::critical(this, "Socket error", clientSocket->errorString());
 }
 
+void CQtClient::updateSensors()
+{
+    for (QMap<QString, SSensorData>::iterator it=sensorDataMap.begin();
+         it!=sensorDataMap.end(); ++it)
+    {
+        int data = it.value().total / it.value().count;
+        
+        if (it.key() == "lightleft")
+        {
+            lightSensorsLCD[0]->display(data);
+            lightSensorsPlot->addData("Left", data);
+        }
+        else if (it.key() == "lightright")
+        {
+            lightSensorsLCD[1]->display(data);
+            lightSensorsPlot->addData("Right", data);
+        }
+        else if (it.key() == "speedleft")
+        {
+            motorSpeedLCD[0]->display(data);
+            motorSpeedPlot->addData("Left (actual)", data);
+        }
+        else if (it.key() == "speedright")
+        {
+            motorSpeedLCD[1]->display(data);
+            motorSpeedPlot->addData("Right (actual)", data);
+        }
+        else if (it.key() == "destspeedleft")
+        {
+            motorSpeedPlot->addData("Left (destination)", data);
+        }
+        else if (it.key() == "destspeedright")
+        {
+            motorSpeedPlot->addData("Right (destination)", data);
+        }
+        else if (it.key() == "distleft")
+        {
+            motorDistanceLCD[0]->display(data);
+            motorDistancePlot->addData("Left", data);
+        }
+        else if (it.key() == "distright")
+        {
+            motorDistanceLCD[1]->display(data);
+            motorDistancePlot->addData("Right", data);
+        }
+        else if (it.key() == "destdistleft")
+        {
+        }
+        else if (it.key() == "destdistright")
+        {
+        }
+        else if (it.key() == "motorcurrentleft")
+        {
+            motorCurrentLCD[0]->display(data);
+            motorCurrentPlot->addData("Left", data);
+        }
+        else if (it.key() == "motorcurrentright")
+        {
+            motorCurrentLCD[1]->display(data);
+            motorCurrentPlot->addData("Right", data);
+        }
+        else if (it.key() == "battery")
+        {
+            batteryLCD->display(data);
+            batteryPlot->addData("Battery", data);
+        }
+        else if (it.key() == "acspower")
+        {
+            ACSPowerSlider->setValue(data);
+        }
+        
+        it.value().total = it.value().count = 0;
+    }
+}
+
 void CQtClient::connectToServer()
 {
     clientSocket->abort();
     clientSocket->connectToHost(serverEdit->text(), 40000);
+}
+
+void CQtClient::sendConsoleCommand()
+{
+    // Append cmd
+    appendConsoleText(QString("> %1\n").arg(consoleIn->text()));
+    
+    if (clientSocket->state() == QAbstractSocket::ConnectedState)
+    {
+        CTcpWriter tcpWriter(clientSocket);
+        tcpWriter << QString("command");
+        tcpWriter << consoleIn->text();
+        tcpWriter.write();
+    }
+    
+    consoleIn->clear();
 }

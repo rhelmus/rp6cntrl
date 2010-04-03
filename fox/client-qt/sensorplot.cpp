@@ -128,11 +128,13 @@ void CSensorPlot::toolToggled(const QString &name)
         zoomer->setEnabled(!magnifier->isEnabled());
 }
 
-void CSensorPlot::addSensor(const std::string &name, const QColor &color)
+void CSensorPlot::addSensor(const std::string &name, const QColor &color,
+                            QwtPlotCurve::CurveStyle style)
 {
     QwtPlotCurve *curve = new QwtPlotCurve(name.c_str());
     curve->setRenderHint(QwtPlotItem::RenderAntialiased);
     curve->setPen(QPen(color));
+    curve->setStyle(style);
     curve->attach(sensorPlot);
 
     sensorPlot->replot();

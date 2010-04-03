@@ -8,6 +8,24 @@ enum { REQUEST_DUMP_BASE_DATA = 0 };
 uint8_t slaveData[I2C_MAX_INDEX];
 uint16_t lastPing;
 RC5data_t lastRC5Data;
+uint8_t slaveMode;
+
+void sendSerialMSGByte(ESerialMessage msg, uint8_t data)
+{
+    writeChar(SERIAL_MSG_START);
+    writeChar(msg);
+    writeChar(data);
+    writeChar('\n');
+}
+
+void sendSerialMSGWord(ESerialMessage msg, uint16_t data)
+{
+    writeChar(SERIAL_MSG_START);
+    writeChar(msg);
+    writeChar(data); // Low
+    writeChar(data >> 8); // High
+    writeChar('\n');
+}
 
 void I2CError(uint8_t error)
 {
@@ -39,6 +57,28 @@ void I2CRequestReady(uint8_t id)
 
         // Send ACK. Neater would be to integrate this in the I2C lib code
         I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_ACK);
+
+        if (slaveMode)
+        {
+            // Update stats through serial
+            sendSerialMSGWord(SERIAL_LIGHT_LEFT, getLeftLightSensor());
+            sendSerialMSGWord(SERIAL_LIGHT_RIGHT, getRightLightSensor());
+            
+            sendSerialMSGByte(SERIAL_MOTOR_SPEED_LEFT, getLeftMotorSpeed());
+            sendSerialMSGByte(SERIAL_MOTOR_SPEED_RIGHT, getRightMotorSpeed());
+            sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_LEFT, getLeftDestMotorSpeed());
+            sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_RIGHT, getRightDestMotorSpeed());
+            sendSerialMSGWord(SERIAL_MOTOR_DIST_LEFT, getLeftMotorDist());
+            sendSerialMSGWord(SERIAL_MOTOR_DIST_RIGHT, getRightMotorDist());
+            sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_LEFT, getLeftMotorDestDist());
+            sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_RIGHT, getRightMotorDestDist());
+            sendSerialMSGWord(SERIAL_MOTOR_CURRENT_LEFT, getLeftMotorCurrent());
+            sendSerialMSGWord(SERIAL_MOTOR_CURRENT_RIGHT, getRightMotorCurrent());
+
+            sendSerialMSGWord(SERIAL_BATTERY, getBattery());
+
+            sendSerialMSGByte(SERIAL_ACS_POWER, getACSPowerState());
+        }
     }
 }
 
@@ -158,8 +198,11 @@ void updateInterface(void)
             I2CTWI_transmitByte(I2C_SLAVEADDRESS, I2C_STATE_SENSORS);
             slaveData[I2C_STATE_SENSORS] = I2CTWI_readByte(I2C_SLAVEADDRESS);
             I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_STATEACK);
+
+            if (slaveMode)
+                sendSerialMSGByte(SERIAL_STATE_SENSORS, slaveData[I2C_STATE_SENSORS]);
         }
-        else if (getStopwatch1() > 50)
+        else if (getStopwatch1() > 100)
         {
             I2CTWI_requestRegisterFromDevice(I2C_SLAVEADDRESS, REQUEST_DUMP_BASE_DATA,
                                              I2C_LEDS, I2C_MAX_INDEX-I2C_LEDS);
