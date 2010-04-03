@@ -70,7 +70,7 @@ void updateStateSensors(void)
 {
     SStateSensors temp;
     temp.bumperLeft = bumper_left;
-    temp.bumperRight = bumper_right;
+    temp.bumperRight = (bumper_right != 0); // bumper_right can be >1!?
     temp.ACSLeft = obstacle_left;
     temp.ACSRight = obstacle_right;
     temp.movementComplete = isMovementComplete();

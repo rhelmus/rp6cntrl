@@ -59,8 +59,8 @@ inline uint16_t getLeftLightSensor(void)
 inline uint16_t getRightLightSensor(void)
 { return slaveData[I2C_LIGHT_RIGHT_LOW] + (slaveData[I2C_LIGHT_RIGHT_HIGH] << 8); }
 
-inline uint16_t getLeftMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_LEFT]; }
-inline uint16_t getRightMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_RIGHT]; }
+inline uint8_t getLeftMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_LEFT]; }
+inline uint8_t getRightMotorSpeed(void) { return slaveData[I2C_MOTOR_SPEED_RIGHT]; }
 
 inline uint8_t getLeftDestMotorSpeed(void)
 { return slaveData[I2C_MOTOR_DESTSPEED_LEFT]; }

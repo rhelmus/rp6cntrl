@@ -10,6 +10,7 @@ class CSerialPort: public QObject
     Q_OBJECT
 
     QextSerialPort *serialPort;
+    QByteArray buffer;
     
 private slots:
     void onReadyRead(void);
@@ -24,7 +25,7 @@ public:
     
 
 signals:
-    void textAvailable(const QString &text);
+    void textAvailable(const QByteArray &text);
 };
 
 #endif

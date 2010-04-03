@@ -34,7 +34,8 @@ static const char setUsageStr[] PROGMEM =
     "speed\t\tSets move speed. Usage: left-speed right-speed\n"
     "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n"
     "rotf\t\tSets rotation error factor. Usage: factor\n"
-    "beep\t\tSets beeper pitch. Usage: pitch\n";
+    "beep\t\tSets beeper pitch. Usage: pitch\n"
+    "slave\t\tEnables or disables slave mode. Usage: boolean.";
 
 static const char dumpUsageStr[] PROGMEM =
     "dump usage:\n\n"
@@ -166,6 +167,11 @@ void handleSetCommand(const char **cmd, uint8_t count)
         setRotationFactor(atoi(cmd[1]));
     else if (!strcmp_P(cmd[0], PSTR("beep")))
         setBeeperPitch(atoi(cmd[1]));
+    else if (!strcmp_P(cmd[0], PSTR("slave")))
+    {
+        extern uint8_t slaveMode;
+        slaveMode = cmd[1][0] == '1';
+    }
 }
 
 void handleDumpCommand(const char **cmd, uint8_t count)

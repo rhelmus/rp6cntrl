@@ -1,7 +1,8 @@
 TEMPLATE = app
 TARGET = client-qt
 HEADERS += client.h \
- sensorplot.h
+ sensorplot.h \
+ ../../shared/shared.h
 SOURCES += main.cpp
 QT += network
 

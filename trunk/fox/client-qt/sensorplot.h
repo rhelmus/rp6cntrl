@@ -27,6 +27,8 @@
 
 #include <QWidget>
 
+#include <qwt_plot_curve.h>
+
 class QLCDNumber;
 class QToolButton;
 class QVBoxLayout;
@@ -70,9 +72,11 @@ private slots:
 public:
     CSensorPlot(const QString &title, QWidget *parent = 0, Qt::WindowFlags f = 0);
 
-    void addSensor(const std::string &name, const QColor &color=Qt::black);
+    void addSensor(const std::string &name, const QColor &color=Qt::black,
+                   QwtPlotCurve::CurveStyle style=QwtPlotCurve::Lines);
     void addData(const std::string &name, const double x, const double y);
     void addData(const std::string &name, const double y);
+    
 };
 
 #endif

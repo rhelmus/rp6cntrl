@@ -34,10 +34,28 @@ void CSerialPort::onReadyRead()
     int a = serialPort->bytesAvailable();
     bytes.resize(a);
     serialPort->read(bytes.data(), bytes.size());
-    qDebug() << bytes;
-    emit textAvailable(bytes);
-    /*    qDebug() << (QString("bytes read: %1\n").arg(bytes.size()));
-    qDebug() << (QString("bytes: %1\n").arg(QString(bytes)));*/
+
+    buffer += bytes;
+
+    int end = buffer.indexOf('\n');
+    while (end != -1)
+    {
+        emit textAvailable(buffer.left(end)); // Emit without newline
+        buffer.remove(0, end+1);
+        end = buffer.indexOf('\n');
+    }
+/*    if (buffer.contains('\n'))
+    {
+        foreach(QByteArray line, buffer.split('\n'))
+        {
+            if (line.size() && line.contains('\n'))
+                emit textAvailable(line);
+        }
+
+        int nl = buffer.lastIndexOf('\n');
+        if (nl != -1)
+            buffer.remove(0, nl+1);
+    }*/
 }
 
 void CSerialPort::disableRTS()

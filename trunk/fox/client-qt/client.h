@@ -4,7 +4,10 @@
 #include <QMainWindow>
 #include <QTcpSocket>
 
+#include "shared.h"
+
 class QCheckBox;
+class QDataStream;
 class QLabel;
 class QLCDNumber;
 class QLineEdit;
@@ -20,7 +23,18 @@ class CQtClient: public QMainWindow
     quint32 tcpReadBlockSize;
     QTcpSocket *clientSocket;
     QLineEdit *serverEdit;
+    QPlainTextEdit *consoleOut;
+    QLineEdit *consoleIn;
     QPlainTextEdit *logWidget;
+    
+    struct SSensorData
+    {
+        uint32_t total, count;
+        SSensorData(void) {}
+        SSensorData(uint32_t t, uint32_t c) : total(t), count(c) {}
+    };
+    
+    QMap<QString, SSensorData> sensorDataMap;
     
     // Overview widget
     QLCDNumber *motorSpeedLCD[2];
@@ -46,6 +60,10 @@ class CQtClient: public QMainWindow
     CSensorPlot *batteryPlot;
     CSensorPlot *micPlot;
     
+    QWidget *createMainTab(void);
+    QWidget *createConsoleTab(void);
+    QWidget *createLogTab(void);
+    
     QWidget *createOverviewWidget(void);
     QWidget *createSpeedWidget(void);
     QWidget *createDistWidget(void);
@@ -55,12 +73,17 @@ class CQtClient: public QMainWindow
     QWidget *createBatteryWidget(void);
     QWidget *createMicWidget(void);
     
+    void appendConsoleText(const QString &text);
     void appendLogText(const QString &text);
+    void parseTcp(QDataStream &stream);
+    void updateStateSensors(const SStateSensors &state);
     
 private slots:
     void serverHasData(void);
     void socketError(QAbstractSocket::SocketError error);
+    void updateSensors(void);
     void connectToServer(void);
+    void sendConsoleCommand(void);
     
 public:
     CQtClient(void);
