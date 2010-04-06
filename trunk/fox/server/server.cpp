@@ -11,7 +11,9 @@ CControl::CControl(QObject *parent) : QObject(parent)
 {
     serialPort = new CSerialPort(this);
     connect(serialPort, SIGNAL(textAvailable(const QByteArray &)), this,
-            SLOT(parseSerial(const QByteArray &)));
+            SLOT(handleSerialText(const QByteArray &)));
+    connect(serialPort, SIGNAL(msgAvailable(const QByteArray &)), this,
+            SLOT(handleSerialMSG(const QByteArray &)));
 
     tcpServer = new CTcpServer(this);
     connect(tcpServer, SIGNAL(clientTcpReceived(QDataStream &)), this,
@@ -66,16 +68,14 @@ void CControl::sendSerial2Tcp(ESerialMessage msg, const QByteArray &serialdata)
     }
 }
 
-void CControl::parseSerial(const QByteArray &text)
+void CControl::handleSerialText(const QByteArray &text)
 {
 //     qDebug() << "parseSerial text: " << text << "\n";
     
 //     qDebug() << "parseSerial msg: " << (uint8_t)text[0] << ":" <<
 //         (uint8_t)text[1] << ":" << (uint8_t)text[2] << ":" << (uint8_t)text[3];
-         
-    if (text[0] == SERIAL_MSG_START)
-        sendSerial2Tcp(static_cast<ESerialMessage>(text[1]), text.mid(2));
-    else if (text == "[READY]")
+
+    if (text == "[READY]")
     {
         serialPort->sendCommand("s");
         QTimer::singleShot(5000, this, SLOT(enableRP6Slave()));
@@ -83,8 +83,24 @@ void CControl::parseSerial(const QByteArray &text)
     else
     {
         tcpServer->sendText("rawserial", text);
-        qDebug() << "Raw: " << text;
+//         qDebug() << "Raw: " << text;
     }
+}
+
+void CControl::handleSerialMSG(const QByteArray &text)
+{
+    //     qDebug() << "parseSerial text: " << text << "\n";
+    
+    //     qDebug() << "parseSerial msg: " << (uint8_t)text[0] << ":" <<
+    //         (uint8_t)text[1] << ":" << (uint8_t)text[2] << ":" << (uint8_t)text[3];
+    
+//     qDebug() << "text[0]: " << (int)text[0];
+//     qDebug() << "text[1]: " << (int)text[1];
+//     qDebug() << "text[2]: " << (int)text[2];
+//     qDebug() << "text[3]: " << (int)text[3];
+//     qDebug() << "len: " << text.length();
+    
+    sendSerial2Tcp(static_cast<ESerialMessage>(text[0]), text.mid(1));
 }
 
 void CControl::parseClientTcp(QDataStream &stream)

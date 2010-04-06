@@ -13,18 +13,18 @@ uint8_t slaveMode;
 void sendSerialMSGByte(ESerialMessage msg, uint8_t data)
 {
     writeChar(SERIAL_MSG_START);
+    writeChar(2); // Size
     writeChar(msg);
     writeChar(data);
-    writeChar('\n');
 }
 
 void sendSerialMSGWord(ESerialMessage msg, uint16_t data)
 {
     writeChar(SERIAL_MSG_START);
+    writeChar(3); // Size
     writeChar(msg);
     writeChar(data); // Low
     writeChar(data >> 8); // High
-    writeChar('\n');
 }
 
 void I2CError(uint8_t error)
@@ -68,6 +68,7 @@ void I2CRequestReady(uint8_t id)
             sendSerialMSGByte(SERIAL_MOTOR_SPEED_RIGHT, getRightMotorSpeed());
             sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_LEFT, getLeftDestMotorSpeed());
             sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_RIGHT, getRightDestMotorSpeed());
+            mSleep(1);
             sendSerialMSGWord(SERIAL_MOTOR_DIST_LEFT, getLeftMotorDist());
             sendSerialMSGWord(SERIAL_MOTOR_DIST_RIGHT, getRightMotorDist());
             sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_LEFT, getLeftMotorDestDist());

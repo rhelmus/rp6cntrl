@@ -32,7 +32,8 @@ class CControl: public QObject
     void sendSerial2Tcp(ESerialMessage msg, const QByteArray &serialdata);
 
 private slots:
-    void parseSerial(const QByteArray &text);
+    void handleSerialText(const QByteArray &text);
+    void handleSerialMSG(const QByteArray &text);
     void parseClientTcp(QDataStream &stream);
     void enableRP6Slave(void);
     
