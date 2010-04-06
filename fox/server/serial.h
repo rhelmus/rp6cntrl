@@ -3,6 +3,8 @@
 
 #include <QObject>
 
+#include "shared.h"
+
 class QextSerialPort;
 
 class CSerialPort: public QObject
@@ -10,8 +12,8 @@ class CSerialPort: public QObject
     Q_OBJECT
 
     QextSerialPort *serialPort;
-    QByteArray buffer;
-    
+    QByteArray msgBuffer, textBuffer;
+
 private slots:
     void onReadyRead(void);
     void disableRTS(void);
@@ -26,6 +28,7 @@ public:
 
 signals:
     void textAvailable(const QByteArray &text);
+    void msgAvailable(const QByteArray &text);
 };
 
 #endif
