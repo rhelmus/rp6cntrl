@@ -44,12 +44,15 @@ void CSerialPort::onReadyRead()
     // Format:
     //  0: Start marker
     //  1: Msg size
+    //  2: Msg type
+    //  n: Data
     int index = msgBuffer.indexOf(SERIAL_MSG_START);
 
     if (index == -1)
     {
         // Only raw text
         textBuffer += msgBuffer;
+        msgBuffer.clear();
     }
     else
     {
@@ -67,47 +70,33 @@ void CSerialPort::onReadyRead()
                 break; // Wait for more bytes
                 
             int msgsize = msgBuffer[1];
-            assert(msgsize <= 3);
             
             if ((nextbytes-1) < msgsize)
                 break; // Wait for more bytes
 
-//             qDebug() << QString("Serial MSG: %1 (%2 bytes)").arg((int)msgBuffer[2]).arg(msgsize);
-            emit msgAvailable(msgBuffer.mid(2, msgsize));
+            emit msgAvailable(static_cast<ESerialMessage>((int)msgBuffer[2]),
+                              msgBuffer.mid(3, msgsize));
             msgBuffer.remove(0, 2 + msgsize);
             
             index = msgBuffer.indexOf(SERIAL_MSG_START);
+
+            // Add any remaining text to raw text buffer
+            if (index == -1)
+            {
+                textBuffer += msgBuffer;
+                msgBuffer.clear();
+            }
         }
     }
 
     index = textBuffer.indexOf('\n');
     while (index != -1)
     {
+        qDebug() << "Raw: " << textBuffer.left(index+1) << "nl: " << index;
         emit textAvailable(textBuffer.left(index)); // Emit without newline
         textBuffer.remove(0, index+1);
         index = textBuffer.indexOf('\n');
     }
-    
-    /*
-    int end = buffer.indexOf('\n');
-    while (end != -1)
-    {
-        emit textAvailable(buffer.left(end)); // Emit without newline
-        buffer.remove(0, end+1);
-        end = buffer.indexOf('\n');
-    }*/
-/*    if (buffer.contains('\n'))
-    {
-        foreach(QByteArray line, buffer.split('\n'))
-        {
-            if (line.size() && line.contains('\n'))
-                emit textAvailable(line);
-        }
-
-        int nl = buffer.lastIndexOf('\n');
-        if (nl != -1)
-            buffer.remove(0, nl+1);
-    }*/
 }
 
 void CSerialPort::disableRTS()

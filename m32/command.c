@@ -35,7 +35,7 @@ static const char setUsageStr[] PROGMEM =
     "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n"
     "rotf\t\tSets rotation error factor. Usage: factor\n"
     "beep\t\tSets beeper pitch. Usage: pitch\n"
-    "slave\t\tEnables or disables slave mode. Usage: boolean.";
+    "slave\t\tEnables or disables slave mode. Usage: boolean.\n";
 
 static const char dumpUsageStr[] PROGMEM =
     "dump usage:\n\n"

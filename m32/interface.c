@@ -61,6 +61,9 @@ void I2CRequestReady(uint8_t id)
         if (slaveMode)
         {
             // Update stats through serial
+            sendSerialMSGByte(SERIAL_BASE_LEDS, getBaseLEDs());
+            sendSerialMSGByte(SERIAL_M32_LEDS, externalPort.LEDS);
+            
             sendSerialMSGWord(SERIAL_LIGHT_LEFT, getLeftLightSensor());
             sendSerialMSGWord(SERIAL_LIGHT_RIGHT, getRightLightSensor());
             
@@ -68,7 +71,6 @@ void I2CRequestReady(uint8_t id)
             sendSerialMSGByte(SERIAL_MOTOR_SPEED_RIGHT, getRightMotorSpeed());
             sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_LEFT, getLeftDestMotorSpeed());
             sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_RIGHT, getRightDestMotorSpeed());
-            mSleep(1);
             sendSerialMSGWord(SERIAL_MOTOR_DIST_LEFT, getLeftMotorDist());
             sendSerialMSGWord(SERIAL_MOTOR_DIST_RIGHT, getRightMotorDist());
             sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_LEFT, getLeftMotorDestDist());

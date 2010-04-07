@@ -45,7 +45,7 @@ class CQtClient: public QMainWindow
     QCheckBox *RC5ToggleBitBox;
     QCheckBox *ACSCollisionBox[2];
     QSlider *ACSPowerSlider;
-    QCheckBox *MainLEDsBox[6];
+    QCheckBox *mainLEDsBox[6];
     QCheckBox *m32LEDsBox[4];
     QLCDNumber *batteryLCD;
     QCheckBox *bumperBox[2];

@@ -191,16 +191,18 @@ QWidget *CQtClient::createOverviewWidget(void)
     
     form->addRow("Main LEDs", w = new QWidget);
     QGridLayout *ledgrid = new QGridLayout(w);
-    for (int row=0; row<3; ++row)
+    
+    for (int col=0; col<2; ++col)
     {
-        for (int col=0; col<2; ++col)
+        for (int row=0; row<3; ++row)
         {
-            ledgrid->addWidget(MainLEDsBox[row+col] = new QCheckBox, row, col);
-            MainLEDsBox[row+col]->setEnabled(false);
+            int ind = row + (col * 3);
+            ledgrid->addWidget(mainLEDsBox[ind] = new QCheckBox, row, col);
+            mainLEDsBox[ind]->setEnabled(false);
         }
     }
     
-    form->addRow("Main LEDs", w = new QWidget);
+    form->addRow("M32 LEDs", w = new QWidget);
     hbox = new QHBoxLayout(w);
     for (int i=0; i<4; ++i)
     {
@@ -368,78 +370,29 @@ void CQtClient::parseTcp(QDataStream &stream)
         state.byte = var.toInt();
         updateStateSensors(state);
     }
+    else if (msg == "baseleds")
+    {
+        QVariant var;
+        stream >> var;
+        int leds = var.toInt();
+        for (int i=0; i<6; ++i)
+            mainLEDsBox[i]->setChecked(leds & (1<<i));
+    }
+    else if (msg == "m32leds")
+    {
+        QVariant var;
+        stream >> var;
+        int leds = var.toInt();
+
+        for (int i=0; i<4; ++i)
+            m32LEDsBox[i]->setChecked(leds & (1<<i));
+    }
     else
     {
         QVariant var;
         stream >> var;
-/*        int data = var.toInt();*/
         sensorDataMap[msg].total += var.toUInt();
         sensorDataMap[msg].count++;
-#if 0
-        if (msg == "lightleft")
-        {
-            lightSensorsLCD[0]->display(data);
-            lightSensorsPlot->addData("Left", data);
-        }
-        else if (msg == "lightright")
-        {
-            lightSensorsLCD[1]->display(data);
-            lightSensorsPlot->addData("Right", data);
-        }
-        else if (msg == "speedleft")
-        {
-            motorSpeedLCD[0]->display(data);
-            motorSpeedPlot->addData("Left (actual)", data);
-        }
-        else if (msg == "speedright")
-        {
-            motorSpeedLCD[1]->display(data);
-            motorSpeedPlot->addData("Right (actual)", data);
-        }
-        else if (msg == "destspeedleft")
-        {
-            motorSpeedPlot->addData("Left (destination)", data);
-        }
-        else if (msg == "destspeedright")
-        {
-            motorSpeedPlot->addData("Right (destination)", data);
-        }
-        else if (msg == "distleft")
-        {
-            motorDistanceLCD[0]->display(data);
-            motorDistancePlot->addData("Left", data);
-        }
-        else if (msg == "distright")
-        {
-            motorDistanceLCD[1]->display(data);
-            motorDistancePlot->addData("Right", data);
-        }
-        else if (msg == "destdistleft")
-        {
-        }
-        else if (msg == "destdistright")
-        {
-        }
-        else if (msg == "motorcurrentleft")
-        {
-            motorCurrentLCD[0]->display(data);
-            motorCurrentPlot->addData("Left", data);
-        }
-        else if (msg == "motorcurrentright")
-        {
-            motorCurrentLCD[1]->display(data);
-            motorCurrentPlot->addData("Right", data);
-        }
-        else if (msg == "battery")
-        {
-            batteryLCD->display(data);
-            batteryPlot->addData("Battery", data);
-        }
-        else if (msg == "acspower")
-        {
-            ACSPowerSlider->setValue(data);
-        }
-#endif
     }
 }
 
@@ -488,6 +441,9 @@ void CQtClient::updateSensors()
     for (QMap<QString, SSensorData>::iterator it=sensorDataMap.begin();
          it!=sensorDataMap.end(); ++it)
     {
+        if (it.value().count == 0)
+            continue;
+        
         int data = it.value().total / it.value().count;
         
         if (it.key() == "lightleft")
