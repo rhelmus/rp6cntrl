@@ -28,7 +28,7 @@ public:
 
 signals:
     void textAvailable(const QByteArray &text);
-    void msgAvailable(const QByteArray &text);
+    void msgAvailable(ESerialMessage msg, const QByteArray &data);
 };
 
 #endif

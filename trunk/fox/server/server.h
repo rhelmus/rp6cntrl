@@ -13,7 +13,7 @@ class CControl: public QObject
 {
     Q_OBJECT
 
-    enum EDataSerialType { DATA_BYTE, DATA_WORD, DATA_ACD };
+    enum EDataSerialType { DATA_BYTE, DATA_WORD };
     
     struct SSerial2TcpInfo
     {
@@ -29,11 +29,10 @@ class CControl: public QObject
     QMap<ESerialMessage, SSerial2TcpInfo> serial2TcpMap;
 
     void initSerial2TcpMap(void);
-    void sendSerial2Tcp(ESerialMessage msg, const QByteArray &serialdata);
 
 private slots:
     void handleSerialText(const QByteArray &text);
-    void handleSerialMSG(const QByteArray &text);
+    void handleSerialMSG(ESerialMessage msg, const QByteArray &data);
     void parseClientTcp(QDataStream &stream);
     void enableRP6Slave(void);
     
