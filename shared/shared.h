@@ -135,6 +135,8 @@ typedef enum
     SERIAL_BATTERY,
 
     SERIAL_ACS_POWER,
+
+    SERIAL_MIC,
 } ESerialMessage;
 
 

@@ -691,6 +691,9 @@ volatile uint16_t sound_timer;
 
 volatile uint16_t timer; // You can use this timer for everything you like!
 
+// Added by Rick
+volatile dynstopwatch_t dynamicStopwatches[DYN_STOPWATCH_COUNT];
+
 
 /**
  * Timer 0 Compare ISR - This timer is used for various
@@ -699,18 +702,18 @@ volatile uint16_t timer; // You can use this timer for everything you like!
  * the sound generation with timer2...
  *
  * By default, it runs at 10kHz which means this ISR is called
- * every ~100µs! This is nice for timing stuff!
+ * every ~100ï¿½s! This is nice for timing stuff!
  */
 ISR (TIMER0_COMP_vect)
 {
-	// 16bit timer (100µs resolution)
+	// 16bit timer (100ï¿½s resolution)
 	timer++;
 	
-	// Blocking delay (100µs):
+	// Blocking delay (100ï¿½s):
 	delay_timer++;
 	
 	// All 1ms based timing stuff
-	if(ms_timer++ >= 10) { // 10 * 100µs = 1ms
+	if(ms_timer++ >= 10) { // 10 * 100ï¿½s = 1ms
 		// 16bit Stopwatches:
 		if(stopwatches.watches & STOPWATCH1)
 			stopwatches.watch1++;
@@ -740,6 +743,14 @@ ISR (TIMER0_COMP_vect)
 		}
 		
 		ms_timer = 0;
+        
+        // Added by Rick: "Dynamic stopwatches"
+        uint8_t i;
+        for (i=0; i<DYN_STOPWATCH_COUNT; ++i)
+        {
+            if (dynamicStopwatches[i].enabled)
+                dynamicStopwatches[i].timer++;
+        }
 	}
 }
 
@@ -927,7 +938,7 @@ void initRP6Control(void)
  * ****************************************************************************
  * Changelog:
  * - v. 1.1 by Dominik S. Herwald
- *		- NEW: universal timer variable with 100µs resolution added!
+ *		- NEW: universal timer variable with 100ï¿½s resolution added!
  * - v. 1.0 (initial release) 16.05.2007 by Dominik S. Herwald
  *
  * ****************************************************************************

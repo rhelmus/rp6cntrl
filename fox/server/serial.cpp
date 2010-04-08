@@ -92,7 +92,6 @@ void CSerialPort::onReadyRead()
     index = textBuffer.indexOf('\n');
     while (index != -1)
     {
-        qDebug() << "Raw: " << textBuffer.left(index+1) << "nl: " << index;
         emit textAvailable(textBuffer.left(index)); // Emit without newline
         textBuffer.remove(0, index+1);
         index = textBuffer.indexOf('\n');

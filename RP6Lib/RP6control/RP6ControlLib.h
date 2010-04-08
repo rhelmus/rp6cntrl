@@ -245,12 +245,28 @@ extern volatile stopwatches_t stopwatches;
 #define setStopwatch7(__VALUE__) stopwatches.watch7 = __VALUE__
 #define setStopwatch8(__VALUE__) stopwatches.watch8 = __VALUE__
 
+// Added by Rick: "Dynamic" stopwatches
+
+#define DYN_STOPWATCH_COUNT 8
+
+typedef struct {
+    uint8_t enabled;
+    volatile uint16_t timer;
+} dynstopwatch_t;
+extern volatile dynstopwatch_t dynamicStopwatches[DYN_STOPWATCH_COUNT];
+
+#define startDynStopwatch(s) dynamicStopwatches[s].enabled = true
+#define stopDynStopwatch(s) dynamicStopwatches[s].enabled = false
+#define isDynStopwatchRunning(s) dynamicStopwatches[s].enabled
+#define setDynStopwatch(s, t) dynamicStopwatches[s].timer = t
+#define getDynStopwatch(s) dynamicStopwatches[s].timer
+
 /*****************************************************************************/
 // Universal timer:
 
 // This timer variable:
 volatile uint16_t timer;  
-// is incremented each 100µs. It is suited for performing time
+// is incremented each 100ï¿½s. It is suited for performing time
 // measurements where the resolution of the stopwatches (1ms) is not enough. 
 
 /*****************************************************************************/
