@@ -46,6 +46,8 @@ void CControl::initSerial2TcpMap()
     serial2TcpMap.insert(SERIAL_BATTERY, SSerial2TcpInfo(DATA_WORD, "battery"));
 
     serial2TcpMap.insert(SERIAL_ACS_POWER, SSerial2TcpInfo(DATA_BYTE, "acspower"));
+
+    serial2TcpMap.insert(SERIAL_MIC, SSerial2TcpInfo(DATA_WORD, "mic"));
 }
 
 void CControl::handleSerialText(const QByteArray &text)

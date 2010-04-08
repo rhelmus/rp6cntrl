@@ -165,8 +165,8 @@ void updateLEDs(ELEDState state)
         LEDState = LEDS_OFF;
         setLEDs(0);
         setBaseLEDs(0);
-        stopStopwatch4();
-        setStopwatch4(0);
+        stopDynStopwatch(1);
+        setDynStopwatch(1, 0);
     }
     else
     {
@@ -180,7 +180,7 @@ void updateLEDs(ELEDState state)
         {
             setLEDs(0);
             setBaseLEDs(0);
-            startStopwatch4();
+            startDynStopwatch(1);
         }
     }
 }
@@ -229,11 +229,11 @@ void rc5controlStart(void)
     LEDState = LEDS_OFF;
 
     // RC5 poll timer
-    setStopwatch3(0);
-    startStopwatch3();
+    setDynStopwatch(0, 0);
+    startDynStopwatch(0);
 
     // LEDs update timer
-    setStopwatch4(0);
+    setDynStopwatch(1, 0);
     
     writeString_P("Started RC5 Control plugin!\n");
 }
@@ -247,17 +247,17 @@ void rc5controlStop(void)
     setLEDs(0);
     LEDState = LEDS_OFF;
 
-    stopStopwatch3();
-    setStopwatch3(0);
-    stopStopwatch4();
-    setStopwatch4(0);
+    stopDynStopwatch(0);
+    setDynStopwatch(0, 0);
+    stopDynStopwatch(1);
+    setDynStopwatch(1, 0);
     
     writeString_P("Stopped RC5 Control plugin.\n");
 }
 
 void rc5controlThink(void)
 {
-    if (getStopwatch3() > 50)
+    if (getDynStopwatch(0) > 50)
     {
         RC5data_t rc5 = getLastRC5();
         if (rc5.key_code)
@@ -274,10 +274,10 @@ void rc5controlThink(void)
             resetLastRC5();
         }
 
-        setStopwatch3(0);
+        setDynStopwatch(0, 0);
     }
 
-    if ((LEDState == LEDS_RUNNING) && (getStopwatch4() > 150))
+    if ((LEDState == LEDS_RUNNING) && (getDynStopwatch(1) > 150))
     {
         if (externalPort.byte)
         {
@@ -307,6 +307,6 @@ void rc5controlThink(void)
             setBaseLEDs(baseleds);
         }
 
-        setStopwatch4(0);
+        setDynStopwatch(1, 0);
     }
 }

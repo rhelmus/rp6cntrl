@@ -9,6 +9,7 @@ uint8_t slaveData[I2C_MAX_INDEX];
 uint16_t lastPing;
 RC5data_t lastRC5Data;
 uint8_t slaveMode;
+uint16_t slaveMicUpdateTime;
 
 void sendSerialMSGByte(ESerialMessage msg, uint8_t data)
 {
@@ -81,6 +82,12 @@ void I2CRequestReady(uint8_t id)
             sendSerialMSGWord(SERIAL_BATTERY, getBattery());
 
             sendSerialMSGByte(SERIAL_ACS_POWER, getACSPowerState());
+
+            if (slaveMicUpdateTime && (getStopwatch3() >= slaveMicUpdateTime))
+            {
+                sendSerialMSGWord(SERIAL_MIC, getMicrophonePeak());
+                setStopwatch3(0);
+            }
         }
     }
 }

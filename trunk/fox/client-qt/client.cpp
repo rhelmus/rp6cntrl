@@ -387,8 +387,15 @@ void CQtClient::parseTcp(QDataStream &stream)
         for (int i=0; i<4; ++i)
             m32LEDsBox[i]->setChecked(leds & (1<<i));
     }
+    else if (msg == "mic")
+    {
+        QVariant var;
+        stream >> var;
+        micPlot->addData("Microphone", var.toInt());
+    }
     else
     {
+        // Other data that needs to be averaged
         QVariant var;
         stream >> var;
         sensorDataMap[msg].total += var.toUInt();

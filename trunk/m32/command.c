@@ -35,7 +35,8 @@ static const char setUsageStr[] PROGMEM =
     "dir\t\tSets move direction. Usage: fwd, bwd, left or right\n"
     "rotf\t\tSets rotation error factor. Usage: factor\n"
     "beep\t\tSets beeper pitch. Usage: pitch\n"
-    "slave\t\tEnables or disables slave mode. Usage: boolean.\n";
+    "slave\t\tEnables or disables slave mode. Usage: boolean.\n"
+    "slavemic\t\tSlave mic update time. Usage: time in msec.\n";
 
 static const char dumpUsageStr[] PROGMEM =
     "dump usage:\n\n"
@@ -171,6 +172,16 @@ void handleSetCommand(const char **cmd, uint8_t count)
     {
         extern uint8_t slaveMode;
         slaveMode = cmd[1][0] == '1';
+    }
+    else if (!strcmp_P(cmd[0], PSTR("slavemic")))
+    {
+        extern uint16_t slaveMicUpdateTime;
+        slaveMicUpdateTime = atoi(cmd[1]);
+        setStopwatch3(0);
+        if (slaveMicUpdateTime)
+            startStopwatch3();
+        else
+            stopStopwatch3();
     }
 }
 

@@ -10,8 +10,8 @@ void acstestStart(void)
     mSleep(15); // Let bot power up
     
     setBaseACS(ACS_POWER_HIGH);
-    startStopwatch3();
-    setStopwatch3(0);    
+    startDynStopwatch(0);
+    setDynStopwatch(0, 0);
     
     writeString_P("Started ACS test plugin!\n");
 }
@@ -22,10 +22,10 @@ void acstestStop(void)
     setBaseACS(ACS_POWER_OFF);
     setBaseLEDs(0);
     
-    stopStopwatch3();
-    setStopwatch3(0);
-    stopStopwatch4();
-    setStopwatch4(0);
+    stopDynStopwatch(0);
+    setDynStopwatch(0, 0);
+    stopDynStopwatch(1);
+    setDynStopwatch(1, 0);
     
     rotating = false;
     
@@ -79,7 +79,7 @@ void acstestThink(void)
     static uint8_t statecycles = 0, prevacsstate;
     uint8_t acs = getACSPowerState();
 
-    if (getStopwatch3() > 5)
+    if (getDynStopwatch(0) > 5)
     {
         uint8_t leds = 0;
 
@@ -108,10 +108,10 @@ void acstestThink(void)
 
         if (getBaseLEDs() != leds)
             setBaseLEDs(leds);
-        setStopwatch3(0);
+        setDynStopwatch(0, 0);
     }
 
-    if (getStopwatch4() > 100)
+    if (getDynStopwatch(1) > 100)
     {
         if (!statecycles && (getStateSensors().ACSState < 2))
         {
@@ -121,7 +121,7 @@ void acstestThink(void)
                 ++acs;
             setBaseACS(acs);
             statecycles = 2; // Amount of ACS cycles required before next switch
-            setStopwatch4(0);
+            setDynStopwatch(1, 0);
         }
     }
 
@@ -130,7 +130,7 @@ void acstestThink(void)
     {
         --statecycles; // Reached another state cycle
         writeString_P("cycle time: ");
-        writeInteger(getStopwatch4(), DEC);
+        writeInteger(getDynStopwatch(1), DEC);
         writeString_P("ms <= ");
         writeInteger(statecycles, DEC);
         writeChar('\n');
@@ -143,10 +143,10 @@ void acstestThink(void)
         rotate(75, RIGHT, 360);
         rotating = true;
     }
-    else if ((getPressedKeyNumber() == 4) && !isStopwatch4Running())
+    else if ((getPressedKeyNumber() == 4) && !isDynStopwatchRunning(1))
     {
-        startStopwatch4();
-        setStopwatch4(0);
+        startDynStopwatch(1);
+        setDynStopwatch(1, 0);
     }
 
     prevacsstate = getStateSensors().ACSState;
