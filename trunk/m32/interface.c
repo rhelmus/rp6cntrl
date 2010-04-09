@@ -78,6 +78,7 @@ void I2CRequestReady(uint8_t id)
             sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_RIGHT, getRightMotorDestDist());
             sendSerialMSGWord(SERIAL_MOTOR_CURRENT_LEFT, getLeftMotorCurrent());
             sendSerialMSGWord(SERIAL_MOTOR_CURRENT_RIGHT, getRightMotorCurrent());
+            sendSerialMSGByte(SERIAL_MOTOR_DIRECTIONS, getMotorDirections().byte);
 
             sendSerialMSGWord(SERIAL_BATTERY, getBattery());
 
@@ -88,6 +89,8 @@ void I2CRequestReady(uint8_t id)
                 sendSerialMSGWord(SERIAL_MIC, getMicrophonePeak());
                 setStopwatch3(0);
             }
+
+            sendSerialMSGWord(SERIAL_LASTRC5, getLastRC5().data);
         }
     }
 }

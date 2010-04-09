@@ -40,6 +40,7 @@ class CQtClient: public QMainWindow
     QLCDNumber *motorSpeedLCD[2];
     QLCDNumber *motorDistanceLCD[2];
     QLCDNumber *motorCurrentLCD[2];
+    QLabel *motorDirection[2];
     QLCDNumber *lightSensorsLCD[2];
     QLabel *RC5DeviceLabel, *RC5KeyLabel;
     QCheckBox *RC5ToggleBitBox;
@@ -60,6 +61,8 @@ class CQtClient: public QMainWindow
     CSensorPlot *batteryPlot;
     CSensorPlot *micPlot;
     
+    SMotorDirections currentMotorDirections;
+    
     QWidget *createMainTab(void);
     QWidget *createConsoleTab(void);
     QWidget *createLogTab(void);
@@ -77,6 +80,7 @@ class CQtClient: public QMainWindow
     void appendLogText(const QString &text);
     void parseTcp(QDataStream &stream);
     void updateStateSensors(const SStateSensors &state);
+    void updateMotorDirections(const SMotorDirections &dir);
     
 private slots:
     void serverHasData(void);

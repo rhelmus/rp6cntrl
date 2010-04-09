@@ -5,6 +5,7 @@
 SStateSensors stateSensors;
 EACSPowerState ACSPowerState;
 RC5data_t lastRC5Data;
+SMotorDirections motorDirections;
 
 // Modified lib source so that ROTATION_FACTOR points to this var
 uint16_t rotationFactor = 750; // Originally 688
@@ -83,6 +84,16 @@ void updateStateSensors(void)
         extIntON(); // Signal external interrupt to notify change
 }
 
+void updateMotorDirections(void)
+{
+    // From base lib
+    extern uint8_t mleft_dir, mright_dir, mleft_des_dir, mright_des_dir;    
+    motorDirections.left = mleft_dir;
+    motorDirections.right = mright_dir;
+    motorDirections.destLeft = mleft_des_dir;
+    motorDirections.destRight = mright_des_dir;
+}
+
 void updateI2CReadRegisters(void)
 {
     uint8_t i = 0;
@@ -149,6 +160,10 @@ void updateI2CReadRegisters(void)
                 break;
             case I2C_MOTOR_RIGHT_DESTDIST_HIGH:
                 I2CTWI_readRegisters[i] = distanceToMove_R >> 8;
+                break;
+
+            case I2C_MOTOR_DIRECTIONS:
+                I2CTWI_readRegisters[i] = motorDirections.byte;
                 break;
                 
             case I2C_ROTATE_FACTOR_LOW:
@@ -321,6 +336,7 @@ int main(void)
         }
         
         updateStateSensors();
+        updateMotorDirections();
         updateI2CReadRegisters();
         handleCommands();        
         task_RP6System();

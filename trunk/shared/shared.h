@@ -3,6 +3,26 @@
 
 #include <stdint.h>
 
+// Stuff from RP6RobotBaseLib.h. Keep this in sync!
+#ifndef RP6MAIN
+
+#define FWD 0
+#define BWD 1
+#define LEFT 2
+#define RIGHT 3
+
+typedef union {
+    uint16_t data;
+    struct {
+        unsigned key_code:6;
+        unsigned device:5;
+        unsigned toggle_bit:1;
+        unsigned reserved:3;
+    };
+} RC5data_t;
+
+#endif
+
 #define I2C_SLAVEADDRESS 10
 #define I2C_CMD_REGISTER 0
 #define I2C_CMD_MAX_ARGS 5
@@ -37,6 +57,8 @@ enum
     I2C_MOTOR_LEFT_DESTDIST_HIGH,
     I2C_MOTOR_RIGHT_DESTDIST_LOW,
     I2C_MOTOR_RIGHT_DESTDIST_HIGH,
+
+    I2C_MOTOR_DIRECTIONS,
 
     I2C_ROTATE_FACTOR_LOW,
     I2C_ROTATE_FACTOR_HIGH,
@@ -81,6 +103,19 @@ typedef enum
     ACS_POWER_MED,
     ACS_POWER_HIGH,
 } EACSPowerState;
+
+// Cheap way to pack all motor directions
+typedef union
+{
+    uint8_t byte;
+    struct
+    {
+        uint8_t left:2;
+        uint8_t right:2;
+        uint8_t destLeft:2;
+        uint8_t destRight:2;
+    };
+} SMotorDirections;
 
 enum
 {
@@ -131,12 +166,15 @@ typedef enum
     SERIAL_MOTOR_DESTDIST_RIGHT,
     SERIAL_MOTOR_CURRENT_LEFT,
     SERIAL_MOTOR_CURRENT_RIGHT,
+    SERIAL_MOTOR_DIRECTIONS,
 
     SERIAL_BATTERY,
 
     SERIAL_ACS_POWER,
 
     SERIAL_MIC,
+
+    SERIAL_LASTRC5,
 } ESerialMessage;
 
 
