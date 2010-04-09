@@ -16,6 +16,19 @@ QLabel *createDataLabel(const QString &l)
     return ret;
 }
 
+QString directionString(uint8_t dir)
+{
+    switch (dir)
+    {
+        case FWD: return "forward"; break;
+        case BWD: return "backward"; break;
+        case LEFT: return "left"; break;
+        case RIGHT: return "right"; break;
+    }
+    
+    return QString();
+}
+
 }
 
 
@@ -37,6 +50,10 @@ CQtClient::CQtClient() : tcpReadBlockSize(0)
     QTimer *uptimer = new QTimer(this);
     connect(uptimer, SIGNAL(timeout()), this, SLOT(updateSensors()));
     uptimer->start(500);
+    
+    currentMotorDirections.byte = 0;
+    
+    appendLogText("Started RP6 Qt frontend.\n");
 }
 
 QWidget *CQtClient::createMainTab()
@@ -143,6 +160,11 @@ QWidget *CQtClient::createOverviewWidget(void)
     hbox = new QHBoxLayout(w);
     hbox->addWidget(motorCurrentLCD[0] = new QLCDNumber);
     hbox->addWidget(motorCurrentLCD[1] = new QLCDNumber);
+
+    form->addRow("Direction", w = new QWidget);
+    hbox = new QHBoxLayout(w);
+    hbox->addWidget(motorDirection[0] = createDataLabel("<none>"));
+    hbox->addWidget(motorDirection[1] = createDataLabel("<none>"));
 
     
     // Light sensors group box
@@ -345,10 +367,12 @@ void CQtClient::appendConsoleText(const QString &text)
 
 void CQtClient::appendLogText(const QString &text)
 {
-    QTextCursor cur = logWidget->textCursor();
+    logWidget->appendHtml(QString("<FONT color=#FF0000><strong>[%1]</strong></FONT> %2")
+            .arg(QTime::currentTime().toString()).arg(text));
+/*    QTextCursor cur = logWidget->textCursor();
     cur.movePosition(QTextCursor::End);
     logWidget->setTextCursor(cur);
-    logWidget->insertPlainText(text);
+    logWidget->insertPlainText(text);*/
 }
 
 void CQtClient::parseTcp(QDataStream &stream)
@@ -393,6 +417,24 @@ void CQtClient::parseTcp(QDataStream &stream)
         stream >> var;
         micPlot->addData("Microphone", var.toInt());
     }
+    else if (msg == "motordir")
+    {
+        QVariant var;
+        stream >> var;
+        SMotorDirections dir;
+        dir.byte = var.toInt();
+        updateMotorDirections(dir);
+    }
+    else if (msg == "rc5")
+    {
+        QVariant var;
+        stream >> var;
+        RC5data_t rc5;
+        rc5.data = var.toInt();
+        RC5DeviceLabel->setText(QString::number(rc5.device));
+        RC5KeyLabel->setText(QString::number(rc5.key_code));
+        RC5ToggleBitBox->setChecked(rc5.toggle_bit);
+    }
     else
     {
         // Other data that needs to be averaged
@@ -411,8 +453,31 @@ void CQtClient::updateStateSensors(const SStateSensors &state)
     ACSCollisionBox[0]->setChecked(state.ACSLeft);
     ACSCollisionBox[1]->setChecked(state.ACSRight);
     
-    ACSPlot->addData("Left", state.ACSLeft);
-    ACSPlot->addData("Right", state.ACSRight);
+    ACSPlot->addData("Left", state.ACSLeft * ACSPowerSlider->value());
+    ACSPlot->addData("Right", state.ACSRight * ACSPowerSlider->value());
+}
+
+void CQtClient::updateMotorDirections(const SMotorDirections &dir)
+{
+    if (dir.byte != currentMotorDirections.byte)
+    {
+        QString leftS(directionString(dir.left)), rightS(directionString(dir.right));
+        if (dir.left != currentMotorDirections.left)
+            appendLogText(QString("Changed left motor direction to %1.\n").arg(leftS));
+        
+        if (dir.right != currentMotorDirections.right)
+            appendLogText(QString("Changed right motor direction to %1.\n").arg(rightS));
+        
+        if (dir.destLeft != currentMotorDirections.destLeft)
+            appendLogText(QString("Changed left destination motor direction to %1.\n").arg(directionString(dir.destLeft)));
+        
+        if (dir.destRight != currentMotorDirections.destRight)
+            appendLogText(QString("Changed right destination motor direction to %1.\n").arg(directionString(dir.destRight)));
+        
+        currentMotorDirections.byte = dir.byte;
+        motorDirection[0]->setText(leftS);
+        motorDirection[1]->setText(rightS);
+    }
 }
 
 void CQtClient::serverHasData()

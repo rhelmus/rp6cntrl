@@ -30,15 +30,19 @@ src_control = [
 
 src_main_lib = [
     rp6lib + "/RP6base/RP6RobotBaseLib.c",
-    rp6lib + "/RP6common/RP6uart.c",
     rp6lib + "/RP6common/RP6I2CslaveTWI.c",
 ]
 
 src_control_lib = [
     rp6lib + "/RP6control/RP6ControlLib.c",
-    rp6lib + "/RP6common/RP6uart.c",
     rp6lib + "/RP6common/RP6I2CmasterTWI.c",
 ]
+
+src_shared_lib = rp6lib + "/RP6common/RP6uart.c"
+target_main_shared = "main/RP6uart"
+target_control_shared = "m32/RP6uart"
+
+main_defines = "-DRP6MAIN"
 
 # ---------------------------------------------
 
@@ -135,14 +139,20 @@ if not rp6.GetOption('clean'):
         Exit(1)
     rp6 = conf.Finish()
 
+main_shared_o = rp6.Object(target_main_shared, src_shared_lib)
+
 # Build main
-rp6.Program(target_main + ".elf", src_main + src_main_lib)
+rp6.Program(target_main + ".elf", src_main + src_main_lib + main_shared_o,
+    CPPDEFINES=Split("$CPPDEFINES " + main_defines))
 
 rp6.Command(target_main + ".hex", target_main + ".elf",
             "avr-objcopy -O %s -R .eeprom $SOURCE $TARGET" % format)
 
 # Build control
-rp6.Program(target_control + ".elf", src_control + src_control_plugins + src_control_lib)
+control_shared_o = rp6.Object(target_control_shared, src_shared_lib)
+
+rp6.Program(target_control + ".elf", src_control + src_control_plugins +
+    src_control_lib + control_shared_o)
 
 rp6.Command(target_control + ".hex", target_control + ".elf",
             "avr-objcopy -O %s -R .eeprom $SOURCE $TARGET" % format)

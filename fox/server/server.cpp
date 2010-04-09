@@ -42,12 +42,15 @@ void CControl::initSerial2TcpMap()
     serial2TcpMap.insert(SERIAL_MOTOR_DESTDIST_RIGHT, SSerial2TcpInfo(DATA_WORD, "destdistright"));
     serial2TcpMap.insert(SERIAL_MOTOR_CURRENT_LEFT, SSerial2TcpInfo(DATA_WORD, "motorcurrentleft"));
     serial2TcpMap.insert(SERIAL_MOTOR_CURRENT_RIGHT, SSerial2TcpInfo(DATA_WORD, "motorcurrentright"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DIRECTIONS, SSerial2TcpInfo(DATA_BYTE, "motordir"));
 
     serial2TcpMap.insert(SERIAL_BATTERY, SSerial2TcpInfo(DATA_WORD, "battery"));
 
     serial2TcpMap.insert(SERIAL_ACS_POWER, SSerial2TcpInfo(DATA_BYTE, "acspower"));
 
     serial2TcpMap.insert(SERIAL_MIC, SSerial2TcpInfo(DATA_WORD, "mic"));
+
+    serial2TcpMap.insert(SERIAL_LASTRC5, SSerial2TcpInfo(DATA_WORD, "rc5"));
 }
 
 void CControl::handleSerialText(const QByteArray &text)

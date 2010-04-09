@@ -5,20 +5,6 @@
 
 // From RP6RobotBaseLib.h. Keep this in sync!
 #define TOGGLEBIT 32
-#define FWD 0
-#define BWD 1
-#define LEFT 2
-#define RIGHT 3
-
-typedef union {
-    uint16_t data;
-    struct {
-        unsigned key_code:6;
-        unsigned device:5;
-        unsigned toggle_bit:1;
-        unsigned reserved:3;
-    };
-} RC5data_t;
 
 #define ACS_STATE_IDLE 0
 #define ACS_STATE_IRCOMM_DELAY 1
@@ -87,6 +73,9 @@ inline uint16_t getLeftMotorDestDist(void)
 inline uint16_t getRightMotorDestDist(void)
 { return slaveData[I2C_MOTOR_RIGHT_DESTDIST_LOW] +
          (slaveData[I2C_MOTOR_RIGHT_DESTDIST_HIGH] << 8); }
+
+inline SMotorDirections getMotorDirections(void)
+{ return (SMotorDirections)slaveData[I2C_MOTOR_DIRECTIONS]; }
 
 inline uint16_t getRotationFactor(void)
 { return slaveData[I2C_ROTATE_FACTOR_LOW] + (slaveData[I2C_ROTATE_FACTOR_HIGH] << 8); }
