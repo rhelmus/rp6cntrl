@@ -3,6 +3,8 @@
 #include <QtGui>
 #include <QtNetwork>
 
+#include <qwt_slider.h>
+
 #include "client.h"
 #include "sensorplot.h"
 #include "tcputil.h"
@@ -20,19 +22,64 @@ QString directionString(uint8_t dir)
 {
     switch (dir)
     {
-        case FWD: return "forward"; break;
-        case BWD: return "backward"; break;
-        case LEFT: return "left"; break;
-        case RIGHT: return "right"; break;
+        case FWD: return "forward";
+        case BWD: return "backward";
+        case LEFT: return "left";
+        case RIGHT: return "right";
     }
     
     return QString();
 }
 
+QString ACSStateToString(uint8_t state)
+{
+    switch (state)
+    {
+        case ACS_STATE_IDLE: return "idle";
+        case ACS_STATE_IRCOMM_DELAY: return "checking for incoming ircomm";
+        case ACS_STATE_SEND_LEFT: return "sending left pulses";
+        case ACS_STATE_WAIT_LEFT: return "receiving left pulses";
+        case ACS_STATE_SEND_RIGHT: return "sending right pulses";
+        case ACS_STATE_WAIT_RIGHT: return "receiving right pulses";
+    }
+    
+    return QString();
+}
+
+QPushButton *createDriveButton(const QIcon &icon, Qt::Key key)
+{
+    QPushButton *ret = new QPushButton;
+    ret->setIcon(icon);
+    ret->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    ret->setShortcut(key);
+    return ret;
+}
+
+QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max)
+{
+    QFrame *ret = new QFrame;
+    ret->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    ret->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
+
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    QLabel *label = new QLabel(title);
+    label->setAlignment(Qt::AlignCenter);
+    vbox->addWidget(label);
+
+    vbox->addWidget(slider = new QwtSlider(0, Qt::Vertical, QwtSlider::LeftScale));
+    slider->setScale(min, max);
+    slider->setRange(min, max);
+    slider->setReadOnly(true);
+    
+    return ret;
+}
+
 }
 
 
-CQtClient::CQtClient() : tcpReadBlockSize(0)
+CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
+                     driveTurning(false), driveForwardSpeed(0), driveTurnSpeed(0)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
@@ -51,6 +98,7 @@ CQtClient::CQtClient() : tcpReadBlockSize(0)
     connect(uptimer, SIGNAL(timeout()), this, SLOT(updateSensors()));
     uptimer->start(500);
     
+    currentStateSensors.byte = 0;
     currentMotorDirections.byte = 0;
     
     appendLogText("Started RP6 Qt frontend.\n");
@@ -67,7 +115,6 @@ QWidget *CQtClient::createMainTab()
     
     QTabWidget *tabWidget = new QTabWidget;
     splitter->addWidget(tabWidget);
-
     tabWidget->addTab(createOverviewWidget(), "Overview");
     tabWidget->addTab(createSpeedWidget(), "Motor speed");
     tabWidget->addTab(createDistWidget(), "Motor distance");
@@ -77,13 +124,9 @@ QWidget *CQtClient::createMainTab()
     tabWidget->addTab(createBatteryWidget(), "Battery");
     tabWidget->addTab(createMicWidget(), "Microphone");
 
-    
-    vbox->addWidget(serverEdit = new QLineEdit);
-    serverEdit->setText("localhost");
-    
-    QPushButton *button = new QPushButton("Connect");
-    connect(button, SIGNAL(clicked()), this, SLOT(connectToServer()));
-    vbox->addWidget(button);
+    splitter->addWidget(tabWidget = new QTabWidget);
+    tabWidget->addTab(createConnectionWidget(), "Connection");
+    tabWidget->addTab(createDriveWidget(), "Drive");
     
     return ret;
 }
@@ -347,12 +390,94 @@ QWidget *CQtClient::createMicWidget(void)
 {
     QWidget *ret = new QWidget;
     
-    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
 
     micPlot = new CSensorPlot("Microphone");
     micPlot->addSensor("Microphone", Qt::red);
 
-    hbox->addWidget(micPlot);
+    vbox->addWidget(micPlot);
+    
+    QWidget *w = new QWidget;
+    w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    vbox->addWidget(w, 0, Qt::AlignCenter);
+    
+    QHBoxLayout *hbox = new QHBoxLayout(w);
+    
+    hbox->addWidget(micUpdateTimeSpinBox = new QSpinBox);
+    micUpdateTimeSpinBox->setSuffix(" ms");
+    micUpdateTimeSpinBox->setRange(0, 100000);
+    micUpdateTimeSpinBox->setValue(500);
+    micUpdateTimeSpinBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    connect(micUpdateTimeSpinBox, SIGNAL(valueChanged(int)), this, SLOT(setMicUpdateTime(int)));
+    
+    hbox->addWidget(micUpdateToggleButton = new QPushButton("Record..."));
+    micUpdateToggleButton->setCheckable(true);
+    micUpdateToggleButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    connect(micUpdateToggleButton, SIGNAL(toggled(bool)), this, SLOT(micPlotToggled(bool)));
+    
+    return ret;
+}
+
+QWidget *CQtClient::createConnectionWidget()
+{
+    QWidget *ret = new QWidget;
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    
+    hbox->addWidget(serverEdit = new QLineEdit);
+    serverEdit->setText("localhost");
+    
+    QPushButton *button = new QPushButton("Connect");
+    connect(button, SIGNAL(clicked()), this, SLOT(connectToServer()));
+    hbox->addWidget(button);
+    
+    return ret;
+}
+
+QWidget *CQtClient::createDriveWidget()
+{
+    QWidget *ret = new QWidget;
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    
+    // Arrow box
+    QWidget *w = new QWidget;
+    w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    hbox->addWidget(w);
+    
+    QGridLayout *grid = new QGridLayout(w);
+    
+    driveMapper = new QSignalMapper(this);
+    connect(driveMapper, SIGNAL(mapped(int)), this, SLOT(driveButtonPressed(int)));
+    
+    QPushButton *button = createDriveButton(style()->standardIcon(QStyle::SP_ArrowUp), Qt::Key_Up);
+    connect(button, SIGNAL(clicked()), driveMapper, SLOT(map()));
+    driveMapper->setMapping(button, FWD);
+    grid->addWidget(button, 0, 1);
+    
+    button = createDriveButton(style()->standardIcon(QStyle::SP_ArrowLeft), Qt::Key_Left);
+    connect(button, SIGNAL(clicked()), driveMapper, SLOT(map()));
+    driveMapper->setMapping(button, LEFT);
+    grid->addWidget(button, 1, 0);
+    
+    button = createDriveButton(style()->standardIcon(QStyle::SP_ArrowDown), Qt::Key_Down);
+    connect(button, SIGNAL(clicked()), driveMapper, SLOT(map()));
+    driveMapper->setMapping(button, BWD);
+    grid->addWidget(button, 1, 1);
+
+    button = createDriveButton(style()->standardIcon(QStyle::SP_ArrowRight), Qt::Key_Right);
+    connect(button, SIGNAL(clicked()), driveMapper, SLOT(map()));
+    driveMapper->setMapping(button, RIGHT);
+    grid->addWidget(button, 1, 2);
+    
+    // Others
+    button = new QPushButton("Full stop");
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    connect(button, SIGNAL(clicked()), this, SLOT(stopDriveButtonPressed()));
+    hbox->addWidget(button);
+    
+    hbox->addWidget(createSlider("<qt><strong>Left</strong>", driveSpeedSlider[0], -255, 255));
+    hbox->addWidget(createSlider("<qt><strong>Right</strong>", driveSpeedSlider[1], -255, 255));
     
     return ret;
 }
@@ -455,6 +580,13 @@ void CQtClient::updateStateSensors(const SStateSensors &state)
     
     ACSPlot->addData("Left", state.ACSLeft * ACSPowerSlider->value());
     ACSPlot->addData("Right", state.ACSRight * ACSPowerSlider->value());
+    
+    if (currentStateSensors.movementComplete && !state.movementComplete)
+        appendLogText("Started movement.");
+    else if (!currentStateSensors.movementComplete && state.movementComplete)
+        appendLogText("Finished movement.");
+    
+    currentStateSensors.byte = state.byte;
 }
 
 void CQtClient::updateMotorDirections(const SMotorDirections &dir)
@@ -478,6 +610,48 @@ void CQtClient::updateMotorDirections(const SMotorDirections &dir)
         motorDirection[0]->setText(leftS);
         motorDirection[1]->setText(rightS);
     }
+}
+
+void CQtClient::executeCommand(const QString &cmd)
+{
+    appendLogText(QString("Executing RP6 console command: \"%1\"\n").arg(cmd));
+    
+    if (clientSocket->state() == QAbstractSocket::ConnectedState)
+    {
+        CTcpWriter tcpWriter(clientSocket);
+        tcpWriter << QString("command");
+        tcpWriter << cmd;
+        tcpWriter.write();
+    }
+    else
+        appendLogText("WARNING: Cannot execute command: not connected!\n");
+}
+
+void CQtClient::changeDriveSpeedVar(int &speed, int delta)
+{
+    const int minflipspeed = 30, maxspeed = 160;
+    
+    speed += delta;
+
+    if (delta > 0)
+    {
+        if ((speed < 0) && (-(speed) < minflipspeed))
+            speed = -(speed);
+        else if ((speed > 0) && (speed < minflipspeed))
+            speed = minflipspeed;
+    }
+    else
+    {
+        if ((speed > 0) && (speed < minflipspeed))
+            speed = -(speed);
+        else if ((speed < 0) && (-(speed) < minflipspeed))
+            speed = -minflipspeed;
+    }
+
+    if (speed < -maxspeed)
+        speed = -maxspeed;
+    else if (speed > maxspeed)
+        speed = maxspeed;
 }
 
 void CQtClient::serverHasData()
@@ -592,18 +766,99 @@ void CQtClient::connectToServer()
     clientSocket->connectToHost(serverEdit->text(), 40000);
 }
 
+void CQtClient::setMicUpdateTime(int value)
+{
+    if (micUpdateToggleButton->isChecked())
+        executeCommand(QString("set slavemic %1").arg(value));
+}
+
+void CQtClient::micPlotToggled(bool checked)
+{
+    if (checked)
+        executeCommand(QString("set slavemic %1").arg(micUpdateTimeSpinBox->value()));
+    else
+        executeCommand("set slavemic 0");
+}
+
+void CQtClient::driveButtonPressed(int dir)
+{
+    const int speedchange = 5, startspeed = 60;
+    
+    if (currentStateSensors.bumperLeft || currentStateSensors.bumperRight || !currentStateSensors.movementComplete)
+        return;
+    
+    if (driveForwardSpeed == 0)
+        driveForwardSpeed = (dir == BWD) ? -startspeed : startspeed;
+    
+    // Change from left/right to up/down?   
+    if (((dir == FWD) || (dir == BWD)) && driveTurning)
+        driveTurnSpeed = 0;
+    
+    if (dir == FWD)
+        changeDriveSpeedVar(driveForwardSpeed, speedchange);
+    else if (dir == BWD)
+        changeDriveSpeedVar(driveForwardSpeed, -speedchange);
+    else if (dir == RIGHT)
+        changeDriveSpeedVar(driveTurnSpeed, speedchange);
+    else if (dir == LEFT)
+        changeDriveSpeedVar(driveTurnSpeed, -speedchange);
+   
+    driveTurning = ((dir == LEFT) || (dir == RIGHT));
+    
+    if (driveForwardSpeed < 0)
+    {
+        if ((currentMotorDirections.destLeft != BWD) || (currentMotorDirections.destRight != BWD))
+            executeCommand("set dir bwd");
+    }
+    else
+    {
+        if ((currentMotorDirections.destLeft != FWD) || (currentMotorDirections.destRight != FWD))
+            executeCommand("set dir fwd");
+    }
+    
+    if (driveTurning)
+    {
+        const int speed = abs(driveForwardSpeed);
+        int left, right;
+
+        if (driveTurnSpeed < 0) // Left
+        {
+            left = speed - ((speed < -driveTurnSpeed) ? speed : -driveTurnSpeed);
+            right = speed;
+        }
+        else // right
+        {
+            left = speed;
+            right = speed - ((speed < driveTurnSpeed) ? speed : driveTurnSpeed);
+        }
+
+        executeCommand(QString("set speed %1 %2").arg(left).arg(right));
+        
+        driveSpeedSlider[0]->setValue((driveForwardSpeed < 0) ? -left : left);
+        driveSpeedSlider[1]->setValue((driveForwardSpeed < 0) ? -right : right);
+    }
+    else
+    {
+        executeCommand(QString("set speed %1 %1").arg(abs(driveForwardSpeed)));
+        driveSpeedSlider[0]->setValue(driveForwardSpeed);
+        driveSpeedSlider[1]->setValue(driveForwardSpeed);
+    }
+}
+
+void CQtClient::stopDriveButtonPressed()
+{
+    executeCommand("stop");
+    driveForwardSpeed = 0;
+    driveTurnSpeed = 0;
+    driveTurning = false;
+    driveSpeedSlider[0]->setValue(0);
+    driveSpeedSlider[1]->setValue(0);
+}
+
 void CQtClient::sendConsoleCommand()
 {
     // Append cmd
     appendConsoleText(QString("> %1\n").arg(consoleIn->text()));
-    
-    if (clientSocket->state() == QAbstractSocket::ConnectedState)
-    {
-        CTcpWriter tcpWriter(clientSocket);
-        tcpWriter << QString("command");
-        tcpWriter << consoleIn->text();
-        tcpWriter.write();
-    }
-    
+    executeCommand(consoleIn->text());
     consoleIn->clear();
 }
