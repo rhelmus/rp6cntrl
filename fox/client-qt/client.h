@@ -12,7 +12,12 @@ class QLabel;
 class QLCDNumber;
 class QLineEdit;
 class QPlainTextEdit;
+class QPushButton;
+class QSignalMapper;
 class QSlider;
+class QSpinBox;
+
+class QwtSlider;
 
 class CSensorPlot;
 
@@ -61,6 +66,16 @@ class CQtClient: public QMainWindow
     CSensorPlot *batteryPlot;
     CSensorPlot *micPlot;
     
+    QSpinBox *micUpdateTimeSpinBox;
+    QPushButton *micUpdateToggleButton;
+    
+    QSignalMapper *driveMapper;
+    int currentDriveDirection;
+    bool driveTurning;
+    int driveForwardSpeed, driveTurnSpeed;
+    QwtSlider *driveSpeedSlider[2];
+    
+    SStateSensors currentStateSensors;
     SMotorDirections currentMotorDirections;
     
     QWidget *createMainTab(void);
@@ -76,17 +91,26 @@ class CQtClient: public QMainWindow
     QWidget *createBatteryWidget(void);
     QWidget *createMicWidget(void);
     
+    QWidget *createConnectionWidget(void);
+    QWidget *createDriveWidget(void);
+    
     void appendConsoleText(const QString &text);
     void appendLogText(const QString &text);
     void parseTcp(QDataStream &stream);
     void updateStateSensors(const SStateSensors &state);
     void updateMotorDirections(const SMotorDirections &dir);
+    void executeCommand(const QString &cmd);
+    void changeDriveSpeedVar(int &speed, int delta);
     
 private slots:
     void serverHasData(void);
     void socketError(QAbstractSocket::SocketError error);
     void updateSensors(void);
     void connectToServer(void);
+    void setMicUpdateTime(int value);
+    void micPlotToggled(bool checked);
+    void driveButtonPressed(int dir);
+    void stopDriveButtonPressed(void);
     void sendConsoleCommand(void);
     
 public:

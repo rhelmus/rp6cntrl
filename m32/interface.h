@@ -4,14 +4,8 @@
 #include "shared.h"
 
 // From RP6RobotBaseLib.h. Keep this in sync!
-#define TOGGLEBIT 32
 
-#define ACS_STATE_IDLE 0
-#define ACS_STATE_IRCOMM_DELAY 1
-#define ACS_STATE_SEND_LEFT 2
-#define ACS_STATE_WAIT_LEFT 3
-#define ACS_STATE_SEND_RIGHT 5
-#define ACS_STATE_WAIT_RIGHT 6
+#define TOGGLEBIT 32
 
 // --- End RP6 base code
 

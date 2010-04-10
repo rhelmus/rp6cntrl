@@ -21,7 +21,15 @@ typedef union {
     };
 } RC5data_t;
 
+#define ACS_STATE_IDLE 0
+#define ACS_STATE_IRCOMM_DELAY 1
+#define ACS_STATE_SEND_LEFT 2
+#define ACS_STATE_WAIT_LEFT 3
+#define ACS_STATE_SEND_RIGHT 5
+#define ACS_STATE_WAIT_RIGHT 6
+
 #endif
+// --- End RP6 base code
 
 #define I2C_SLAVEADDRESS 10
 #define I2C_CMD_REGISTER 0
