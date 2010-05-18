@@ -215,7 +215,7 @@ void updateInterface(void)
             if (slaveMode)
                 sendSerialMSGByte(SERIAL_STATE_SENSORS, slaveData[I2C_STATE_SENSORS]);
         }
-        else if (getStopwatch1() > 100)
+        else if (getStopwatch1() > 50)
         {
             I2CTWI_requestRegisterFromDevice(I2C_SLAVEADDRESS, REQUEST_DUMP_BASE_DATA,
                                              I2C_LEDS, I2C_MAX_INDEX-I2C_LEDS);

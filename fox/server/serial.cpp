@@ -7,7 +7,7 @@
 
 CSerialPort::CSerialPort(QObject *parent) : QObject(parent)
 {
-    serialPort = new QextSerialPort("/dev/ttyUSB0", QextSerialPort::EventDriven);
+    serialPort = new QextSerialPort("/dev/ttyUSB1", QextSerialPort::EventDriven);
     serialPort->setParent(this);
     serialPort->setBaudRate(BAUD38400);
     serialPort->setFlowControl(FLOW_OFF);
@@ -28,6 +28,10 @@ CSerialPort::CSerialPort(QObject *parent) : QObject(parent)
     
     serialPort->setDtr(false);
     serialPort->setRts(false);
+
+    commandProcessTimer = new QTimer(this);
+    connect(commandProcessTimer, SIGNAL(timeout()), this,
+            SLOT(processCommandQueue()));
 }
 
 void CSerialPort::onReadyRead()
@@ -103,6 +107,15 @@ void CSerialPort::disableRTS()
     serialPort->setRts(false);
 }
 
+void CSerialPort::processCommandQueue()
+{
+    QString command = commandQueue.dequeue();
+    serialPort->write((command + "\n").toLatin1());
+
+    if (commandQueue.isEmpty())
+        commandProcessTimer->stop();
+}
+
 void CSerialPort::resetRP6()
 {
     serialPort->setRts(true);
@@ -111,5 +124,8 @@ void CSerialPort::resetRP6()
 
 void CSerialPort::sendCommand(const QString &command)
 {
-    serialPort->write((command + "\n").toLatin1());
+    commandQueue.enqueue(command);
+
+    if (!commandProcessTimer->isActive())
+        commandProcessTimer->start(5); // Execute console commands every 25 msec
 }

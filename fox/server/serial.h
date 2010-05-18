@@ -2,8 +2,11 @@
 #define SERIAL_H
 
 #include <QObject>
+#include <QQueue>
 
 #include "shared.h"
+
+class QTimer;
 
 class QextSerialPort;
 
@@ -13,10 +16,13 @@ class CSerialPort: public QObject
 
     QextSerialPort *serialPort;
     QByteArray msgBuffer, textBuffer;
+    QQueue<QString> commandQueue;
+    QTimer *commandProcessTimer;
 
 private slots:
     void onReadyRead(void);
     void disableRTS(void);
+    void processCommandQueue(void);
 
 public:
     CSerialPort(QObject *parent);

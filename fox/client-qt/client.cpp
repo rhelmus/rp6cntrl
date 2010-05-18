@@ -6,6 +6,7 @@
 #include <qwt_slider.h>
 
 #include "client.h"
+#include "scanner.h"
 #include "sensorplot.h"
 #include "tcputil.h"
 
@@ -46,6 +47,19 @@ QString ACSStateToString(uint8_t state)
     return QString();
 }
 
+QString ACSPowerToString(EACSPowerState state)
+{
+    switch (state)
+    {
+        case ACS_POWER_OFF: return "off";
+        case ACS_POWER_LOW: return "low";
+        case ACS_POWER_MED: return "med";
+        case ACS_POWER_HIGH: return "high";
+    }
+    
+    return QString();
+}
+
 QPushButton *createDriveButton(const QIcon &icon, Qt::Key key)
 {
     QPushButton *ret = new QPushButton;
@@ -79,7 +93,10 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
 
 
 CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
-                     driveTurning(false), driveForwardSpeed(0), driveTurnSpeed(0)
+                     driveTurning(false), driveForwardSpeed(0), driveTurnSpeed(0),
+                     isScanning(false), alternatingScan(false),
+                     remainingACSCycles(0), firstStateUpdate(false),
+                     ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
@@ -90,6 +107,7 @@ CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
     mainTab->addTab(createLogTab(), "Log");
     
     clientSocket = new QTcpSocket(this);
+    connect(clientSocket, SIGNAL(connected()), this, SLOT(connectedToServer()));
     connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
     connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
             this, SLOT(socketError(QAbstractSocket::SocketError)));
@@ -99,6 +117,8 @@ CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
     uptimer->start(500);
     
     currentStateSensors.byte = 0;
+    motorDistance[0] = motorDistance[1] = 0;
+    destMotorDistance[0] = destMotorDistance[1] = 0;
     currentMotorDirections.byte = 0;
     
     appendLogText("Started RP6 Qt frontend.\n");
@@ -127,6 +147,7 @@ QWidget *CQtClient::createMainTab()
     splitter->addWidget(tabWidget = new QTabWidget);
     tabWidget->addTab(createConnectionWidget(), "Connection");
     tabWidget->addTab(createDriveWidget(), "Drive");
+    tabWidget->addTab(createScannerWidget(), "Scan");
     
     return ret;
 }
@@ -482,6 +503,35 @@ QWidget *CQtClient::createDriveWidget()
     return ret;
 }
 
+QWidget *CQtClient::createScannerWidget()
+{
+    QWidget *ret = new QWidget;
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    
+    QWidget *w = new QWidget;
+    w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    hbox->addWidget(w, 0, Qt::AlignVCenter);
+    QFormLayout *form = new QFormLayout(w);
+    
+    form->addRow("Speed", scanSpeedSpinBox = new QSpinBox);
+    scanSpeedSpinBox->setRange(0, 160);
+    scanSpeedSpinBox->setValue(60);
+
+    form->addRow("Scan power", scanPowerComboBox = new QComboBox);
+    scanPowerComboBox->addItems(QStringList() << "Low" << "Medium" << "High" <<
+            "Alternating");
+    scanPowerComboBox->setCurrentIndex(1);
+    
+    form->addRow(scanButton = new QPushButton("Scan"));
+    connect(scanButton, SIGNAL(clicked()), this, SLOT(startScan()));
+    
+    
+    hbox->addWidget(scannerWidget = new CScannerWidget, 0);
+
+    return ret;
+}
+
 void CQtClient::appendConsoleText(const QString &text)
 {
     QTextCursor cur = consoleOut->textCursor();
@@ -542,6 +592,46 @@ void CQtClient::parseTcp(QDataStream &stream)
         stream >> var;
         micPlot->addData("Microphone", var.toInt());
     }
+    else if (msg == "destspeedleft")
+    {
+        QVariant var;
+        stream >> var;
+        motorSpeedPlot->addData("Left (destination)", var.toInt());
+    }
+    else if (msg == "destspeedright")
+    {
+        QVariant var;
+        stream >> var;
+        motorSpeedPlot->addData("Right (destination)", var.toInt());
+    }
+    else if (msg == "distleft")
+    {
+        QVariant var;
+        stream >> var;
+        motorDistanceLCD[0]->display(var.toInt());
+        motorDistancePlot->addData("Left", var.toInt());
+        motorDistance[0] = var.toInt();
+    }
+    else if (msg == "distright")
+    {
+        QVariant var;
+        stream >> var;
+        motorDistanceLCD[1]->display(var.toInt());
+        motorDistancePlot->addData("Right", var.toInt());
+        motorDistance[1] = var.toInt();
+    }
+    else if (msg == "destdistleft")
+    {
+        QVariant var;
+        stream >> var;
+        destMotorDistance[0] = var.toInt();
+    }
+    else if (msg == "destdistright")
+    {
+        QVariant var;
+        stream >> var;
+        destMotorDistance[1] = var.toInt();
+    }
     else if (msg == "motordir")
     {
         QVariant var;
@@ -586,7 +676,54 @@ void CQtClient::updateStateSensors(const SStateSensors &state)
     else if (!currentStateSensors.movementComplete && state.movementComplete)
         appendLogText("Finished movement.");
     
+    if (isScanning)
+        updateScan(currentStateSensors, state);
+    
     currentStateSensors.byte = state.byte;
+    firstStateUpdate = false;
+}
+
+void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &newstate)
+{
+    appendLogText("updateScan()\n");
+    
+    // UNDONE: Which sensor?
+    if (newstate.ACSLeft || newstate.ACSRight)
+        scannerWidget->addPoint(motorDistance[0] * 360 / destMotorDistance[0],
+                                ACSPowerState);
+    else
+        scannerWidget->endPoint();
+    
+    if (!firstStateUpdate && !oldstate.movementComplete && newstate.movementComplete)
+    {
+        stopScan();
+        return;
+    }
+
+    if (alternatingScan && (ACSPowerState != ACS_POWER_OFF))
+    {
+        if (!remainingACSCycles && (newstate.ACSState < 2))
+        {
+            appendLogText("ACS Cycle reached\n");
+            
+            // UNDONE: Only change to more power when no hit
+            EACSPowerState newpower = ACSPowerState;
+            if (newpower == ACS_POWER_LOW)
+                newpower = ACS_POWER_MED;
+            else if (newpower == ACS_POWER_MED)
+                newpower = ACS_POWER_HIGH;
+            else // if (newacs == ACS_POWER_HIGH)
+                newpower = ACS_POWER_LOW;
+            
+            remainingACSCycles = 2; // Wait two more cycles before next switch
+            
+            executeCommand(QString("set acs %1").arg(ACSPowerToString(newpower)));
+        }
+        
+        if (remainingACSCycles && (oldstate.ACSState != ACS_STATE_WAIT_RIGHT) &&
+            (newstate.ACSState == ACS_STATE_WAIT_RIGHT))
+            --remainingACSCycles; // Reached another state cycle
+    }
 }
 
 void CQtClient::updateMotorDirections(const SMotorDirections &dir)
@@ -654,6 +791,14 @@ void CQtClient::changeDriveSpeedVar(int &speed, int delta)
         speed = maxspeed;
 }
 
+void CQtClient::connectedToServer()
+{
+    appendLogText(QString("Connected to server (%1:%2)\n").
+            arg(clientSocket->localAddress().toString()).
+            arg(clientSocket->localPort()));
+    firstStateUpdate = true;
+}
+
 void CQtClient::serverHasData()
 {
     QDataStream in(clientSocket);
@@ -712,30 +857,6 @@ void CQtClient::updateSensors()
             motorSpeedLCD[1]->display(data);
             motorSpeedPlot->addData("Right (actual)", data);
         }
-        else if (it.key() == "destspeedleft")
-        {
-            motorSpeedPlot->addData("Left (destination)", data);
-        }
-        else if (it.key() == "destspeedright")
-        {
-            motorSpeedPlot->addData("Right (destination)", data);
-        }
-        else if (it.key() == "distleft")
-        {
-            motorDistanceLCD[0]->display(data);
-            motorDistancePlot->addData("Left", data);
-        }
-        else if (it.key() == "distright")
-        {
-            motorDistanceLCD[1]->display(data);
-            motorDistancePlot->addData("Right", data);
-        }
-        else if (it.key() == "destdistleft")
-        {
-        }
-        else if (it.key() == "destdistright")
-        {
-        }
         else if (it.key() == "motorcurrentleft")
         {
             motorCurrentLCD[0]->display(data);
@@ -754,6 +875,7 @@ void CQtClient::updateSensors()
         else if (it.key() == "acspower")
         {
             ACSPowerSlider->setValue(data);
+            ACSPowerState = static_cast<EACSPowerState>(data);
         }
         
         it.value().total = it.value().count = 0;
@@ -853,6 +975,40 @@ void CQtClient::stopDriveButtonPressed()
     driveTurning = false;
     driveSpeedSlider[0]->setValue(0);
     driveSpeedSlider[1]->setValue(0);
+}
+
+void CQtClient::startScan()
+{
+    isScanning = true;
+    scannerWidget->clear();
+    scanButton->setEnabled(false);
+    
+    if (scanPowerComboBox->currentText() == "Alternating")
+    {
+        appendLogText("Alternating scan started.\n");
+        executeCommand("set acs low");
+        remainingACSCycles = 2;
+        alternatingScan = true;
+    }
+    else
+    {
+        alternatingScan = false;
+        
+        if (scanPowerComboBox->currentText() == "Low")
+            executeCommand("set acs low");
+        else if (scanPowerComboBox->currentText() == "Medium")
+            executeCommand("set acs med");
+        else if (scanPowerComboBox->currentText() == "High")
+            executeCommand("set acs high");
+    }
+    
+    executeCommand(QString("rotate 360 %1").arg(scanSpeedSpinBox->value()));
+}
+
+void CQtClient::stopScan()
+{
+    isScanning = false;
+    scanButton->setEnabled(true);
 }
 
 void CQtClient::sendConsoleCommand()
