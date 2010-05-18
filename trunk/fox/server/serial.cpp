@@ -5,9 +5,9 @@
 #include "qextserialport.h"
 #include "serial.h"
 
-CSerialPort::CSerialPort(QObject *parent) : QObject(parent)
+CSerialPort::CSerialPort(QObject *parent, const QString &port) : QObject(parent)
 {
-    serialPort = new QextSerialPort("/dev/ttyUSB1", QextSerialPort::EventDriven);
+    serialPort = new QextSerialPort(port, QextSerialPort::EventDriven);
     serialPort->setParent(this);
     serialPort->setBaudRate(BAUD38400);
     serialPort->setFlowControl(FLOW_OFF);

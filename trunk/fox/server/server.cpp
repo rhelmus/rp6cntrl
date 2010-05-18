@@ -9,7 +9,10 @@
 
 CControl::CControl(QObject *parent) : QObject(parent)
 {
-    serialPort = new CSerialPort(this);
+    QStringList args(QCoreApplication::arguments());
+    QString port = (args.size() > 1) ? args.at(1) : "/dev/ttyUSB0";
+    
+    serialPort = new CSerialPort(this, port);
     connect(serialPort, SIGNAL(textAvailable(const QByteArray &)), this,
             SLOT(handleSerialText(const QByteArray &)));
     connect(serialPort, SIGNAL(msgAvailable(ESerialMessage, const QByteArray &)),

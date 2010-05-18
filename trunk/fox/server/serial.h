@@ -25,7 +25,7 @@ private slots:
     void processCommandQueue(void);
 
 public:
-    CSerialPort(QObject *parent);
+    CSerialPort(QObject *parent, const QString &port);
 
     void resetRP6(void);
     void sendCommand(const QString &command);
