@@ -7,6 +7,7 @@
 #include "shared.h"
 
 class QCheckBox;
+class QComboBox;
 class QDataStream;
 class QLabel;
 class QLCDNumber;
@@ -19,6 +20,7 @@ class QSpinBox;
 
 class QwtSlider;
 
+class CScannerWidget;
 class CSensorPlot;
 
 class CQtClient: public QMainWindow
@@ -75,8 +77,20 @@ class CQtClient: public QMainWindow
     int driveForwardSpeed, driveTurnSpeed;
     QwtSlider *driveSpeedSlider[2];
     
+    QSpinBox *scanSpeedSpinBox;
+    QComboBox *scanPowerComboBox;
+    QPushButton *scanButton;
+    CScannerWidget *scannerWidget;
+    bool isScanning;
+    bool alternatingScan;
+    int remainingACSCycles; // Remaining cycles before switch
+    
+    bool firstStateUpdate;
     SStateSensors currentStateSensors;
+    int motorDistance[2];
+    int destMotorDistance[2];
     SMotorDirections currentMotorDirections;
+    EACSPowerState ACSPowerState;
     
     QWidget *createMainTab(void);
     QWidget *createConsoleTab(void);
@@ -93,16 +107,19 @@ class CQtClient: public QMainWindow
     
     QWidget *createConnectionWidget(void);
     QWidget *createDriveWidget(void);
+    QWidget *createScannerWidget(void);
     
     void appendConsoleText(const QString &text);
     void appendLogText(const QString &text);
     void parseTcp(QDataStream &stream);
     void updateStateSensors(const SStateSensors &state);
+    void updateScan(const SStateSensors &oldstate, const SStateSensors &newstate);
     void updateMotorDirections(const SMotorDirections &dir);
     void executeCommand(const QString &cmd);
     void changeDriveSpeedVar(int &speed, int delta);
     
 private slots:
+    void connectedToServer(void);
     void serverHasData(void);
     void socketError(QAbstractSocket::SocketError error);
     void updateSensors(void);
@@ -111,6 +128,8 @@ private slots:
     void micPlotToggled(bool checked);
     void driveButtonPressed(int dir);
     void stopDriveButtonPressed(void);
+    void startScan(void);
+    void stopScan(void);
     void sendConsoleCommand(void);
     
 public:

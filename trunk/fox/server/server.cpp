@@ -84,13 +84,13 @@ void CControl::parseClientTcp(QDataStream &stream)
 {
     QString msg;
     stream >> msg;
-    qDebug() << "Received client msg:" << msg;
 
     if (msg == "command")
     {
         QString cmd;
         stream >> cmd;
         serialPort->sendCommand(cmd);
+        qDebug() << "Received client cmd:" << cmd;
     }
 }
 
