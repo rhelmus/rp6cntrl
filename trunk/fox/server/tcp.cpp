@@ -1,18 +1,17 @@
 #include <QtCore>
 #include <QtNetwork>
+
 #include <iostream>
 
 #include "tcputil.h"
 #include "tcp.h"
-
-using std::cerr;
 
 CTcpServer::CTcpServer(QObject *parent) : QObject(parent)
 {
     tcpServer = new QTcpServer(this);
     if (!tcpServer->listen(QHostAddress::Any, 40000))
     {
-        cerr << "Failed to start server:" << tcpServer->errorString().toStdString();
+        std::cerr << "Failed to start server:" << tcpServer->errorString().toStdString();
         QCoreApplication::exit(1);
         return;
     }

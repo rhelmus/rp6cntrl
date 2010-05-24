@@ -4,6 +4,7 @@
 #include <QMap>
 #include <QObject>
 
+#include "lua.h"
 #include "shared.h"
 
 class CSerialPort;
@@ -23,12 +24,18 @@ class CControl: public QObject
         SSerial2TcpInfo(EDataSerialType d,
                         const char *t) : dataType(d), tcpVariable(t) {}
     };
+
+    typedef QMap<QString, QVariant> TLuaScriptMap;
     
     CSerialPort *serialPort;
     CTcpServer *tcpServer;
     QMap<ESerialMessage, SSerial2TcpInfo> serial2TcpMap;
+    CLuaInterface luaInterface;
 
     void initSerial2TcpMap(void);
+    void initLua(void);
+    TLuaScriptMap getLuaScripts(void);
+    void sendLuaScripts(void);
 
 private slots:
     void handleSerialText(const QByteArray &text);
@@ -38,6 +45,8 @@ private slots:
     
 public:
     CControl(QObject *parent);
+
+    static int luaExecCmd(lua_State *l);
 };
 
 #endif

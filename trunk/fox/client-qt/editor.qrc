@@ -1,0 +1,22 @@
+<RCC>
+    <qresource prefix="/" >
+        <file alias="closeall.png">../qce/closeall.png</file>
+        <file alias="comment.png">../qce/comment.png</file>
+        <file alias="copy.png">../qce/copy.png</file>
+        <file alias="cut.png">../qce/cut.png</file>
+        <file alias="down.png">../qce/down.png</file>
+        <file alias="exit.png">../qce/exit.png</file>
+        <file alias="find.png">../qce/find.png</file>
+        <file alias="goto.png">../qce/goto.png</file>
+        <file alias="indent.png">../qce/indent.png</file>
+        <file alias="paste.png">../qce/paste.png</file>
+        <file alias="redo.png">../qce/redo.png</file>
+        <file alias="reload.png">../qce/reload.png</file>
+        <file alias="replace.png">../qce/replace.png</file>
+        <file alias="uncomment.png">../qce/uncomment.png</file>
+        <file alias="underline.png">../qce/underline.png</file>
+        <file alias="undo.png">../qce/undo.png</file>
+        <file alias="unindent.png">../qce/unindent.png</file>
+        <file alias="up.png">../qce/up.png</file>
+    </qresource>
+</RCC>
