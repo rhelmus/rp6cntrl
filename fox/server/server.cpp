@@ -23,6 +23,7 @@ CControl::CControl(QObject *parent) : QObject(parent)
             SLOT(parseClientTcp(QDataStream &)));
 
     initSerial2TcpMap();
+    initLua();
 }
 
 void CControl::initSerial2TcpMap()
@@ -54,6 +55,34 @@ void CControl::initSerial2TcpMap()
     serial2TcpMap.insert(SERIAL_MIC, SSerial2TcpInfo(DATA_WORD, "mic"));
 
     serial2TcpMap.insert(SERIAL_LASTRC5, SSerial2TcpInfo(DATA_WORD, "rc5"));
+}
+
+void CControl::initLua()
+{
+    luaInterface.registerFunction(luaExecCmd, "exec", this);
+
+    lua_newtable(luaInterface);
+    for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
+         it!=serial2TcpMap.end(); ++it)
+    {
+        lua_pushinteger(luaInterface, 0);
+        lua_setfield(luaInterface, -2, it.value().tcpVariable);
+    }
+    lua_setglobal(luaInterface, "sensortable");
+    
+    luaInterface.exec();
+}
+
+CControl::TLuaScriptMap CControl::getLuaScripts()
+{
+    QSettings settings;
+    return settings.value("scripts").toMap();
+}
+
+void CControl::sendLuaScripts()
+{
+    TLuaScriptMap scripts = getLuaScripts();
+    tcpServer->sendKeyValue("scripts", QVariant(scripts.keys()));
 }
 
 void CControl::handleSerialText(const QByteArray &text)
@@ -95,10 +124,71 @@ void CControl::parseClientTcp(QDataStream &stream)
         serialPort->sendCommand(cmd);
         qDebug() << "Received client cmd:" << cmd;
     }
+    else if (msg == "getscripts")
+        sendLuaScripts();
+    else if (msg == "runlua")
+    {
+        QByteArray script;
+        stream >> script;
+        luaInterface.runScript(script.constData());
+    }
+    else if ((msg == "uploadlua") || (msg == "uprunlua"))
+    {
+        QString name;
+        QByteArray script;
+        stream >> name >> script;
+
+        TLuaScriptMap scripts = getLuaScripts();
+        scripts[name] = script;
+        QSettings().setValue("scripts", scripts);
+
+        sendLuaScripts();
+
+        if (msg == "uprunlua")
+            luaInterface.runScript(script.constData());
+    }
+    else if (msg == "runlocallua")
+    {
+        QString name;
+        stream >> name;
+        
+        TLuaScriptMap scripts = getLuaScripts();
+        if (scripts.find(name) != scripts.end())
+            luaInterface.runScript(scripts[name].toString().toLatin1().data());
+    }
+    else if (msg == "removelocallua")
+    {
+        QString name;
+        stream >> name;
+        
+        TLuaScriptMap scripts = getLuaScripts();
+        scripts.remove(name);
+        QSettings().setValue("scripts", scripts);
+        
+        sendLuaScripts();
+    }
+    else if (msg == "getlocallua")
+    {
+        QString name;
+        stream >> name;
+        
+        TLuaScriptMap scripts = getLuaScripts();
+        if (scripts.find(name) != scripts.end())
+            tcpServer->sendKeyValue("reqscript", scripts[name]);
+    }
 }
 
 void CControl::enableRP6Slave()
 {
     serialPort->sendCommand("set power 1");
     serialPort->sendCommand("set slave 1");
+}
+
+int CControl::luaExecCmd(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    const char *cmd = luaL_checkstring(l, 1);
+    qDebug() << "Exec cmd: " << cmd << "\n";
+    control->serialPort->sendCommand(cmd);
+    return 0;
 }

@@ -12,6 +12,8 @@ class QDataStream;
 class QLabel;
 class QLCDNumber;
 class QLineEdit;
+class QListWidget;
+class QListWidgetItem;
 class QPlainTextEdit;
 class QPushButton;
 class QSignalMapper;
@@ -20,6 +22,7 @@ class QSpinBox;
 
 class QwtSlider;
 
+class CEditor;
 class CScannerWidget;
 class CSensorPlot;
 
@@ -85,6 +88,10 @@ class CQtClient: public QMainWindow
     bool alternatingScan;
     int remainingACSCycles; // Remaining cycles before switch
     
+    CEditor *scriptEditor;
+    QListWidget *localScriptListWidget, *serverScriptListWidget;
+    QListWidgetItem *previousScriptItem;
+    
     bool firstStateUpdate;
     SStateSensors currentStateSensors;
     int motorDistance[2];
@@ -93,6 +100,7 @@ class CQtClient: public QMainWindow
     EACSPowerState ACSPowerState;
     
     QWidget *createMainTab(void);
+    QWidget *createLuaTab(void);
     QWidget *createConsoleTab(void);
     QWidget *createLogTab(void);
     
@@ -109,6 +117,9 @@ class CQtClient: public QMainWindow
     QWidget *createDriveWidget(void);
     QWidget *createScannerWidget(void);
     
+    QWidget *createLocalLuaWidget(void);
+    QWidget *createServerLuaWidget(void);
+    
     void appendConsoleText(const QString &text);
     void appendLogText(const QString &text);
     void parseTcp(QDataStream &stream);
@@ -117,6 +128,7 @@ class CQtClient: public QMainWindow
     void updateMotorDirections(const SMotorDirections &dir);
     void executeCommand(const QString &cmd);
     void changeDriveSpeedVar(int &speed, int delta);
+    bool checkScriptSave(void);
     
 private slots:
     void connectedToServer(void);
@@ -130,7 +142,19 @@ private slots:
     void stopDriveButtonPressed(void);
     void startScan(void);
     void stopScan(void);
+    void localScriptChanged(QListWidgetItem *item);
+    void newLocalScript(void);
+    void addLocalScript(void);
+    void removeLocalScript(void);
+    void uploadLocalScript(void);
+    void runLocalScript(void);
+    void uploadRunLocalScript(void);
+    void runServerScript(void);
+    void removeServerScript(void);
     void sendConsoleCommand(void);
+    
+protected:
+    virtual void closeEvent(QCloseEvent *e);
     
 public:
     CQtClient(void);

@@ -6,6 +6,7 @@
 #include <qwt_slider.h>
 
 #include "client.h"
+#include "editor.h"
 #include "scanner.h"
 #include "sensorplot.h"
 #include "tcputil.h"
@@ -95,14 +96,15 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
 CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
                      driveTurning(false), driveForwardSpeed(0), driveTurnSpeed(0),
                      isScanning(false), alternatingScan(false),
-                     remainingACSCycles(0), firstStateUpdate(false),
-                     ACSPowerState(ACS_POWER_OFF)
+                     remainingACSCycles(0), previousScriptItem(NULL),
+                     firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
     setCentralWidget(mainTab);
     
     mainTab->addTab(createMainTab(), "Main");
+    mainTab->addTab(createLuaTab(), "Lua");
     mainTab->addTab(createConsoleTab(), "Console");
     mainTab->addTab(createLogTab(), "Log");
     
@@ -150,6 +152,31 @@ QWidget *CQtClient::createMainTab()
     tabWidget->addTab(createScannerWidget(), "Scan");
     
     return ret;
+}
+
+QWidget *CQtClient::createLuaTab()
+{
+    QSplitter *split = new QSplitter(Qt::Vertical);
+    
+    QGroupBox *group = new QGroupBox("Editor");
+    split->addWidget(group);
+    QVBoxLayout *vbox = new QVBoxLayout(group);
+    
+    vbox->addWidget(scriptEditor = new CEditor(this));
+    scriptEditor->getToolBar()->addAction(style()->
+            standardIcon(QStyle::SP_DialogSaveButton),
+                         "Save", scriptEditor->editor(), SLOT(save()));
+    
+    QWidget *w = new QWidget;
+    QHBoxLayout *hbox = new QHBoxLayout(w);
+    split->addWidget(w);
+    
+    hbox->addWidget(createLocalLuaWidget());
+    hbox->addWidget(createServerLuaWidget());
+    
+    split->setStretchFactor(0, 66);
+    split->setStretchFactor(1, 33);
+    return split;
 }
 
 QWidget *CQtClient::createConsoleTab()
@@ -532,6 +559,73 @@ QWidget *CQtClient::createScannerWidget()
     return ret;
 }
 
+QWidget *CQtClient::createLocalLuaWidget()
+{
+    QGroupBox *ret = new QGroupBox("Local");
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    
+    hbox->addWidget(localScriptListWidget = new QListWidget);
+    connect(localScriptListWidget, SIGNAL(itemActivated(QListWidgetItem *)), this,
+            SLOT(localScriptChanged(QListWidgetItem *)));
+
+    QSettings settings;
+    QStringList scripts = settings.value("scripts").toStringList();
+    for (QStringList::iterator it=scripts.begin(); it!=scripts.end(); ++it)
+    {
+        QListWidgetItem *item = new QListWidgetItem(QFileInfo(*it).fileName(),
+                localScriptListWidget);
+        item->setData(Qt::UserRole, *it);
+    }
+    
+    QVBoxLayout *vbox = new QVBoxLayout;
+    hbox->addLayout(vbox);
+    
+    QPushButton *button = new QPushButton("New");
+    connect(button, SIGNAL(clicked()), this, SLOT(newLocalScript()));
+    vbox->addWidget(button);
+    
+    vbox->addWidget(button = new QPushButton("Add"));
+    connect(button, SIGNAL(clicked()), this, SLOT(addLocalScript()));
+
+    vbox->addWidget(button = new QPushButton("Remove"));
+    connect(button, SIGNAL(clicked()), this, SLOT(removeLocalScript()));
+    
+    vbox->addWidget(button = new QPushButton("Upload"));
+    connect(button, SIGNAL(clicked()), this, SLOT(uploadLocalScript()));
+    
+    vbox->addWidget(button = new QPushButton("Run"));
+    connect(button, SIGNAL(clicked()), this, SLOT(runLocalScript()));
+    
+    vbox->addWidget(button = new QPushButton("Upload && Run"));
+    connect(button, SIGNAL(clicked()), this, SLOT(uploadRunLocalScript()));
+    
+    return ret;
+}
+
+QWidget *CQtClient::createServerLuaWidget()
+{
+    QGroupBox *ret = new QGroupBox("Fox");
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    
+    hbox->addWidget(serverScriptListWidget = new QListWidget);
+    
+    QVBoxLayout *vbox = new QVBoxLayout;
+    hbox->addLayout(vbox);
+    
+    QPushButton *button = new QPushButton("Run");
+    vbox->addWidget(button);
+    connect(button, SIGNAL(clicked()), this, SLOT(runServerScript()));
+    
+    vbox->addWidget(button = new QPushButton("Remove"));
+    connect(button, SIGNAL(clicked()), this, SLOT(removeServerScript()));
+    
+    vbox->addWidget(button = new QPushButton("Download"));
+    
+    return ret;
+}
+
 void CQtClient::appendConsoleText(const QString &text)
 {
     QTextCursor cur = consoleOut->textCursor();
@@ -649,6 +743,22 @@ void CQtClient::parseTcp(QDataStream &stream)
         RC5DeviceLabel->setText(QString::number(rc5.device));
         RC5KeyLabel->setText(QString::number(rc5.key_code));
         RC5ToggleBitBox->setChecked(rc5.toggle_bit);
+    }
+    else if (msg == "scripts")
+    {
+        QVariant var;
+        stream >> var;
+        
+        serverScriptListWidget->clear();
+        serverScriptListWidget->addItems(var.toStringList());
+    }
+    else if (msg == "reqscript")
+    {
+        QVariant var;
+        stream >> var;
+        QString file = QFileDialog::getSaveFileName(this, "Save script", QString(),
+                "undone", tr("Lua scripts (*.lua)"));
+        // UNDONE
     }
     else
     {
@@ -791,12 +901,35 @@ void CQtClient::changeDriveSpeedVar(int &speed, int delta)
         speed = maxspeed;
 }
 
+bool CQtClient::checkScriptSave()
+{
+    if (scriptEditor->editor()->isContentModified())
+    {
+        QMessageBox::StandardButton ret = QMessageBox::question(this,
+                "Save modified script?", QString("Changes has been made to %1.\nSave?").
+                arg(scriptEditor->editor()->fileName()),
+                QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
+                QMessageBox::Yes);
+        
+        if (ret == QMessageBox::Cancel)
+            return false;
+        else if (ret == QMessageBox::Yes)
+            scriptEditor->editor()->save();
+    }
+    
+    return true;
+}
+
 void CQtClient::connectedToServer()
 {
     appendLogText(QString("Connected to server (%1:%2)\n").
             arg(clientSocket->localAddress().toString()).
             arg(clientSocket->localPort()));
     firstStateUpdate = true;
+    
+    CTcpWriter tcpWriter(clientSocket);
+    tcpWriter << QString("getscripts");
+    tcpWriter.write();
 }
 
 void CQtClient::serverHasData()
@@ -1011,10 +1144,181 @@ void CQtClient::stopScan()
     scanButton->setEnabled(true);
 }
 
+void CQtClient::localScriptChanged(QListWidgetItem *item)
+{
+    const QString fn = item->data(Qt::UserRole).toString();
+    
+    if ((fn != scriptEditor->editor()->fileName()) && !checkScriptSave())
+        localScriptListWidget->setCurrentItem(previousScriptItem);
+    else
+    {
+        if (!QFileInfo(fn).exists())
+        {
+            scriptEditor->editor()->setFileName("");
+            scriptEditor->setText(QString("Could not open file %1.").arg(fn));
+        }
+        else
+            scriptEditor->load(fn);
+
+        previousScriptItem = item;
+    }
+}
+
+void CQtClient::newLocalScript()
+{
+    QString file = QFileDialog::getSaveFileName(this, QString(), QString(),
+            tr("Lua scripts (*.lua)"));
+    
+    if (!file.isNull())
+    {
+        QFile f(file);
+        if (!f.open(QFile::WriteOnly | QFile::Truncate | QFile::Text))
+            QMessageBox::critical(this, "File error", QString("Failed to create file"));
+        else
+        {
+            QSettings settings;
+            QStringList scripts = settings.value("scripts").toStringList();
+            scripts << file;
+            settings.setValue("scripts", scripts);
+
+            QListWidgetItem *item = new QListWidgetItem(QFileInfo(file).fileName(),
+                    localScriptListWidget);
+            item->setData(Qt::UserRole, file);
+            localScriptListWidget->setCurrentItem(item);
+        }
+    }
+}
+
+void CQtClient::addLocalScript()
+{
+    QString file = QFileDialog::getOpenFileName(this, QString(), QString(),
+            tr("Lua scripts (*.lua)"));
+    
+    if (!file.isNull())
+    {
+        QSettings settings;
+        QStringList scripts = settings.value("scripts").toStringList();
+        scripts << file;
+        settings.setValue("scripts", scripts);
+
+        QListWidgetItem *item = new QListWidgetItem(QFileInfo(file).fileName(),
+                localScriptListWidget);
+        item->setData(Qt::UserRole, file);
+        localScriptListWidget->setCurrentItem(item);
+    }
+}
+
+void CQtClient::removeLocalScript()
+{
+    if (localScriptListWidget->currentRow() != -1)
+    {
+        QMessageBox::StandardButton ret = QMessageBox::question(this,
+                "Removing file", "Remove from disk aswell?",
+                            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
+                            QMessageBox::Yes);
+        if (ret != QMessageBox::Cancel)
+        {
+            if (ret == QMessageBox::Yes)
+                QFile::remove(localScriptListWidget->currentItem()->
+                        data(Qt::UserRole).toString());
+            
+            QSettings settings;
+            QStringList scripts = settings.value("scripts").toStringList();
+            scripts.removeAt(localScriptListWidget->currentRow());
+            settings.setValue("scripts", scripts);
+        
+            delete localScriptListWidget->currentItem();
+        }
+    }
+}
+
+void CQtClient::uploadLocalScript()
+{
+    if (localScriptListWidget->currentItem())
+    {
+        QFile file(localScriptListWidget->currentItem()->data(Qt::UserRole).toString());
+        if (!file.open(QFile::ReadOnly | QFile::Text))
+            QMessageBox::critical(this, "File error", QString("Failed to open file."));
+        else
+        {
+            CTcpWriter tcpWriter(clientSocket);
+            tcpWriter << QString("uploadlua");
+            tcpWriter << localScriptListWidget->currentItem()->text();
+            tcpWriter << file.readAll();
+            tcpWriter.write();
+        }
+    }
+}
+
+void CQtClient::runLocalScript()
+{
+    if (localScriptListWidget->currentItem())
+    {
+        QFile file(localScriptListWidget->currentItem()->data(Qt::UserRole).toString());
+        if (!file.open(QFile::ReadOnly | QFile::Text))
+            QMessageBox::critical(this, "File error", QString("Failed to open file."));
+        else
+        {
+            CTcpWriter tcpWriter(clientSocket);
+            tcpWriter << QString("runlua");
+            tcpWriter << file.readAll();
+            tcpWriter.write();
+        }
+    }
+}
+
+void CQtClient::uploadRunLocalScript()
+{
+    if (localScriptListWidget->currentItem())
+    {
+        QFile file(localScriptListWidget->currentItem()->data(Qt::UserRole).toString());
+        if (!file.open(QFile::ReadOnly | QFile::Text))
+            QMessageBox::critical(this, "File error", QString("Failed to open file."));
+        else
+        {
+            CTcpWriter tcpWriter(clientSocket);
+            tcpWriter << QString("uprunlua");
+            tcpWriter << localScriptListWidget->currentItem()->text();
+            tcpWriter << file.readAll();
+            tcpWriter.write();
+        }
+    }
+}
+
+void CQtClient::runServerScript()
+{
+    if (serverScriptListWidget->currentItem())
+    {
+        CTcpWriter tcpWriter(clientSocket);
+        tcpWriter << QString("runlocallua");
+        tcpWriter << serverScriptListWidget->currentItem()->text();
+        tcpWriter.write();
+    }
+}
+
+void CQtClient::removeServerScript()
+{
+    if (serverScriptListWidget->currentItem())
+    {
+        CTcpWriter tcpWriter(clientSocket);
+        tcpWriter << QString("removelocallua");
+        tcpWriter << serverScriptListWidget->currentItem()->text();
+        tcpWriter.write();
+    }
+}
+
 void CQtClient::sendConsoleCommand()
 {
     // Append cmd
     appendConsoleText(QString("> %1\n").arg(consoleIn->text()));
     executeCommand(consoleIn->text());
     consoleIn->clear();
+}
+
+void CQtClient::closeEvent(QCloseEvent *e)
+{
+    if (checkScriptSave())
+        e->accept();
+    else
+        e->ignore();
 }

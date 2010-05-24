@@ -1,0 +1,81 @@
+<!DOCTYPE QNFA>
+<QNFA language="Lua" extensions="lua" defaultLineMark="" >
+    <embed target="Doxygen"/>
+
+    <context id="comment/special" format="comment" stayOnLine="true" >
+        <start>#\!</start>
+        <stop exclusive="false">\n</stop>
+    </context>
+
+    <context id="comment/multi" format="comment">
+        <start parenthesis="luacomment:open" indent="1" fold="1">--\[\[</start>
+        <stop parenthesis="luacomment:close" indent="1" fold="1">\]\]</stop>
+    </context>
+
+       <context id="comment/single" format="comment" stayOnLine="true" >
+        <start>--</start>
+        <stop exclusive="false">\n</stop>
+    </context>
+
+    <context id="data/string1" format="text" >
+        <start>&quot;</start>
+        <stop>&quot;</stop>
+        <stop exclusive="false">\n</stop>
+        <sequence id="escape" format="escapeseq" >\\[nrtvf\\"'\n]</sequence>
+    </context>
+
+    <context id="data/string2" format="text" >
+        <start>'</start>
+        <stop>'</stop>
+        <stop exclusive="false">\n</stop>
+        <sequence id="escape" format="escapeseq" >\\[nrtvf\\"'\n]</sequence>
+    </context>
+
+    <sequence parenthesis="round:open">(</sequence>
+    <sequence parenthesis="round:close">)</sequence>
+    <sequence parenthesis="curly:open" indent="1" fold="1">{</sequence>
+    <sequence parenthesis="curly:close" indent="1" fold="1">}</sequence>
+    <sequence parenthesis="square:open">\[</sequence>
+    <sequence parenthesis="square:close">\]</sequence>
+    
+    <word parenthesis="luablock:open" indent="1" fold="1" format="keyword">do</word>
+    <word parenthesis="luablock:open" indent="1" fold="1" format="keyword">if</word>
+    <word parenthesis="luablock:close" indent="1" fold="1" format="keyword">end</word>
+    <word parenthesis="luablock:open" indent="1" fold="1" format="keyword">function</word>
+    <word parenthesis="repeatblock:open" indent="1" fold="1" format="keyword">repeat</word>
+    <word parenthesis="repeatblock:close" indent="1" fold="1" format="keyword">until</word>
+    
+    <list id="keywords" format="keyword">
+        <word>table.insert</word>
+        <word>coroutine.create</word>
+        <word>coroutine.resume</word>
+        <word>coroutine.yield</word>
+        <word>const</word>
+        <word>and</word>
+        <word>break</word>
+<!--        <word>do</word> -->
+        <word>else</word>
+        <word>elseif</word>
+<!--    <word>end</word> -->
+        <word>false</word>
+        <word>for</word>
+<!--        <word>function</word> -->
+<!--        <word>if</word> -->
+            <word>in</word>
+        <word>local</word>
+        <word>nil</word>
+        <word>not</word>
+        <word>or</word>
+<!--        <word>repeat</word> -->
+        <word>return</word>
+        <word>then</word>
+        <word>true</word>
+<!--        <word>until</word> -->
+        <word>while</word>
+    </list>
+
+    <word id="data/float" format="numbers">-?[0123456789]*.[0123456789]+f?</word>
+    <word id="data/hexadecimal" format="numbers">0[xX][0123456789abcdefABCDEF]+[ulUL]*</word>
+    <word id="data/octal" format="numbers">0[01234567]+</word>
+    <word id="data/decimal" format="numbers">-?[0123456789]+[ulUL]*</word>
+</QNFA>
