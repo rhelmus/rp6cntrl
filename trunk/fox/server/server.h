@@ -46,7 +46,9 @@ private slots:
 public:
     CControl(QObject *parent);
 
+    // Lua bindings
     static int luaExecCmd(lua_State *l);
+    static int luaSendText(lua_State *l);
 };
 
 #endif

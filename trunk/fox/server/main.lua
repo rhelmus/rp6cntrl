@@ -5,3 +5,14 @@ for k, v in pairs(sensortable) do
     end
 end
 
+local oldprint = print
+
+function print(s, ...)
+    oldprint(s, ...)
+
+    if ... then
+        sendtext(s .. table.concat(..., "\t"))
+    else
+        sendtext(s)
+    end
+end

@@ -110,6 +110,7 @@ CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
     
     clientSocket = new QTcpSocket(this);
     connect(clientSocket, SIGNAL(connected()), this, SLOT(connectedToServer()));
+    connect(clientSocket, SIGNAL(disconnected()), this, SLOT(disconnectedFromServer()));
     connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
     connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
             this, SLOT(socketError(QAbstractSocket::SocketError)));
@@ -123,6 +124,8 @@ CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
     destMotorDistance[0] = destMotorDistance[1] = 0;
     currentMotorDirections.byte = 0;
     
+    updateConnection(false);
+
     appendLogText("Started RP6 Qt frontend.\n");
 }
 
@@ -462,6 +465,7 @@ QWidget *CQtClient::createMicWidget(void)
     micUpdateToggleButton->setCheckable(true);
     micUpdateToggleButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     connect(micUpdateToggleButton, SIGNAL(toggled(bool)), this, SLOT(micPlotToggled(bool)));
+    connectionDependentWidgets << micUpdateToggleButton;
     
     return ret;
 }
@@ -475,9 +479,8 @@ QWidget *CQtClient::createConnectionWidget()
     hbox->addWidget(serverEdit = new QLineEdit);
     serverEdit->setText("localhost");
     
-    QPushButton *button = new QPushButton("Connect");
-    connect(button, SIGNAL(clicked()), this, SLOT(connectToServer()));
-    hbox->addWidget(button);
+    hbox->addWidget(connectButton = new QPushButton("Connect"));
+    connect(connectButton, SIGNAL(clicked()), this, SLOT(toggleServerConnection()));
     
     return ret;
 }
@@ -485,6 +488,7 @@ QWidget *CQtClient::createConnectionWidget()
 QWidget *CQtClient::createDriveWidget()
 {
     QWidget *ret = new QWidget;
+    connectionDependentWidgets << ret;
     
     QHBoxLayout *hbox = new QHBoxLayout(ret);
     
@@ -533,6 +537,7 @@ QWidget *CQtClient::createDriveWidget()
 QWidget *CQtClient::createScannerWidget()
 {
     QWidget *ret = new QWidget;
+    connectionDependentWidgets << ret;
     
     QHBoxLayout *hbox = new QHBoxLayout(ret);
     
@@ -593,12 +598,15 @@ QWidget *CQtClient::createLocalLuaWidget()
     
     vbox->addWidget(button = new QPushButton("Upload"));
     connect(button, SIGNAL(clicked()), this, SLOT(uploadLocalScript()));
+    connectionDependentWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Run"));
     connect(button, SIGNAL(clicked()), this, SLOT(runLocalScript()));
+    connectionDependentWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Upload && Run"));
     connect(button, SIGNAL(clicked()), this, SLOT(uploadRunLocalScript()));
+    connectionDependentWidgets << button;
     
     return ret;
 }
@@ -617,13 +625,29 @@ QWidget *CQtClient::createServerLuaWidget()
     QPushButton *button = new QPushButton("Run");
     vbox->addWidget(button);
     connect(button, SIGNAL(clicked()), this, SLOT(runServerScript()));
+    connectionDependentWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Remove"));
     connect(button, SIGNAL(clicked()), this, SLOT(removeServerScript()));
+    connectionDependentWidgets << button;
     
-    vbox->addWidget(button = new QPushButton("Download"));
+    vbox->addWidget(downloadButton = new QPushButton("Download"));
+    connect(downloadButton, SIGNAL(clicked()), this, SLOT(downloadServerScript()));
+    connectionDependentWidgets << downloadButton;
     
     return ret;
+}
+
+void CQtClient::updateConnection(bool connected)
+{
+    if (connected)
+        connectButton->setText("Disconnect");
+    else
+        connectButton->setText("Connect");
+    
+    for (QList<QWidget *>::iterator it=connectionDependentWidgets.begin();
+         it!=connectionDependentWidgets.end(); ++it)
+        (*it)->setEnabled(connected);
 }
 
 void CQtClient::appendConsoleText(const QString &text)
@@ -756,9 +780,40 @@ void CQtClient::parseTcp(QDataStream &stream)
     {
         QVariant var;
         stream >> var;
-        QString file = QFileDialog::getSaveFileName(this, "Save script", QString(),
-                "undone", tr("Lua scripts (*.lua)"));
-        // UNDONE
+        
+        QString fn = QFileDialog::getSaveFileName(this, "Save script", downloadScript,
+                tr("Lua scripts (*.lua)"));
+        
+        if (!fn.isEmpty())
+        {
+            QFile file(fn);
+            if (!file.open(QFile::WriteOnly | QFile::Truncate | QFile::Text))
+                QMessageBox::critical(this, "File error",
+                                        QString("Failed to create file"));
+            else
+            {
+                file.write(var.toByteArray());
+                
+                QSettings settings;
+                QStringList scripts = settings.value("scripts").toStringList();
+                scripts << fn;
+                settings.setValue("scripts", scripts);
+
+                QListWidgetItem *item = new QListWidgetItem(QFileInfo(file).fileName(),
+                        localScriptListWidget);
+                item->setData(Qt::UserRole, fn);
+                localScriptListWidget->setCurrentItem(item);
+            }
+        }
+        
+        downloadScript.clear();
+        downloadButton->setEnabled(true);
+    }
+    else if (msg == "luatxt")
+    {
+        QVariant var;
+        stream >> var;
+        appendLogText(QString("Lua: %1\n").arg(var.toString()));
     }
     else
     {
@@ -930,6 +985,14 @@ void CQtClient::connectedToServer()
     CTcpWriter tcpWriter(clientSocket);
     tcpWriter << QString("getscripts");
     tcpWriter.write();
+    
+    updateConnection(true);
+}
+
+void CQtClient::disconnectedFromServer()
+{
+    appendLogText("Disconnected from server.\n");
+    updateConnection(false);
 }
 
 void CQtClient::serverHasData()
@@ -958,6 +1021,8 @@ void CQtClient::serverHasData()
 void CQtClient::socketError(QAbstractSocket::SocketError error)
 {
     QMessageBox::critical(this, "Socket error", clientSocket->errorString());
+    appendLogText(QString("Socket error: %1\n").arg(clientSocket->errorString()));
+    updateConnection(false);
 }
 
 void CQtClient::updateSensors()
@@ -1015,10 +1080,13 @@ void CQtClient::updateSensors()
     }
 }
 
-void CQtClient::connectToServer()
+void CQtClient::toggleServerConnection()
 {
-    clientSocket->abort();
-    clientSocket->connectToHost(serverEdit->text(), 40000);
+    const bool wasconnected = (clientSocket->state() == QAbstractSocket::ConnectedState);
+    clientSocket->abort(); // Always disconnect first
+    
+    if (!wasconnected)
+        clientSocket->connectToHost(serverEdit->text(), 40000);
 }
 
 void CQtClient::setMicUpdateTime(int value)
@@ -1303,6 +1371,20 @@ void CQtClient::removeServerScript()
         CTcpWriter tcpWriter(clientSocket);
         tcpWriter << QString("removelocallua");
         tcpWriter << serverScriptListWidget->currentItem()->text();
+        tcpWriter.write();
+    }
+}
+
+void CQtClient::downloadServerScript()
+{
+    if (serverScriptListWidget->currentItem())
+    {
+        downloadScript = serverScriptListWidget->currentItem()->text();
+        downloadButton->setEnabled(false);
+        
+        CTcpWriter tcpWriter(clientSocket);
+        tcpWriter << QString("getlocallua");
+        tcpWriter << downloadScript;
         tcpWriter.write();
     }
 }
