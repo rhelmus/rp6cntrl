@@ -60,6 +60,7 @@ void CControl::initSerial2TcpMap()
 void CControl::initLua()
 {
     luaInterface.registerFunction(luaExecCmd, "exec", this);
+    luaInterface.registerFunction(luaSendText, "sendtext", this);
 
     lua_newtable(luaInterface);
     for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
@@ -190,5 +191,13 @@ int CControl::luaExecCmd(lua_State *l)
     const char *cmd = luaL_checkstring(l, 1);
     qDebug() << "Exec cmd: " << cmd << "\n";
     control->serialPort->sendCommand(cmd);
+    return 0;
+}
+
+int CControl::luaSendText(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    const char *txt = luaL_checkstring(l, 1);
+    control->tcpServer->sendKeyValue("luatxt", QString(txt));
     return 0;
 }

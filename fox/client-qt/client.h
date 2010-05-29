@@ -33,6 +33,8 @@ class CQtClient: public QMainWindow
     quint32 tcpReadBlockSize;
     QTcpSocket *clientSocket;
     QLineEdit *serverEdit;
+    QPushButton *connectButton;
+    QList<QWidget *> connectionDependentWidgets;
     QPlainTextEdit *consoleOut;
     QLineEdit *consoleIn;
     QPlainTextEdit *logWidget;
@@ -89,8 +91,10 @@ class CQtClient: public QMainWindow
     int remainingACSCycles; // Remaining cycles before switch
     
     CEditor *scriptEditor;
+    QPushButton *downloadButton;
     QListWidget *localScriptListWidget, *serverScriptListWidget;
     QListWidgetItem *previousScriptItem;
+    QString downloadScript;
     
     bool firstStateUpdate;
     SStateSensors currentStateSensors;
@@ -120,6 +124,7 @@ class CQtClient: public QMainWindow
     QWidget *createLocalLuaWidget(void);
     QWidget *createServerLuaWidget(void);
     
+    void updateConnection(bool connected);
     void appendConsoleText(const QString &text);
     void appendLogText(const QString &text);
     void parseTcp(QDataStream &stream);
@@ -132,10 +137,11 @@ class CQtClient: public QMainWindow
     
 private slots:
     void connectedToServer(void);
+    void disconnectedFromServer(void);
     void serverHasData(void);
     void socketError(QAbstractSocket::SocketError error);
     void updateSensors(void);
-    void connectToServer(void);
+    void toggleServerConnection(void);
     void setMicUpdateTime(int value);
     void micPlotToggled(bool checked);
     void driveButtonPressed(int dir);
@@ -151,6 +157,7 @@ private slots:
     void uploadRunLocalScript(void);
     void runServerScript(void);
     void removeServerScript(void);
+    void downloadServerScript(void);
     void sendConsoleCommand(void);
     
 protected:
