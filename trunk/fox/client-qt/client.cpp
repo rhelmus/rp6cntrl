@@ -166,9 +166,10 @@ QWidget *CQtClient::createLuaTab()
     QVBoxLayout *vbox = new QVBoxLayout(group);
     
     vbox->addWidget(scriptEditor = new CEditor(this));
-    scriptEditor->getToolBar()->addAction(style()->
+    QAction *a = scriptEditor->getToolBar()->addAction(style()->
             standardIcon(QStyle::SP_DialogSaveButton),
                          "Save", scriptEditor->editor(), SLOT(save()));
+    a->setShortcut(tr("Ctrl+S"));
     
     QWidget *w = new QWidget;
     QHBoxLayout *hbox = new QHBoxLayout(w);
