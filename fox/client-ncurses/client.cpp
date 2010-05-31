@@ -40,26 +40,63 @@ void CNCursManager::stopNCurs()
 }
 
 
-CNCursClient::CNCursClient() : tcpReadBlockSize(0)
+CNCursClient::CNCursClient() : tcpReadBlockSize(0), activeScreen(NULL)
 {
     initDisplayMaps();
     
-    NNCurses::CBox *mainhbox = new NNCurses::CBox(CBox::HORIZONTAL, true);
-    StartPack(mainhbox, false, true, 0, 0);
+    StartPack(mainScreen = createMainScreen(), false, true, 0, 0);
+    StartPack(logScreen = createLogScreen(), false, true, 0, 0);
 
-    mainhbox->AddWidget(createDisplayWidget("Movement", movementDisplays));
-    mainhbox->AddWidget(createDisplayWidget("Sensors", sensorDisplays));
-    mainhbox->AddWidget(createDisplayWidget("Other", otherDisplays));
+    screenList.push_back(mainScreen);
+    screenList.push_back(logScreen);
 
-    EndPack(connectButton = new NNCurses::CButton("Connect"), false, true, 0, 0);
+    enableScreen(mainScreen);
+}
 
+CNCursClient::TScreen *CNCursClient::createMainScreen()
+{
+    TScreen *ret = new TScreen(CBox::VERTICAL, false);
+    ret->Enable(false);
+
+    NNCurses::CBox *hbox = new NNCurses::CBox(CBox::HORIZONTAL, true);
+    ret->AddWidget(hbox);
+    
+    hbox->AddWidget(createDisplayWidget("Movement", movementDisplays));
+    hbox->AddWidget(createDisplayWidget("Sensors", sensorDisplays));
+    hbox->AddWidget(createDisplayWidget("Other", otherDisplays));
+    
+    ret->EndPack(connectButton = new NNCurses::CButton("Connect"), false, true, 0, 0);
+    
     clientSocket = new QTcpSocket(this);
     connect(clientSocket, SIGNAL(connected()), this, SLOT(connectedToServer()));
     connect(clientSocket, SIGNAL(disconnected()), this, SLOT(disconnectedFromServer()));
     connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
     connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
             this, SLOT(socketError(QAbstractSocket::SocketError)));
-            
+    
+    return ret;
+}
+
+CNCursClient::TScreen *CNCursClient::createLogScreen()
+{
+    TScreen *ret = new TScreen(CBox::HORIZONTAL, true);
+    ret->Enable(false);
+
+    ret->AddWidget(new NNCurses::CLabel("Placeholder here"));
+    
+    return ret;
+}
+
+void CNCursClient::enableScreen(TScreen *screen)
+{
+    if (activeScreen == screen)
+        return;
+    
+    if (activeScreen)
+        activeScreen->Enable(false);
+
+    screen->Enable(true);
+    activeScreen = screen;
 }
 
 void CNCursClient::initDisplayMaps()
@@ -118,7 +155,7 @@ void CNCursClient::updateConnection(bool connected)
         connectButton->SetText("Connect");
 }
 
-void CQtClient::parseTcp(QDataStream &stream)
+void CNCursClient::parseTcp(QDataStream &stream)
 {
     QString msg;
     QVariant data;
@@ -185,4 +222,30 @@ bool CNCursClient::CoreHandleEvent(NNCurses::CWidget *emitter, int type)
     }
     
     return false;
+}
+
+bool CNCursClient::CoreHandleKey(wchar_t key)
+{
+    if (NNCurses::CWindow::CoreHandleKey(key))
+        return true;
+    
+    if (key == KEY_F(2))
+    {
+        enableScreen(mainScreen);
+        return true;
+    }
+    else if (key == KEY_F(3))
+    {
+        enableScreen(logScreen);
+        return true;
+    }
+    
+    return false;
+}
+
+void CNCursClient::CoreGetButtonDescs(NNCurses::TButtonDescList &list)
+{
+    list.push_back(NNCurses::TButtonDescPair("F2", "Main"));
+    list.push_back(NNCurses::TButtonDescPair("F3", "Log"));
+    CWindow::CoreGetButtonDescs(list);
 }
