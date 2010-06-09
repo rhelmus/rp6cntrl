@@ -3,11 +3,12 @@
 
 #include "tui/button.h"
 #include "tui/label.h"
-#include "tui/separator.h"
+#include "tui/textfield.h"
 #include "tui/tui.h"
 #include "client.h"
+#include "display_widget.h"
 
-CNCursManager::CNCursManager(QObject *parent) : QObject(parent)
+CNCursManager::CNCursManager(QObject *parent) : QObject(parent)                                                
 {
     // Setup ncurses
     NNCurses::TUI.InitNCurses();
@@ -40,10 +41,9 @@ void CNCursManager::stopNCurs()
 }
 
 
-CNCursClient::CNCursClient() : tcpReadBlockSize(0), activeScreen(NULL)
+CNCursClient::CNCursClient() : tcpReadBlockSize(0), activeScreen(NULL),
+                               dataDisplays(DISPLAY_MAX_INDEX)
 {
-    initDisplayMaps();
-    
     StartPack(mainScreen = createMainScreen(), false, true, 0, 0);
     StartPack(logScreen = createLogScreen(), false, true, 0, 0);
 
@@ -51,6 +51,8 @@ CNCursClient::CNCursClient() : tcpReadBlockSize(0), activeScreen(NULL)
     screenList.push_back(logScreen);
 
     enableScreen(mainScreen);
+
+    appendLogText("Started NCurses client.\n");
 }
 
 CNCursClient::TScreen *CNCursClient::createMainScreen()
@@ -61,9 +63,9 @@ CNCursClient::TScreen *CNCursClient::createMainScreen()
     NNCurses::CBox *hbox = new NNCurses::CBox(CBox::HORIZONTAL, true);
     ret->AddWidget(hbox);
     
-    hbox->AddWidget(createDisplayWidget("Movement", movementDisplays));
-    hbox->AddWidget(createDisplayWidget("Sensors", sensorDisplays));
-    hbox->AddWidget(createDisplayWidget("Other", otherDisplays));
+    hbox->AddWidget(createMovementDisplay());
+    hbox->AddWidget(createSensorDisplay());
+    hbox->AddWidget(createOtherDisplay());
     
     ret->EndPack(connectButton = new NNCurses::CButton("Connect"), false, true, 0, 0);
     
@@ -82,7 +84,7 @@ CNCursClient::TScreen *CNCursClient::createLogScreen()
     TScreen *ret = new TScreen(CBox::HORIZONTAL, true);
     ret->Enable(false);
 
-    ret->AddWidget(new NNCurses::CLabel("Placeholder here"));
+    ret->AddWidget(logWidget = new NNCurses::CTextField(30, 10, true));
     
     return ret;
 }
@@ -99,50 +101,44 @@ void CNCursClient::enableScreen(TScreen *screen)
     activeScreen = screen;
 }
 
-void CNCursClient::initDisplayMaps()
+void CNCursClient::appendLogText(std::string text)
 {
-    movementDisplays["Speed"] = NULL;
-    movementDisplays["Distance"] = NULL;
-    movementDisplays["Current"] = NULL;
-    movementDisplays["Direction"] = NULL;
-    
-    sensorDisplays["Light"] = NULL;
-    sensorDisplays["ACS"] = NULL;
-    sensorDisplays["Bumpers"] = NULL;
-    
-    otherDisplays["Battery"] = NULL;
-    otherDisplays["RC5"] = NULL;
-    otherDisplays["Main LEDs"] = NULL;
-    otherDisplays["M32 LEDs"] = NULL;
-    otherDisplays["Pressed key"] = NULL;
+    text = QTime::currentTime().toString().toStdString() + ": " + text;
+    logWidget->AddText(text);
 }
 
-NNCurses::CBox *CNCursClient::createDisplayWidget(const std::string &title,
-                                                 TDisplayMap &map)
+CDisplayWidget *CNCursClient::createMovementDisplay()
 {
-    NNCurses::CBox *ret = new NNCurses::CBox(CBox::VERTICAL, false);
-    ret->SetBox(true);
-    ret->SetMinWidth(10);
+    CDisplayWidget *ret = new CDisplayWidget("Movement");
 
-    ret->StartPack(new NNCurses::CLabel(title), false, true, 0, 0);
-    ret->StartPack(new NNCurses::CSeparator(ACS_HLINE), false, true, 0, 0);
+    dataDisplays[DISPLAY_SPEED] = ret->addDisplay("Speed");
+    dataDisplays[DISPLAY_DISTANCE] = ret->addDisplay("Distance");
+    dataDisplays[DISPLAY_CURRENT] = ret->addDisplay("Current");
+    dataDisplays[DISPLAY_DIRECTION] = ret->addDisplay("Direction");
+    
+    return ret;
+}
 
-    NNCurses::CBox *hbox = new NNCurses::CBox(CBox::HORIZONTAL, false, 1);
-    ret->StartPack(hbox, false, false, 0, 0);
+CDisplayWidget *CNCursClient::createSensorDisplay()
+{
+    CDisplayWidget *ret = new CDisplayWidget("Sensors");
 
-    NNCurses::CBox *keyvbox = new NNCurses::CBox(CBox::VERTICAL, false);
-    hbox->StartPack(keyvbox, false, false, 0, 0);
+    dataDisplays[DISPLAY_LIGHT] = ret->addDisplay("Light");
+    dataDisplays[DISPLAY_ACS] = ret->addDisplay("ACS");
+    dataDisplays[DISPLAY_BUMPERS] = ret->addDisplay("Bumpers");
+    
+    return ret;
+}
 
-    NNCurses::CBox *datavbox = new NNCurses::CBox(CBox::VERTICAL, false);
-    hbox->StartPack(datavbox, true, true, 0, 0);
-    datavbox->SetDFColors(COLOR_YELLOW, COLOR_BLUE);
+CDisplayWidget *CNCursClient::createOtherDisplay()
+{
+    CDisplayWidget *ret = new CDisplayWidget("Other");
 
-    for (TDisplayMap::iterator it=map.begin(); it!=map.end(); ++it)
-    {
-        keyvbox->StartPack(new NNCurses::CLabel(it->first, false), false, false, 0, 0);
-        datavbox->StartPack(it->second = new NNCurses::CLabel("NA"), true,
-                            true, 0, 0);
-    }
+    dataDisplays[DISPLAY_BATTERY] = ret->addDisplay("Battery");
+    dataDisplays[DISPLAY_RC5] = ret->addDisplay("RC5");
+    dataDisplays[DISPLAY_MAIN_LEDS] = ret->addDisplay("Main LEDs");
+    dataDisplays[DISPLAY_M32_LEDS] = ret->addDisplay("M32 LEDs");
+    dataDisplays[DISPLAY_KEYS] = ret->addDisplay("Pressed keys");
     
     return ret;
 }
@@ -150,9 +146,15 @@ NNCurses::CBox *CNCursClient::createDisplayWidget(const std::string &title,
 void CNCursClient::updateConnection(bool connected)
 {
     if (connected)
+    {
         connectButton->SetText("Disconnect");
+        appendLogText("Disconnected from server.\n");
+    }
     else
+    {
         connectButton->SetText("Connect");
+        appendLogText("Connected to server.\n");
+    }
 }
 
 void CNCursClient::parseTcp(QDataStream &stream)
@@ -160,6 +162,11 @@ void CNCursClient::parseTcp(QDataStream &stream)
     QString msg;
     QVariant data;
     stream >> msg >> data;
+
+    if (msg == "lightleft")
+    {
+        dataDisplays[DISPLAY_LIGHT]->SetText(data.toString().toStdString());
+    }
 }
 
 void CNCursClient::connectedToServer()
@@ -195,7 +202,7 @@ void CNCursClient::serverHasData()
     }
 }
 
-void CNCursClient::socketError(QAbstractSocket::SocketError error)
+void CNCursClient::socketError(QAbstractSocket::SocketError)
 {
     // ...
     updateConnection(false);

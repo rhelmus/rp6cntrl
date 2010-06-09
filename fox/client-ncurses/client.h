@@ -1,6 +1,7 @@
 #include <QObject>
 #include <QTcpSocket>
 
+#include "shared.h"
 #include "tui/window.h"
 
 class QAbstractSocket;
@@ -9,7 +10,10 @@ class QDataStream;
 namespace NNCurses {
 class CButton;
 class CLabel;
+class CTextField;
 }
+
+class CDisplayWidget;
 
 class CNCursManager: public QObject
 {
@@ -28,7 +32,27 @@ class CNCursClient: public QObject, public NNCurses::CWindow
 {
     Q_OBJECT
 
-    typedef std::map<std::string, NNCurses::CLabel *> TDisplayMap;
+    enum EDisplayType
+    {
+        DISPLAY_SPEED=0,
+        DISPLAY_DISTANCE,
+        DISPLAY_CURRENT,
+        DISPLAY_DIRECTION,
+
+        DISPLAY_LIGHT,
+        DISPLAY_ACS,
+        DISPLAY_BUMPERS,
+
+        DISPLAY_BATTERY,
+        DISPLAY_RC5,
+        DISPLAY_MAIN_LEDS,
+        DISPLAY_M32_LEDS,
+        DISPLAY_KEYS,
+
+        DISPLAY_MAX_INDEX
+    };
+    
+    typedef std::vector<NNCurses::CLabel *> TDisplayList;
     typedef NNCurses::CBox TScreen;
     typedef std::vector<TScreen *> TScreenList;
 
@@ -41,14 +65,18 @@ class CNCursClient: public QObject, public NNCurses::CWindow
     TScreen *logScreen;
     
     NNCurses::CButton *connectButton;
-    TDisplayMap movementDisplays, sensorDisplays, otherDisplays;
+    TDisplayList dataDisplays;
 
+    NNCurses::CTextField *logWidget;
+    
     TScreen *createMainScreen(void);
     TScreen *createLogScreen(void);
 
     void enableScreen(TScreen *screen);
-    void initDisplayMaps(void);
-    NNCurses::CBox *createDisplayWidget(const std::string &title, TDisplayMap &map);
+    void appendLogText(std::string text);
+    CDisplayWidget *createMovementDisplay(void);
+    CDisplayWidget *createSensorDisplay(void);
+    CDisplayWidget *createOtherDisplay(void);
     void updateConnection(bool connected);
     void parseTcp(QDataStream &stream);
 

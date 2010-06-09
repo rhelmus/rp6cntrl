@@ -76,13 +76,13 @@ protected:
     
     virtual void UpdateEnabled(void) { }
     
-    virtual bool CoreHandleKey(wchar_t key) { return false; }
-    virtual bool CoreHandleEvent(CWidget *emitter, int event) { return false; }
+    virtual bool CoreHandleKey(wchar_t) { return false; }
+    virtual bool CoreHandleEvent(CWidget *, int) { return false; }
     
     virtual int CoreRequestWidth(void) { return GetMinWidth(); }
     virtual int CoreRequestHeight(void) { return GetMinHeight(); }
     
-    virtual void CoreGetButtonDescs(TButtonDescList &list) { }
+    virtual void CoreGetButtonDescs(TButtonDescList &) { }
     
     // Interface to be used by friends and derived classes
     void InitDraw(void);

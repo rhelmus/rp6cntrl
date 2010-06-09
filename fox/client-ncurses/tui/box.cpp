@@ -313,7 +313,7 @@ bool CBox::CoreHandleEvent(CWidget *emitter, int event)
     return CGroup::CoreHandleEvent(emitter, event);
 }
 
-void CBox::CoreRemoveWidget(CWidget *w)
+void CBox::CoreRemoveWidget(CWidget *)
 {
     RequestUpdate();
 }
