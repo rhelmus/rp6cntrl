@@ -50,7 +50,7 @@ protected:
     virtual bool CoreHandleKey(wchar_t key);
     virtual bool CoreHandleEvent(CWidget *emitter, int event);
     virtual void CoreAddWidget(CWidget *w) { InitChild(w); };
-    virtual void CoreRemoveWidget(CWidget *w) { }
+    virtual void CoreRemoveWidget(CWidget *) { }
     virtual void CoreFocusWidget(CWidget *w);
     virtual void CoreDrawChilds(void);
     virtual void CoreGetButtonDescs(TButtonDescList &list);
