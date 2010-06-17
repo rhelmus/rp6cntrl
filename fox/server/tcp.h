@@ -5,10 +5,13 @@
 
 #include <QMap>
 #include <QObject>
+#include <QTcpSocket>
+
+#include "shared.h"
+#include "tcputil.h"
 
 class QSignalMapper;
 class QTcpServer;
-class QTcpSocket;
 
 class CTcpServer: public QObject
 {
@@ -26,8 +29,17 @@ private slots:
 public:
     CTcpServer(QObject *parent);
 
-    void sendText(const QString &key, const QString &text);
-    void sendKeyValue(const QString &key, QVariant value);
+    template <typename C> void send(ETcpMessage msg, const C &value)
+    {
+        for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
+            it!=clientInfo.end(); ++it)
+        {
+            CTcpWriter tcpWriter(it.key());
+            tcpWriter << static_cast<uint8_t>(msg);
+            tcpWriter << value;
+            tcpWriter.write();
+        }
+    }
 
 signals:
     void clientTcpReceived(QDataStream &stream);

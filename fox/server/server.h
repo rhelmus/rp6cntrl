@@ -13,16 +13,13 @@ class CTcpServer;
 class CControl: public QObject
 {
     Q_OBJECT
-
-    enum EDataSerialType { DATA_BYTE, DATA_WORD };
-    
+  
     struct SSerial2TcpInfo
     {
-        EDataSerialType dataType;
-        const char *tcpVariable;
+        ETcpMessage tcpMessage;
+        const char *luaKey;
         SSerial2TcpInfo(void) {}
-        SSerial2TcpInfo(EDataSerialType d,
-                        const char *t) : dataType(d), tcpVariable(t) {}
+        SSerial2TcpInfo(ETcpMessage m, const char *l) : tcpMessage(m), luaKey(l) {}
     };
 
     typedef QMap<QString, QVariant> TLuaScriptMap;

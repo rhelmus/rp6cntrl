@@ -20,6 +20,7 @@
 
 #include <QTcpSocket>
 
+#include "shared.h"
 #include "tcputil.h"
 
 CTcpWriter::CTcpWriter(QTcpSocket *s) : socket(s)
@@ -42,4 +43,30 @@ void CTcpWriter::write()
     
     socket->write(block);
     block.clear();
+}
+
+
+QMap<ETcpMessage, EDataType> tcpDataTypes;
+void initTcpDataTypes()
+{
+    tcpDataTypes[TCP_STATE_SENSORS] = DATA_BYTE;
+    tcpDataTypes[TCP_BASE_LEDS] = DATA_BYTE;
+    tcpDataTypes[TCP_M32_LEDS] = DATA_BYTE;
+    tcpDataTypes[TCP_LIGHT_LEFT] = DATA_WORD;
+    tcpDataTypes[TCP_LIGHT_RIGHT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_SPEED_LEFT] = DATA_BYTE;
+    tcpDataTypes[TCP_MOTOR_SPEED_RIGHT] = DATA_BYTE;
+    tcpDataTypes[TCP_MOTOR_DESTSPEED_LEFT] = DATA_BYTE;
+    tcpDataTypes[TCP_MOTOR_DESTSPEED_RIGHT] = DATA_BYTE;
+    tcpDataTypes[TCP_MOTOR_DIST_LEFT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_DIST_RIGHT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_DESTDIST_LEFT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_DESTDIST_RIGHT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_CURRENT_LEFT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_CURRENT_RIGHT] = DATA_WORD;
+    tcpDataTypes[TCP_MOTOR_DIRECTIONS] = DATA_BYTE;
+    tcpDataTypes[TCP_BATTERY] = DATA_WORD;
+    tcpDataTypes[TCP_ACS_POWER] = DATA_BYTE;
+    tcpDataTypes[TCP_MIC] = DATA_WORD;
+    tcpDataTypes[TCP_LASTRC5] = DATA_WORD;
 }

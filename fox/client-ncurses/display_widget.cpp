@@ -20,15 +20,28 @@ CDisplayWidget::CDisplayWidget(const std::string &t) :
     
     dataBox = new NNCurses::CBox(CBox::VERTICAL, false);
     hbox->StartPack(dataBox, true, true, 0, 0);
-    dataBox->SetDFColors(COLOR_YELLOW, COLOR_BLUE);
 }
 
-NNCurses::CLabel *CDisplayWidget::addDisplay(const std::string &l)
+void CDisplayWidget::addDisplay(const std::string &l, int id, int amount)
 {
     keyBox->StartPack(new NNCurses::CLabel(l, false), false, false, 0, 0);
 
-    NNCurses::CLabel *ret = new NNCurses::CLabel("NA");
-    dataBox->StartPack(ret, true, true, 0, 0);
+    NNCurses::CBox *hbox = new NNCurses::CBox(CBox::HORIZONTAL, false);
+    dataBox->StartPack(hbox, true, true, 0, 0);
+    
+    for (int i=0; i<amount; ++i)
+    {
+        if (i > 0) // Add seperator?
+            hbox->StartPack(new NNCurses::CLabel("/"), true, true, 0, 0);
+        
+        NNCurses::CLabel *label = new NNCurses::CLabel("NA");
+        label->SetDFColors(COLOR_YELLOW, COLOR_BLUE);
+        hbox->StartPack(label, true, true, 0, 0);
+        displayValueMaps[id].push_back(label);
+    }
+}
 
-    return ret;
+void CDisplayWidget::setDisplayValue(int id, int index, const std::string &value)
+{
+    displayValueMaps[id][index]->SetText(value);
 }

@@ -1,6 +1,7 @@
 #include <QObject>
 #include <QTcpSocket>
 
+#include "client_base.h"
 #include "shared.h"
 #include "tui/window.h"
 
@@ -27,11 +28,9 @@ public:
     CNCursManager(QObject *parent);
 };
 
-// QObject must be inherited first!
-class CNCursClient: public QObject, public NNCurses::CWindow
+// QObject derived classes must be inherited first!
+class CNCursClient: public CBaseClient, public NNCurses::CWindow
 {
-    Q_OBJECT
-
     enum EDisplayType
     {
         DISPLAY_SPEED=0,
@@ -52,41 +51,39 @@ class CNCursClient: public QObject, public NNCurses::CWindow
         DISPLAY_MAX_INDEX
     };
     
-    typedef std::vector<NNCurses::CLabel *> TDisplayList;
     typedef NNCurses::CBox TScreen;
     typedef std::vector<TScreen *> TScreenList;
 
-    QTcpSocket *clientSocket;
-    quint32 tcpReadBlockSize;
-
     TScreenList screenList;
     TScreen *activeScreen;
-    TScreen *mainScreen;
-    TScreen *logScreen;
-    
-    NNCurses::CButton *connectButton;
-    TDisplayList dataDisplays;
+    TScreen *mainScreen, *consoleScreen, *logScreen;
+    bool drivingEnabled;
 
-    NNCurses::CTextField *logWidget;
+    CDisplayWidget *movementDisplay, *sensorDisplay, *otherDisplay;
+    NNCurses::CButton *connectButton;
+
+    NNCurses::CTextField *consoleOutput, *logWidget;
     
     TScreen *createMainScreen(void);
+    TScreen *createConsoleScreen(void);
     TScreen *createLogScreen(void);
 
     void enableScreen(TScreen *screen);
-    void appendLogText(std::string text);
     CDisplayWidget *createMovementDisplay(void);
     CDisplayWidget *createSensorDisplay(void);
     CDisplayWidget *createOtherDisplay(void);
-    void updateConnection(bool connected);
-    void parseTcp(QDataStream &stream);
 
-private slots:
-    void connectedToServer(void);
-    void disconnectedFromServer(void);
-    void serverHasData(void);
-    void socketError(QAbstractSocket::SocketError error);
-
+    virtual void updateConnection(bool connected);
+    virtual void tcpError(const QString &) {}
+    virtual void tcpRobotStateUpdate(const SStateSensors &,
+                                     const SStateSensors &newstate);
+    virtual void tcpHandleRobotData(ETcpMessage msg, int data);
+    virtual void updateDriveSpeed(int, int) {}
+    
 protected:
+    virtual void appendConsoleOutput(const QString &text);
+    virtual void appendLogOutput(const QString &text);
+    
     virtual bool CoreHandleEvent(NNCurses::CWidget *emitter, int type);
     virtual bool CoreHandleKey(wchar_t key);
     virtual void CoreGetButtonDescs(NNCurses::TButtonDescList &list);

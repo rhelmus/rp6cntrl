@@ -3,7 +3,6 @@
 
 #include <iostream>
 
-#include "tcputil.h"
 #include "tcp.h"
 
 CTcpServer::CTcpServer(QObject *parent) : QObject(parent)
@@ -72,29 +71,5 @@ void CTcpServer::clientHasData(QObject *obj)
         
         clientTcpReceived(in);
         clientInfo[socket] = 0;
-    }
-}
-
-void CTcpServer::sendText(const QString &key, const QString &text)
-{
-    for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
-         it!=clientInfo.end(); ++it)
-    {
-        CTcpWriter tcpWriter(it.key());
-        tcpWriter << key;
-        tcpWriter << text;
-        tcpWriter.write();
-    }
-}
-
-void CTcpServer::sendKeyValue(const QString &key, QVariant value)
-{
-    for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
-         it!=clientInfo.end(); ++it)
-    {
-        CTcpWriter tcpWriter(it.key());
-        tcpWriter << key;
-        tcpWriter << value;
-        tcpWriter.write();
     }
 }

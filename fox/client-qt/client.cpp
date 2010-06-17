@@ -93,9 +93,7 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
 }
 
 
-CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
-                     driveTurning(false), driveForwardSpeed(0), driveTurnSpeed(0),
-                     isScanning(false), alternatingScan(false),
+CQtClient::CQtClient() : isScanning(false), alternatingScan(false),
                      remainingACSCycles(0), previousScriptItem(NULL),
                      firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
 {
@@ -108,25 +106,16 @@ CQtClient::CQtClient() : tcpReadBlockSize(0), currentDriveDirection(FWD),
     mainTab->addTab(createConsoleTab(), "Console");
     mainTab->addTab(createLogTab(), "Log");
     
-    clientSocket = new QTcpSocket(this);
-    connect(clientSocket, SIGNAL(connected()), this, SLOT(connectedToServer()));
-    connect(clientSocket, SIGNAL(disconnected()), this, SLOT(disconnectedFromServer()));
-    connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
-    connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
-            this, SLOT(socketError(QAbstractSocket::SocketError)));
-    
     QTimer *uptimer = new QTimer(this);
     connect(uptimer, SIGNAL(timeout()), this, SLOT(updateSensors()));
     uptimer->start(500);
     
-    currentStateSensors.byte = 0;
     motorDistance[0] = motorDistance[1] = 0;
     destMotorDistance[0] = destMotorDistance[1] = 0;
-    currentMotorDirections.byte = 0;
     
     updateConnection(false);
 
-    appendLogText("Started RP6 Qt frontend.\n");
+    appendLogOutput("Started RP6 Qt frontend.\n");
 }
 
 QWidget *CQtClient::createMainTab()
@@ -199,7 +188,7 @@ QWidget *CQtClient::createConsoleTab()
     hbox->addWidget(consoleIn = new QLineEdit);
     
     QPushButton *button = new QPushButton("Send");
-    connect(button, SIGNAL(clicked()), this, SLOT(sendConsoleCommand()));
+    connect(button, SIGNAL(clicked()), this, SLOT(sendConsolePressed()));
     connect(consoleIn, SIGNAL(returnPressed()), button, SLOT(click()));
     hbox->addWidget(button);
 
@@ -557,7 +546,7 @@ QWidget *CQtClient::createScannerWidget()
     scanPowerComboBox->setCurrentIndex(1);
     
     form->addRow(scanButton = new QPushButton("Scan"));
-    connect(scanButton, SIGNAL(clicked()), this, SLOT(startScan()));
+    connect(scanButton, SIGNAL(clicked()), this, SLOT(scanButtonPressed()));
     
     
     hbox->addWidget(scannerWidget = new CScannerWidget, 0);
@@ -588,25 +577,25 @@ QWidget *CQtClient::createLocalLuaWidget()
     hbox->addLayout(vbox);
     
     QPushButton *button = new QPushButton("New");
-    connect(button, SIGNAL(clicked()), this, SLOT(newLocalScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(newLocalScriptPressed()));
     vbox->addWidget(button);
     
     vbox->addWidget(button = new QPushButton("Add"));
-    connect(button, SIGNAL(clicked()), this, SLOT(addLocalScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(addLocalScriptPressed()));
 
     vbox->addWidget(button = new QPushButton("Remove"));
-    connect(button, SIGNAL(clicked()), this, SLOT(removeLocalScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(removeLocalScriptPressed()));
     
     vbox->addWidget(button = new QPushButton("Upload"));
-    connect(button, SIGNAL(clicked()), this, SLOT(uploadLocalScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(uploadLocalScriptPressed()));
     connectionDependentWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Run"));
-    connect(button, SIGNAL(clicked()), this, SLOT(runLocalScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(runLocalScriptPressed()));
     connectionDependentWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Upload && Run"));
-    connect(button, SIGNAL(clicked()), this, SLOT(uploadRunLocalScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(uploadRunLocalScriptPressed()));
     connectionDependentWidgets << button;
     
     return ret;
@@ -625,50 +614,21 @@ QWidget *CQtClient::createServerLuaWidget()
     
     QPushButton *button = new QPushButton("Run");
     vbox->addWidget(button);
-    connect(button, SIGNAL(clicked()), this, SLOT(runServerScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(runServerScriptPressed()));
     connectionDependentWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Remove"));
-    connect(button, SIGNAL(clicked()), this, SLOT(removeServerScript()));
+    connect(button, SIGNAL(clicked()), this, SLOT(removeServerScriptPressed()));
     connectionDependentWidgets << button;
     
     vbox->addWidget(downloadButton = new QPushButton("Download"));
-    connect(downloadButton, SIGNAL(clicked()), this, SLOT(downloadServerScript()));
+    connect(downloadButton, SIGNAL(clicked()), this, SLOT(downloadServerScriptPressed()));
     connectionDependentWidgets << downloadButton;
     
     return ret;
 }
 
-void CQtClient::updateConnection(bool connected)
-{
-    if (connected)
-        connectButton->setText("Disconnect");
-    else
-        connectButton->setText("Connect");
-    
-    for (QList<QWidget *>::iterator it=connectionDependentWidgets.begin();
-         it!=connectionDependentWidgets.end(); ++it)
-        (*it)->setEnabled(connected);
-}
-
-void CQtClient::appendConsoleText(const QString &text)
-{
-    QTextCursor cur = consoleOut->textCursor();
-    cur.movePosition(QTextCursor::End);
-    consoleOut->setTextCursor(cur);
-    consoleOut->insertPlainText(text);
-}
-
-void CQtClient::appendLogText(const QString &text)
-{
-    logWidget->appendHtml(QString("<FONT color=#FF0000><strong>[%1]</strong></FONT> %2")
-            .arg(QTime::currentTime().toString()).arg(text));
-/*    QTextCursor cur = logWidget->textCursor();
-    cur.movePosition(QTextCursor::End);
-    logWidget->setTextCursor(cur);
-    logWidget->insertPlainText(text);*/
-}
-
+#if 0
 void CQtClient::parseTcp(QDataStream &stream)
 {
     QString msg;
@@ -678,7 +638,7 @@ void CQtClient::parseTcp(QDataStream &stream)
     {
         QString output;
         stream >> output;
-        appendConsoleText(output + "\n");
+        appendConsoleOutput(output + "\n");
     }
     else if (msg == "state")
     {
@@ -814,7 +774,7 @@ void CQtClient::parseTcp(QDataStream &stream)
     {
         QVariant var;
         stream >> var;
-        appendLogText(QString("Lua: %1\n").arg(var.toString()));
+        appendLogOutput(QString("Lua: %1\n").arg(var.toString()));
     }
     else
     {
@@ -825,33 +785,11 @@ void CQtClient::parseTcp(QDataStream &stream)
         sensorDataMap[msg].count++;
     }
 }
-
-void CQtClient::updateStateSensors(const SStateSensors &state)
-{
-    bumperBox[0]->setChecked(state.bumperLeft);
-    bumperBox[1]->setChecked(state.bumperRight);
-    
-    ACSCollisionBox[0]->setChecked(state.ACSLeft);
-    ACSCollisionBox[1]->setChecked(state.ACSRight);
-    
-    ACSPlot->addData("Left", state.ACSLeft * ACSPowerSlider->value());
-    ACSPlot->addData("Right", state.ACSRight * ACSPowerSlider->value());
-    
-    if (currentStateSensors.movementComplete && !state.movementComplete)
-        appendLogText("Started movement.");
-    else if (!currentStateSensors.movementComplete && state.movementComplete)
-        appendLogText("Finished movement.");
-    
-    if (isScanning)
-        updateScan(currentStateSensors, state);
-    
-    currentStateSensors.byte = state.byte;
-    firstStateUpdate = false;
-}
+#endif
 
 void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &newstate)
 {
-    appendLogText("updateScan()\n");
+    appendLogOutput("updateScan()\n");
     
     // UNDONE: Which sensor?
     if (newstate.ACSLeft || newstate.ACSRight)
@@ -870,7 +808,7 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
     {
         if (!remainingACSCycles && (newstate.ACSState < 2))
         {
-            appendLogText("ACS Cycle reached\n");
+            appendLogOutput("ACS Cycle reached\n");
             
             // UNDONE: Only change to more power when no hit
             EACSPowerState newpower = ACSPowerState;
@@ -892,69 +830,10 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
     }
 }
 
-void CQtClient::updateMotorDirections(const SMotorDirections &dir)
+void CQtClient::stopScan()
 {
-    if (dir.byte != currentMotorDirections.byte)
-    {
-        QString leftS(directionString(dir.left)), rightS(directionString(dir.right));
-        if (dir.left != currentMotorDirections.left)
-            appendLogText(QString("Changed left motor direction to %1.\n").arg(leftS));
-        
-        if (dir.right != currentMotorDirections.right)
-            appendLogText(QString("Changed right motor direction to %1.\n").arg(rightS));
-        
-        if (dir.destLeft != currentMotorDirections.destLeft)
-            appendLogText(QString("Changed left destination motor direction to %1.\n").arg(directionString(dir.destLeft)));
-        
-        if (dir.destRight != currentMotorDirections.destRight)
-            appendLogText(QString("Changed right destination motor direction to %1.\n").arg(directionString(dir.destRight)));
-        
-        currentMotorDirections.byte = dir.byte;
-        motorDirection[0]->setText(leftS);
-        motorDirection[1]->setText(rightS);
-    }
-}
-
-void CQtClient::executeCommand(const QString &cmd)
-{
-    appendLogText(QString("Executing RP6 console command: \"%1\"\n").arg(cmd));
-    
-    if (clientSocket->state() == QAbstractSocket::ConnectedState)
-    {
-        CTcpWriter tcpWriter(clientSocket);
-        tcpWriter << QString("command");
-        tcpWriter << cmd;
-        tcpWriter.write();
-    }
-    else
-        appendLogText("WARNING: Cannot execute command: not connected!\n");
-}
-
-void CQtClient::changeDriveSpeedVar(int &speed, int delta)
-{
-    const int minflipspeed = 30, maxspeed = 160;
-    
-    speed += delta;
-
-    if (delta > 0)
-    {
-        if ((speed < 0) && (-(speed) < minflipspeed))
-            speed = -(speed);
-        else if ((speed > 0) && (speed < minflipspeed))
-            speed = minflipspeed;
-    }
-    else
-    {
-        if ((speed > 0) && (speed < minflipspeed))
-            speed = -(speed);
-        else if ((speed < 0) && (-(speed) < minflipspeed))
-            speed = -minflipspeed;
-    }
-
-    if (speed < -maxspeed)
-        speed = -maxspeed;
-    else if (speed > maxspeed)
-        speed = maxspeed;
+    isScanning = false;
+    scanButton->setEnabled(true);
 }
 
 bool CQtClient::checkScriptSave()
@@ -976,118 +855,229 @@ bool CQtClient::checkScriptSave()
     return true;
 }
 
-void CQtClient::connectedToServer()
+void CQtClient::updateConnection(bool connected)
 {
-    appendLogText(QString("Connected to server (%1:%2)\n").
-            arg(clientSocket->localAddress().toString()).
-            arg(clientSocket->localPort()));
-    firstStateUpdate = true;
-    
-    CTcpWriter tcpWriter(clientSocket);
-    tcpWriter << QString("getscripts");
-    tcpWriter.write();
-    
-    updateConnection(true);
-}
-
-void CQtClient::disconnectedFromServer()
-{
-    appendLogText("Disconnected from server.\n");
-    updateConnection(false);
-}
-
-void CQtClient::serverHasData()
-{
-    QDataStream in(clientSocket);
-    in.setVersion(QDataStream::Qt_4_4);
-
-    while (true)
+    if (connected)
     {
-        if (tcpReadBlockSize == 0)
+        firstStateUpdate = true;
+        connectButton->setText("Disconnect");
+    }
+    else
+        connectButton->setText("Connect");
+    
+    for (QList<QWidget *>::iterator it=connectionDependentWidgets.begin();
+         it!=connectionDependentWidgets.end(); ++it)
+        (*it)->setEnabled(connected);
+}
+
+void CQtClient::tcpError(const QString &error)
+{
+    QMessageBox::critical(this, "Socket error", error);
+}
+
+void CQtClient::tcpRobotStateUpdate(const SStateSensors &oldstate,
+                                    const SStateSensors &newstate)
+{
+    bumperBox[0]->setChecked(newstate.bumperLeft);
+    bumperBox[1]->setChecked(newstate.bumperRight);
+    
+    ACSCollisionBox[0]->setChecked(newstate.ACSLeft);
+    ACSCollisionBox[1]->setChecked(newstate.ACSRight);
+    
+    ACSPlot->addData("Left", newstate.ACSLeft * ACSPowerSlider->value());
+    ACSPlot->addData("Right", newstate.ACSRight * ACSPowerSlider->value());
+    
+    if (isScanning)
+        updateScan(oldstate, newstate);
+    
+    firstStateUpdate = false;
+}
+
+void CQtClient::tcpHandleRobotData(ETcpMessage msg, int data)
+{
+    switch (msg)
+    {
+        case TCP_BASE_LEDS:
         {
-            if (clientSocket->bytesAvailable() < (int)sizeof(quint32))
-                return;
-
-            in >> tcpReadBlockSize;
+            for (int i=0; i<6; ++i)
+                mainLEDsBox[i]->setChecked(data & (1<<i));
+            break;
         }
+        case TCP_M32_LEDS:
+        {
+            for (int i=0; i<4; ++i)
+                m32LEDsBox[i]->setChecked(data & (1<<i));
+            break;
+        }
+        case TCP_MOTOR_DIRECTIONS:
+        {
+            SMotorDirections dir;
+            dir.byte = data;
+            motorDirection[0]->setText(directionString(dir.left));
+            motorDirection[1]->setText(directionString(dir.right));
+            break;
+        }
+        case TCP_MOTOR_DESTDIST_LEFT: destMotorDistance[0] = data; break;
+        case TCP_MOTOR_DESTDIST_RIGHT: destMotorDistance[1] = data; break;
+        case TCP_ACS_POWER:
+            ACSPowerSlider->setValue(data);
+            ACSPowerState = static_cast<EACSPowerState>(data);
+            break;
+        case TCP_LASTRC5:
+        {
+            RC5data_t rc5;
+            rc5.data = data;
+            RC5DeviceLabel->setText(QString::number(rc5.device));
+            RC5KeyLabel->setText(QString::number(rc5.key_code));
+            RC5ToggleBitBox->setChecked(rc5.toggle_bit);
+            break;
+        }
+            
+        // Averaged data?
+        case TCP_LIGHT_LEFT:
+        case TCP_LIGHT_RIGHT:
+        case TCP_MOTOR_SPEED_LEFT:
+        case TCP_MOTOR_SPEED_RIGHT:
+        case TCP_MOTOR_CURRENT_LEFT:
+        case TCP_MOTOR_CURRENT_RIGHT:
+        case TCP_BATTERY:
+        case TCP_MIC:
+            averagedSensorDataMap[msg].total += data;
+            averagedSensorDataMap[msg].count++;
+            break;
 
-        if (clientSocket->bytesAvailable() < tcpReadBlockSize)
-            return;
+        case TCP_MOTOR_DESTSPEED_LEFT:
+        case TCP_MOTOR_DESTSPEED_RIGHT:
+            delayedSensorDataMap[msg] = data;
+            break;
 
-        parseTcp(in);
-        tcpReadBlockSize = 0;
+        case TCP_MOTOR_DIST_LEFT:
+            motorDistance[0] = data;
+            delayedSensorDataMap[msg] = data;
+            break;
+            
+        case TCP_MOTOR_DIST_RIGHT:
+            motorDistance[1] = data;
+            delayedSensorDataMap[msg] = data;
+            break;
+
+        default: break;
     }
 }
 
-void CQtClient::socketError(QAbstractSocket::SocketError error)
+void CQtClient::tcpLuaScripts(const QStringList &list)
 {
-    QMessageBox::critical(this, "Socket error", clientSocket->errorString());
-    appendLogText(QString("Socket error: %1\n").arg(clientSocket->errorString()));
-    updateConnection(false);
+    serverScriptListWidget->clear();
+    serverScriptListWidget->addItems(list);
+}
+
+void CQtClient::tcpRequestedScript(const QByteArray &text)
+{
+    QString fn = QFileDialog::getSaveFileName(this, "Save script", downloadScript,
+                                              tr("Lua scripts (*.lua)"));
+        
+    if (!fn.isEmpty())
+    {
+        QFile file(fn);
+        if (!file.open(QFile::WriteOnly | QFile::Truncate | QFile::Text))
+            QMessageBox::critical(this, "File error",
+                                  QString("Failed to create file"));
+        else
+        {
+            file.write(text);
+                
+            QSettings settings;
+            QStringList scripts = settings.value("scripts").toStringList();
+            scripts << fn;
+            settings.setValue("scripts", scripts);
+
+            QListWidgetItem *item = new QListWidgetItem(QFileInfo(file).fileName(),
+                    localScriptListWidget);
+            item->setData(Qt::UserRole, fn);
+            localScriptListWidget->setCurrentItem(item);
+        }
+    }
+        
+    downloadScript.clear();
+    downloadButton->setEnabled(true);
+}
+
+void CQtClient::updateDriveSpeed(int left, int right)
+{
+    driveSpeedSlider[0]->setValue(left);
+    driveSpeedSlider[1]->setValue(right);
 }
 
 void CQtClient::updateSensors()
 {
-    for (QMap<QString, SSensorData>::iterator it=sensorDataMap.begin();
-         it!=sensorDataMap.end(); ++it)
+    for (QMap<ETcpMessage, SSensorData>::iterator it=averagedSensorDataMap.begin();
+         it!=averagedSensorDataMap.end(); ++it)
     {
         if (it.value().count == 0)
             continue;
         
         int data = it.value().total / it.value().count;
         
-        if (it.key() == "lightleft")
+        if (it.key() == TCP_LIGHT_LEFT)
         {
             lightSensorsLCD[0]->display(data);
             lightSensorsPlot->addData("Left", data);
         }
-        else if (it.key() == "lightright")
+        else if (it.key() == TCP_LIGHT_RIGHT)
         {
             lightSensorsLCD[1]->display(data);
             lightSensorsPlot->addData("Right", data);
         }
-        else if (it.key() == "speedleft")
+        else if (it.key() == TCP_MOTOR_SPEED_LEFT)
         {
             motorSpeedLCD[0]->display(data);
             motorSpeedPlot->addData("Left (actual)", data);
         }
-        else if (it.key() == "speedright")
+        else if (it.key() == TCP_MOTOR_SPEED_RIGHT)
         {
             motorSpeedLCD[1]->display(data);
             motorSpeedPlot->addData("Right (actual)", data);
         }
-        else if (it.key() == "motorcurrentleft")
+        else if (it.key() == TCP_MOTOR_CURRENT_LEFT)
         {
             motorCurrentLCD[0]->display(data);
             motorCurrentPlot->addData("Left", data);
         }
-        else if (it.key() == "motorcurrentright")
+        else if (it.key() == TCP_MOTOR_CURRENT_RIGHT)
         {
             motorCurrentLCD[1]->display(data);
             motorCurrentPlot->addData("Right", data);
         }
-        else if (it.key() == "battery")
+        else if (it.key() == TCP_BATTERY)
         {
             batteryLCD->display(data);
             batteryPlot->addData("Battery", data);
         }
-        else if (it.key() == "acspower")
-        {
-            ACSPowerSlider->setValue(data);
-            ACSPowerState = static_cast<EACSPowerState>(data);
-        }
+        else if (it.key() == TCP_MIC)
+            micPlot->addData("Microphone", data);
         
         it.value().total = it.value().count = 0;
     }
+    
+    motorSpeedPlot->addData("Left (destination)",
+                            delayedSensorDataMap[TCP_MOTOR_DESTSPEED_LEFT]);
+    
+    motorSpeedPlot->addData("Right (destination)",
+                            delayedSensorDataMap[TCP_MOTOR_DESTSPEED_RIGHT]);
+    
+    motorDistanceLCD[0]->display(delayedSensorDataMap[TCP_MOTOR_DIST_LEFT]);
+    motorDistancePlot->addData("Left", delayedSensorDataMap[TCP_MOTOR_DIST_LEFT]);
+    
+    motorDistanceLCD[1]->display(delayedSensorDataMap[TCP_MOTOR_DIST_RIGHT]);
+    motorDistancePlot->addData("Right", delayedSensorDataMap[TCP_MOTOR_DIST_RIGHT]);
 }
 
 void CQtClient::toggleServerConnection()
 {
-    const bool wasconnected = (clientSocket->state() == QAbstractSocket::ConnectedState);
-    clientSocket->abort(); // Always disconnect first
-    
-    if (!wasconnected)
-        clientSocket->connectToHost(serverEdit->text(), 40000);
+    if (connected())
+        disconnectFromServer();
+    else
+        connectToHost(serverEdit->text());
 }
 
 void CQtClient::setMicUpdateTime(int value)
@@ -1104,82 +1094,7 @@ void CQtClient::micPlotToggled(bool checked)
         executeCommand("set slavemic 0");
 }
 
-void CQtClient::driveButtonPressed(int dir)
-{
-    const int speedchange = 5, startspeed = 60;
-    
-    if (currentStateSensors.bumperLeft || currentStateSensors.bumperRight || !currentStateSensors.movementComplete)
-        return;
-    
-    if (driveForwardSpeed == 0)
-        driveForwardSpeed = (dir == BWD) ? -startspeed : startspeed;
-    
-    // Change from left/right to up/down?   
-    if (((dir == FWD) || (dir == BWD)) && driveTurning)
-        driveTurnSpeed = 0;
-    
-    if (dir == FWD)
-        changeDriveSpeedVar(driveForwardSpeed, speedchange);
-    else if (dir == BWD)
-        changeDriveSpeedVar(driveForwardSpeed, -speedchange);
-    else if (dir == RIGHT)
-        changeDriveSpeedVar(driveTurnSpeed, speedchange);
-    else if (dir == LEFT)
-        changeDriveSpeedVar(driveTurnSpeed, -speedchange);
-   
-    driveTurning = ((dir == LEFT) || (dir == RIGHT));
-    
-    if (driveForwardSpeed < 0)
-    {
-        if ((currentMotorDirections.destLeft != BWD) || (currentMotorDirections.destRight != BWD))
-            executeCommand("set dir bwd");
-    }
-    else
-    {
-        if ((currentMotorDirections.destLeft != FWD) || (currentMotorDirections.destRight != FWD))
-            executeCommand("set dir fwd");
-    }
-    
-    if (driveTurning)
-    {
-        const int speed = abs(driveForwardSpeed);
-        int left, right;
-
-        if (driveTurnSpeed < 0) // Left
-        {
-            left = speed - ((speed < -driveTurnSpeed) ? speed : -driveTurnSpeed);
-            right = speed;
-        }
-        else // right
-        {
-            left = speed;
-            right = speed - ((speed < driveTurnSpeed) ? speed : driveTurnSpeed);
-        }
-
-        executeCommand(QString("set speed %1 %2").arg(left).arg(right));
-        
-        driveSpeedSlider[0]->setValue((driveForwardSpeed < 0) ? -left : left);
-        driveSpeedSlider[1]->setValue((driveForwardSpeed < 0) ? -right : right);
-    }
-    else
-    {
-        executeCommand(QString("set speed %1 %1").arg(abs(driveForwardSpeed)));
-        driveSpeedSlider[0]->setValue(driveForwardSpeed);
-        driveSpeedSlider[1]->setValue(driveForwardSpeed);
-    }
-}
-
-void CQtClient::stopDriveButtonPressed()
-{
-    executeCommand("stop");
-    driveForwardSpeed = 0;
-    driveTurnSpeed = 0;
-    driveTurning = false;
-    driveSpeedSlider[0]->setValue(0);
-    driveSpeedSlider[1]->setValue(0);
-}
-
-void CQtClient::startScan()
+void CQtClient::scanButtonPressed()
 {
     isScanning = true;
     scannerWidget->clear();
@@ -1187,7 +1102,7 @@ void CQtClient::startScan()
     
     if (scanPowerComboBox->currentText() == "Alternating")
     {
-        appendLogText("Alternating scan started.\n");
+        appendLogOutput("Alternating scan started.\n");
         executeCommand("set acs low");
         remainingACSCycles = 2;
         alternatingScan = true;
@@ -1205,12 +1120,6 @@ void CQtClient::startScan()
     }
     
     executeCommand(QString("rotate 360 %1").arg(scanSpeedSpinBox->value()));
-}
-
-void CQtClient::stopScan()
-{
-    isScanning = false;
-    scanButton->setEnabled(true);
 }
 
 void CQtClient::localScriptChanged(QListWidgetItem *item)
@@ -1233,7 +1142,7 @@ void CQtClient::localScriptChanged(QListWidgetItem *item)
     }
 }
 
-void CQtClient::newLocalScript()
+void CQtClient::newLocalScriptPressed()
 {
     QString file = QFileDialog::getSaveFileName(this, QString(), QString(),
             tr("Lua scripts (*.lua)"));
@@ -1258,7 +1167,7 @@ void CQtClient::newLocalScript()
     }
 }
 
-void CQtClient::addLocalScript()
+void CQtClient::addLocalScriptPressed()
 {
     QString file = QFileDialog::getOpenFileName(this, QString(), QString(),
             tr("Lua scripts (*.lua)"));
@@ -1277,7 +1186,7 @@ void CQtClient::addLocalScript()
     }
 }
 
-void CQtClient::removeLocalScript()
+void CQtClient::removeLocalScriptPressed()
 {
     if (localScriptListWidget->currentRow() != -1)
     {
@@ -1301,7 +1210,7 @@ void CQtClient::removeLocalScript()
     }
 }
 
-void CQtClient::uploadLocalScript()
+void CQtClient::uploadLocalScriptPressed()
 {
     if (localScriptListWidget->currentItem())
     {
@@ -1309,17 +1218,12 @@ void CQtClient::uploadLocalScript()
         if (!file.open(QFile::ReadOnly | QFile::Text))
             QMessageBox::critical(this, "File error", QString("Failed to open file."));
         else
-        {
-            CTcpWriter tcpWriter(clientSocket);
-            tcpWriter << QString("uploadlua");
-            tcpWriter << localScriptListWidget->currentItem()->text();
-            tcpWriter << file.readAll();
-            tcpWriter.write();
-        }
+            uploadLocalScript(localScriptListWidget->currentItem()->text(),
+                              file.readAll());
     }
 }
 
-void CQtClient::runLocalScript()
+void CQtClient::runLocalScriptPressed()
 {
     if (localScriptListWidget->currentItem())
     {
@@ -1327,16 +1231,11 @@ void CQtClient::runLocalScript()
         if (!file.open(QFile::ReadOnly | QFile::Text))
             QMessageBox::critical(this, "File error", QString("Failed to open file."));
         else
-        {
-            CTcpWriter tcpWriter(clientSocket);
-            tcpWriter << QString("runlua");
-            tcpWriter << file.readAll();
-            tcpWriter.write();
-        }
+            runLocalScript(file.readAll());
     }
 }
 
-void CQtClient::uploadRunLocalScript()
+void CQtClient::uploadRunLocalScriptPressed()
 {
     if (localScriptListWidget->currentItem())
     {
@@ -1344,58 +1243,53 @@ void CQtClient::uploadRunLocalScript()
         if (!file.open(QFile::ReadOnly | QFile::Text))
             QMessageBox::critical(this, "File error", QString("Failed to open file."));
         else
-        {
-            CTcpWriter tcpWriter(clientSocket);
-            tcpWriter << QString("uprunlua");
-            tcpWriter << localScriptListWidget->currentItem()->text();
-            tcpWriter << file.readAll();
-            tcpWriter.write();
-        }
+            uploadRunLocalScript(localScriptListWidget->currentItem()->text(),
+                                 file.readAll());
     }
 }
 
-void CQtClient::runServerScript()
+void CQtClient::runServerScriptPressed()
 {
     if (serverScriptListWidget->currentItem())
-    {
-        CTcpWriter tcpWriter(clientSocket);
-        tcpWriter << QString("runlocallua");
-        tcpWriter << serverScriptListWidget->currentItem()->text();
-        tcpWriter.write();
-    }
+        runServerScript(serverScriptListWidget->currentItem()->text());
 }
 
-void CQtClient::removeServerScript()
+void CQtClient::removeServerScriptPressed()
 {
     if (serverScriptListWidget->currentItem())
-    {
-        CTcpWriter tcpWriter(clientSocket);
-        tcpWriter << QString("removelocallua");
-        tcpWriter << serverScriptListWidget->currentItem()->text();
-        tcpWriter.write();
-    }
+        removeServerScript(serverScriptListWidget->currentItem()->text());
 }
 
-void CQtClient::downloadServerScript()
+void CQtClient::downloadServerScriptPressed()
 {
     if (serverScriptListWidget->currentItem())
     {
         downloadScript = serverScriptListWidget->currentItem()->text();
         downloadButton->setEnabled(false);
-        
-        CTcpWriter tcpWriter(clientSocket);
-        tcpWriter << QString("getlocallua");
-        tcpWriter << downloadScript;
-        tcpWriter.write();
+        downloadServerScript(downloadScript);
     }
 }
 
-void CQtClient::sendConsoleCommand()
+void CQtClient::sendConsolePressed()
 {
     // Append cmd
-    appendConsoleText(QString("> %1\n").arg(consoleIn->text()));
+    appendConsoleOutput(QString("> %1\n").arg(consoleIn->text()));
     executeCommand(consoleIn->text());
     consoleIn->clear();
+}
+
+void CQtClient::appendConsoleOutput(const QString &text)
+{
+    QTextCursor cur = consoleOut->textCursor();
+    cur.movePosition(QTextCursor::End);
+    consoleOut->setTextCursor(cur);
+    consoleOut->insertPlainText(text);
+}
+
+void CQtClient::appendLogOutput(const QString &text)
+{
+    logWidget->appendHtml(QString("<FONT color=#FF0000><strong>[%1]</strong></FONT> %2")
+            .arg(QTime::currentTime().toString()).arg(text));
 }
 
 void CQtClient::closeEvent(QCloseEvent *e)
