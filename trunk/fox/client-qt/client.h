@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QTcpSocket>
 
+#include "client_base.h"
 #include "shared.h"
 
 class QCheckBox;
@@ -26,12 +27,10 @@ class CEditor;
 class CScannerWidget;
 class CSensorPlot;
 
-class CQtClient: public QMainWindow
+class CQtClient: public QMainWindow, public CBaseClient
 {
     Q_OBJECT
     
-    quint32 tcpReadBlockSize;
-    QTcpSocket *clientSocket;
     QLineEdit *serverEdit;
     QPushButton *connectButton;
     QList<QWidget *> connectionDependentWidgets;
@@ -42,11 +41,11 @@ class CQtClient: public QMainWindow
     struct SSensorData
     {
         uint32_t total, count;
-        SSensorData(void) {}
-        SSensorData(uint32_t t, uint32_t c) : total(t), count(c) {}
+        SSensorData(void) : total(0), count(0) {}
     };
     
-    QMap<QString, SSensorData> sensorDataMap;
+    QMap<ETcpMessage, SSensorData> averagedSensorDataMap;
+    QMap<ETcpMessage, int> delayedSensorDataMap;
     
     // Overview widget
     QLCDNumber *motorSpeedLCD[2];
@@ -77,9 +76,6 @@ class CQtClient: public QMainWindow
     QPushButton *micUpdateToggleButton;
     
     QSignalMapper *driveMapper;
-    int currentDriveDirection;
-    bool driveTurning;
-    int driveForwardSpeed, driveTurnSpeed;
     QwtSlider *driveSpeedSlider[2];
     
     QSpinBox *scanSpeedSpinBox;
@@ -97,10 +93,8 @@ class CQtClient: public QMainWindow
     QString downloadScript;
     
     bool firstStateUpdate;
-    SStateSensors currentStateSensors;
     int motorDistance[2];
     int destMotorDistance[2];
-    SMotorDirections currentMotorDirections;
     EACSPowerState ACSPowerState;
     
     QWidget *createMainTab(void);
@@ -124,43 +118,43 @@ class CQtClient: public QMainWindow
     QWidget *createLocalLuaWidget(void);
     QWidget *createServerLuaWidget(void);
     
-    void updateConnection(bool connected);
-    void appendConsoleText(const QString &text);
-    void appendLogText(const QString &text);
-    void parseTcp(QDataStream &stream);
-    void updateStateSensors(const SStateSensors &state);
     void updateScan(const SStateSensors &oldstate, const SStateSensors &newstate);
-    void updateMotorDirections(const SMotorDirections &dir);
-    void executeCommand(const QString &cmd);
-    void changeDriveSpeedVar(int &speed, int delta);
+    void stopScan(void);
     bool checkScriptSave(void);
     
+    virtual void updateConnection(bool connected);
+    virtual void tcpError(const QString &error);
+    virtual void tcpRobotStateUpdate(const SStateSensors &oldstate,
+                                     const SStateSensors &newstate);
+    virtual void tcpHandleRobotData(ETcpMessage msg, int data);
+    virtual void tcpLuaScripts(const QStringList &list);
+    virtual void tcpRequestedScript(const QByteArray &text);
+    virtual void updateDriveSpeed(int left, int right);
+    
 private slots:
-    void connectedToServer(void);
-    void disconnectedFromServer(void);
-    void serverHasData(void);
-    void socketError(QAbstractSocket::SocketError error);
     void updateSensors(void);
     void toggleServerConnection(void);
     void setMicUpdateTime(int value);
     void micPlotToggled(bool checked);
-    void driveButtonPressed(int dir);
-    void stopDriveButtonPressed(void);
-    void startScan(void);
-    void stopScan(void);
+    void driveButtonPressed(int dir) { updateDriving(dir); }
+    void stopDriveButtonPressed(void) { stopDrive(); }
+    void scanButtonPressed(void);
     void localScriptChanged(QListWidgetItem *item);
-    void newLocalScript(void);
-    void addLocalScript(void);
-    void removeLocalScript(void);
-    void uploadLocalScript(void);
-    void runLocalScript(void);
-    void uploadRunLocalScript(void);
-    void runServerScript(void);
-    void removeServerScript(void);
-    void downloadServerScript(void);
-    void sendConsoleCommand(void);
+    void newLocalScriptPressed(void);
+    void addLocalScriptPressed(void);
+    void removeLocalScriptPressed(void);
+    void uploadLocalScriptPressed(void);
+    void runLocalScriptPressed(void);
+    void uploadRunLocalScriptPressed(void);
+    void runServerScriptPressed(void);
+    void removeServerScriptPressed(void);
+    void downloadServerScriptPressed(void);
+    void sendConsolePressed(void);
     
 protected:
+    virtual void appendConsoleOutput(const QString &text);
+    virtual void appendLogOutput(const QString &text);
+
     virtual void closeEvent(QCloseEvent *e);
     
 public:

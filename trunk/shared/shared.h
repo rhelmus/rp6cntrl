@@ -188,7 +188,10 @@ typedef enum
 typedef enum
 {
     // Robot
-    TCP_STATE_SENSORS=0,
+    TCP_RAWSERIAL=0,
+    
+    TCP_MIN_ROBOT_INDEX,
+    TCP_STATE_SENSORS,
     TCP_BASE_LEDS,
     TCP_M32_LEDS,
     TCP_LIGHT_LEFT,
@@ -208,9 +211,9 @@ typedef enum
     TCP_ACS_POWER,
     TCP_MIC,
     TCP_LASTRC5,
+    TCP_MAX_ROBOT_INDEX,
 
     // Fox
-    TCP_RAWSERIAL,
     TCP_LUASCRIPTS,
     TCP_REQUESTEDSCRIPT,
     TCP_LUATEXT,

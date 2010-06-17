@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include <QtCore>
 #include <QtNetwork>
 
@@ -7,6 +9,36 @@
 #include "tui/tui.h"
 #include "client.h"
 #include "display_widget.h"
+#include "tcputil.h"
+
+namespace {
+
+std::string intToStdString(int n)
+{
+    std::stringstream stream;
+    stream << n;
+    return stream.str();
+}
+
+std::string binaryToStdString(uint8_t n)
+{
+    return ((QString()).setNum(n, 2).toStdString());
+}
+
+std::string directionToStdString(uint8_t dir)
+{
+    switch (dir)
+    {
+        case FWD: return "fwd";
+        case BWD: return "bwd";
+        case LEFT: return "left";
+        case RIGHT: return "right";
+    }
+    
+    return std::string();
+}
+
+}
 
 CNCursManager::CNCursManager(QObject *parent) : QObject(parent)                                                
 {
@@ -26,7 +58,7 @@ CNCursManager::CNCursManager(QObject *parent) : QObject(parent)
     timer->start(0);
 
     connect(QCoreApplication::instance(), SIGNAL(aboutToQuit()), this,
-            SLOT(stopNCurs()));
+            SLOT(stopNCurs()));    
 }
 
 void CNCursManager::updateNCurs()
@@ -41,18 +73,20 @@ void CNCursManager::stopNCurs()
 }
 
 
-CNCursClient::CNCursClient() : tcpReadBlockSize(0), activeScreen(NULL),
-                               dataDisplays(DISPLAY_MAX_INDEX)
+CNCursClient::CNCursClient() : activeScreen(NULL),
+                               drivingEnabled(false)
 {
     StartPack(mainScreen = createMainScreen(), false, true, 0, 0);
+    StartPack(consoleScreen = createConsoleScreen(), false, true, 0, 0);
     StartPack(logScreen = createLogScreen(), false, true, 0, 0);
 
     screenList.push_back(mainScreen);
+    screenList.push_back(consoleScreen);
     screenList.push_back(logScreen);
 
     enableScreen(mainScreen);
 
-    appendLogText("Started NCurses client.\n");
+    appendLogOutput("Started NCurses client.\n");
 }
 
 CNCursClient::TScreen *CNCursClient::createMainScreen()
@@ -60,21 +94,24 @@ CNCursClient::TScreen *CNCursClient::createMainScreen()
     TScreen *ret = new TScreen(CBox::VERTICAL, false);
     ret->Enable(false);
 
-    NNCurses::CBox *hbox = new NNCurses::CBox(CBox::HORIZONTAL, true);
+    NNCurses::CBox *hbox = new NNCurses::CBox(CBox::HORIZONTAL, false);
     ret->AddWidget(hbox);
     
-    hbox->AddWidget(createMovementDisplay());
-    hbox->AddWidget(createSensorDisplay());
-    hbox->AddWidget(createOtherDisplay());
+    hbox->AddWidget(movementDisplay = createMovementDisplay());
+    hbox->AddWidget(sensorDisplay = createSensorDisplay());
+    hbox->AddWidget(otherDisplay = createOtherDisplay());
     
     ret->EndPack(connectButton = new NNCurses::CButton("Connect"), false, true, 0, 0);
     
-    clientSocket = new QTcpSocket(this);
-    connect(clientSocket, SIGNAL(connected()), this, SLOT(connectedToServer()));
-    connect(clientSocket, SIGNAL(disconnected()), this, SLOT(disconnectedFromServer()));
-    connect(clientSocket, SIGNAL(readyRead()), this, SLOT(serverHasData()));
-    connect(clientSocket, SIGNAL(error(QAbstractSocket::SocketError)),
-            this, SLOT(socketError(QAbstractSocket::SocketError)));
+    return ret;
+}
+
+CNCursClient::TScreen *CNCursClient::createConsoleScreen()
+{
+    TScreen *ret = new TScreen(CBox::VERTICAL, true);
+    ret->Enable(false);
+    
+    ret->AddWidget(consoleOutput = new NNCurses::CTextField(30, 10, true));
     
     return ret;
 }
@@ -101,20 +138,14 @@ void CNCursClient::enableScreen(TScreen *screen)
     activeScreen = screen;
 }
 
-void CNCursClient::appendLogText(std::string text)
-{
-    text = QTime::currentTime().toString().toStdString() + ": " + text;
-    logWidget->AddText(text);
-}
-
 CDisplayWidget *CNCursClient::createMovementDisplay()
 {
     CDisplayWidget *ret = new CDisplayWidget("Movement");
 
-    dataDisplays[DISPLAY_SPEED] = ret->addDisplay("Speed");
-    dataDisplays[DISPLAY_DISTANCE] = ret->addDisplay("Distance");
-    dataDisplays[DISPLAY_CURRENT] = ret->addDisplay("Current");
-    dataDisplays[DISPLAY_DIRECTION] = ret->addDisplay("Direction");
+    ret->addDisplay("Speed", DISPLAY_SPEED, 2);
+    ret->addDisplay("Distance", DISPLAY_DISTANCE, 2);
+    ret->addDisplay("Current", DISPLAY_CURRENT, 2);
+    ret->addDisplay("Direction", DISPLAY_DIRECTION, 2);
     
     return ret;
 }
@@ -123,9 +154,9 @@ CDisplayWidget *CNCursClient::createSensorDisplay()
 {
     CDisplayWidget *ret = new CDisplayWidget("Sensors");
 
-    dataDisplays[DISPLAY_LIGHT] = ret->addDisplay("Light");
-    dataDisplays[DISPLAY_ACS] = ret->addDisplay("ACS");
-    dataDisplays[DISPLAY_BUMPERS] = ret->addDisplay("Bumpers");
+    ret->addDisplay("Light", DISPLAY_LIGHT, 2);
+    ret->addDisplay("ACS", DISPLAY_ACS, 2);
+    ret->addDisplay("Bumpers", DISPLAY_BUMPERS, 2);
     
     return ret;
 }
@@ -134,78 +165,91 @@ CDisplayWidget *CNCursClient::createOtherDisplay()
 {
     CDisplayWidget *ret = new CDisplayWidget("Other");
 
-    dataDisplays[DISPLAY_BATTERY] = ret->addDisplay("Battery");
-    dataDisplays[DISPLAY_RC5] = ret->addDisplay("RC5");
-    dataDisplays[DISPLAY_MAIN_LEDS] = ret->addDisplay("Main LEDs");
-    dataDisplays[DISPLAY_M32_LEDS] = ret->addDisplay("M32 LEDs");
-    dataDisplays[DISPLAY_KEYS] = ret->addDisplay("Pressed keys");
+    ret->addDisplay("Battery", DISPLAY_BATTERY, 1);
+    ret->addDisplay("RC5 (dev/tog/key)", DISPLAY_RC5, 3);
+    ret->addDisplay("Main LEDs", DISPLAY_MAIN_LEDS, 1);
+    ret->addDisplay("M32 LEDs", DISPLAY_M32_LEDS, 1);
+    ret->addDisplay("Pressed keys", DISPLAY_KEYS, 1);
     
     return ret;
 }
 
 void CNCursClient::updateConnection(bool connected)
 {
-    if (connected)
+    connectButton->SetText((connected) ? "Disconnect" : "Connect");
+}
+
+void CNCursClient::tcpRobotStateUpdate(const SStateSensors &,
+                                       const SStateSensors &newstate)
+{
+    sensorDisplay->setDisplayValue(DISPLAY_ACS, 0,
+                                   intToStdString(newstate.ACSLeft));
+    sensorDisplay->setDisplayValue(DISPLAY_ACS, 1,
+                                   intToStdString(newstate.ACSRight));
+
+    sensorDisplay->setDisplayValue(DISPLAY_BUMPERS, 0,
+                                   intToStdString(newstate.bumperLeft));
+    sensorDisplay->setDisplayValue(DISPLAY_BUMPERS, 1,
+                                   intToStdString(newstate.bumperRight));
+}
+
+void CNCursClient::tcpHandleRobotData(ETcpMessage msg, int data)
+{
+    if (msg == TCP_BASE_LEDS)
+        otherDisplay->setDisplayValue(DISPLAY_MAIN_LEDS, 0,
+                                        binaryToStdString(data));
+    else if (msg == TCP_M32_LEDS)
+        otherDisplay->setDisplayValue(DISPLAY_M32_LEDS, 0,
+                                        binaryToStdString(data));
+    else if (msg == TCP_LIGHT_LEFT)
+        sensorDisplay->setDisplayValue(DISPLAY_LIGHT, 0, intToStdString(data));
+    else if (msg == TCP_LIGHT_RIGHT)
+        sensorDisplay->setDisplayValue(DISPLAY_LIGHT, 1, intToStdString(data));
+    else if (msg == TCP_MOTOR_SPEED_LEFT)
+        movementDisplay->setDisplayValue(DISPLAY_SPEED, 0, intToStdString(data));
+    else if (msg == TCP_MOTOR_SPEED_RIGHT)
+        movementDisplay->setDisplayValue(DISPLAY_SPEED, 1, intToStdString(data));
+    else if (msg == TCP_MOTOR_DIST_LEFT)
+        movementDisplay->setDisplayValue(DISPLAY_DISTANCE, 0, intToStdString(data));
+    else if (msg == TCP_MOTOR_DIST_RIGHT)
+        movementDisplay->setDisplayValue(DISPLAY_DISTANCE, 1, intToStdString(data));
+    else if (msg == TCP_MOTOR_CURRENT_LEFT)
+        movementDisplay->setDisplayValue(DISPLAY_CURRENT, 0, intToStdString(data));
+    else if (msg == TCP_MOTOR_CURRENT_RIGHT)
+        movementDisplay->setDisplayValue(DISPLAY_CURRENT, 1, intToStdString(data));
+    else if (msg == TCP_MOTOR_DIRECTIONS)
     {
-        connectButton->SetText("Disconnect");
-        appendLogText("Disconnected from server.\n");
+        SMotorDirections dir;
+        dir.byte = data;
+        movementDisplay->setDisplayValue(DISPLAY_DIRECTION, 0,
+                                            directionToStdString(dir.left));
+        movementDisplay->setDisplayValue(DISPLAY_DIRECTION, 1,
+                                            directionToStdString(dir.right));
     }
-    else
+    else if (msg == TCP_BATTERY)
+        otherDisplay->setDisplayValue(DISPLAY_BATTERY, 0, intToStdString(data));
+    else if (msg == TCP_LASTRC5)
     {
-        connectButton->SetText("Connect");
-        appendLogText("Connected to server.\n");
+        RC5data_t rc5;
+        rc5.data = data;
+        otherDisplay->setDisplayValue(DISPLAY_RC5, 0,
+                                            intToStdString(rc5.device));
+        otherDisplay->setDisplayValue(DISPLAY_RC5, 1,
+                                            intToStdString(rc5.toggle_bit));
+        otherDisplay->setDisplayValue(DISPLAY_RC5, 2,
+                                            intToStdString(rc5.key_code));
     }
 }
 
-void CNCursClient::parseTcp(QDataStream &stream)
+void CNCursClient::appendConsoleOutput(const QString &text)
 {
-    QString msg;
-    QVariant data;
-    stream >> msg >> data;
-
-    if (msg == "lightleft")
-    {
-        dataDisplays[DISPLAY_LIGHT]->SetText(data.toString().toStdString());
-    }
+    consoleOutput->AddText(text.toStdString());
 }
 
-void CNCursClient::connectedToServer()
+void CNCursClient::appendLogOutput(const QString &text)
 {
-    updateConnection(true);
-}
-
-void CNCursClient::disconnectedFromServer()
-{
-    updateConnection(false);
-}
-
-void CNCursClient::serverHasData()
-{
-    QDataStream in(clientSocket);
-    in.setVersion(QDataStream::Qt_4_4);
-    
-    while (true)
-    {
-        if (tcpReadBlockSize == 0)
-        {
-            if (clientSocket->bytesAvailable() < (int)sizeof(quint32))
-                return;
-            
-            in >> tcpReadBlockSize;
-        }
-        
-        if (clientSocket->bytesAvailable() < tcpReadBlockSize)
-            return;
-        
-        parseTcp(in);
-        tcpReadBlockSize = 0;
-    }
-}
-
-void CNCursClient::socketError(QAbstractSocket::SocketError)
-{
-    // ...
-    updateConnection(false);
+    std::string s = (QTime::currentTime().toString() + ": " + text).toStdString();
+    logWidget->AddText(s);
 }
 
 bool CNCursClient::CoreHandleEvent(NNCurses::CWidget *emitter, int type)
@@ -217,12 +261,10 @@ bool CNCursClient::CoreHandleEvent(NNCurses::CWidget *emitter, int type)
     {
         if (emitter == connectButton)
         {
-            const bool wasconnected = (clientSocket->state() ==
-                QAbstractSocket::ConnectedState);
-            clientSocket->abort(); // Always disconnect first
-
-            if (!wasconnected)
-                clientSocket->connectToHost("localhost", 40000);
+            if (connected())
+                disconnectFromServer();
+            else
+                connectToHost("localhost");
             
             return true;
         }
@@ -243,8 +285,30 @@ bool CNCursClient::CoreHandleKey(wchar_t key)
     }
     else if (key == KEY_F(3))
     {
+        enableScreen(consoleScreen);
+        return true;
+    }
+    else if (key == KEY_F(4))
+    {
         enableScreen(logScreen);
         return true;
+    }
+    else if (key == KEY_F(5))
+    {
+        drivingEnabled = !drivingEnabled;
+        if (!drivingEnabled)
+            stopDrive();
+        return true;
+    }
+    else if ((activeScreen == mainScreen) && drivingEnabled)
+    {
+        switch (key)
+        {
+            case KEY_UP: updateDriving(FWD); return true;
+            case KEY_LEFT: updateDriving(LEFT); return true;
+            case KEY_RIGHT: updateDriving(RIGHT); return true;
+            case KEY_DOWN: updateDriving(BWD); return true;
+        }
     }
     
     return false;
@@ -253,6 +317,8 @@ bool CNCursClient::CoreHandleKey(wchar_t key)
 void CNCursClient::CoreGetButtonDescs(NNCurses::TButtonDescList &list)
 {
     list.push_back(NNCurses::TButtonDescPair("F2", "Main"));
-    list.push_back(NNCurses::TButtonDescPair("F3", "Log"));
+    list.push_back(NNCurses::TButtonDescPair("F3", "Console"));
+    list.push_back(NNCurses::TButtonDescPair("F4", "Log"));
+    list.push_back(NNCurses::TButtonDescPair("F5", "Toggle drive"));
     CWindow::CoreGetButtonDescs(list);
 }

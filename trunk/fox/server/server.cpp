@@ -22,39 +22,56 @@ CControl::CControl(QObject *parent) : QObject(parent)
     connect(tcpServer, SIGNAL(clientTcpReceived(QDataStream &)), this,
             SLOT(parseClientTcp(QDataStream &)));
 
+    initTcpDataTypes();
     initSerial2TcpMap();
     initLua();
 }
 
 void CControl::initSerial2TcpMap()
 {
-    serial2TcpMap.insert(SERIAL_STATE_SENSORS, SSerial2TcpInfo(DATA_BYTE, "state"));
+    serial2TcpMap.insert(SERIAL_STATE_SENSORS,
+                         SSerial2TcpInfo(TCP_STATE_SENSORS, "state"));
 
-    serial2TcpMap.insert(SERIAL_BASE_LEDS, SSerial2TcpInfo(DATA_BYTE, "baseleds"));
-    serial2TcpMap.insert(SERIAL_M32_LEDS, SSerial2TcpInfo(DATA_BYTE, "m32leds"));
+    serial2TcpMap.insert(SERIAL_BASE_LEDS,
+                         SSerial2TcpInfo(TCP_BASE_LEDS, "baseleds"));
+    serial2TcpMap.insert(SERIAL_M32_LEDS,
+                         SSerial2TcpInfo(TCP_M32_LEDS, "m32leds"));
     
-    serial2TcpMap.insert(SERIAL_LIGHT_LEFT, SSerial2TcpInfo(DATA_WORD, "lightleft"));
-    serial2TcpMap.insert(SERIAL_LIGHT_RIGHT, SSerial2TcpInfo(DATA_WORD, "lightright"));
+    serial2TcpMap.insert(SERIAL_LIGHT_LEFT,
+                         SSerial2TcpInfo(TCP_LIGHT_LEFT, "lightleft"));
+    serial2TcpMap.insert(SERIAL_LIGHT_RIGHT,
+                         SSerial2TcpInfo(TCP_LIGHT_RIGHT, "lightright"));
     
-    serial2TcpMap.insert(SERIAL_MOTOR_SPEED_LEFT, SSerial2TcpInfo(DATA_BYTE, "speedleft"));
-    serial2TcpMap.insert(SERIAL_MOTOR_SPEED_RIGHT, SSerial2TcpInfo(DATA_BYTE, "speedright"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DESTSPEED_LEFT, SSerial2TcpInfo(DATA_BYTE, "destspeedleft"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DESTSPEED_RIGHT, SSerial2TcpInfo(DATA_BYTE, "destspeedright"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DIST_LEFT, SSerial2TcpInfo(DATA_WORD, "distleft"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DIST_RIGHT, SSerial2TcpInfo(DATA_WORD, "distright"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DESTDIST_LEFT, SSerial2TcpInfo(DATA_WORD, "destdistleft"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DESTDIST_RIGHT, SSerial2TcpInfo(DATA_WORD, "destdistright"));
-    serial2TcpMap.insert(SERIAL_MOTOR_CURRENT_LEFT, SSerial2TcpInfo(DATA_WORD, "motorcurrentleft"));
-    serial2TcpMap.insert(SERIAL_MOTOR_CURRENT_RIGHT, SSerial2TcpInfo(DATA_WORD, "motorcurrentright"));
-    serial2TcpMap.insert(SERIAL_MOTOR_DIRECTIONS, SSerial2TcpInfo(DATA_BYTE, "motordir"));
+    serial2TcpMap.insert(SERIAL_MOTOR_SPEED_LEFT,
+                         SSerial2TcpInfo(TCP_MOTOR_SPEED_LEFT, "speedleft"));
+    serial2TcpMap.insert(SERIAL_MOTOR_SPEED_RIGHT,
+                         SSerial2TcpInfo(TCP_MOTOR_SPEED_RIGHT, "speedright"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DESTSPEED_LEFT,
+                         SSerial2TcpInfo(TCP_MOTOR_DESTSPEED_LEFT, "destspeedleft"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DESTSPEED_RIGHT,
+                         SSerial2TcpInfo(TCP_MOTOR_DESTSPEED_RIGHT, "destspeedright"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DIST_LEFT,
+                         SSerial2TcpInfo(TCP_MOTOR_DIST_LEFT, "distleft"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DIST_RIGHT,
+                         SSerial2TcpInfo(TCP_MOTOR_DIST_RIGHT, "distright"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DESTDIST_LEFT,
+                         SSerial2TcpInfo(TCP_MOTOR_DESTDIST_LEFT, "destdistleft"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DESTDIST_RIGHT,
+                         SSerial2TcpInfo(TCP_MOTOR_DESTDIST_RIGHT, "destdistright"));
+    serial2TcpMap.insert(SERIAL_MOTOR_CURRENT_LEFT,
+                         SSerial2TcpInfo(TCP_MOTOR_CURRENT_LEFT, "motorcurrentleft"));
+    serial2TcpMap.insert(SERIAL_MOTOR_CURRENT_RIGHT,
+                         SSerial2TcpInfo(TCP_MOTOR_CURRENT_RIGHT, "motorcurrentright"));
+    serial2TcpMap.insert(SERIAL_MOTOR_DIRECTIONS,
+                         SSerial2TcpInfo(TCP_MOTOR_DIRECTIONS, "motordirections"));
 
-    serial2TcpMap.insert(SERIAL_BATTERY, SSerial2TcpInfo(DATA_WORD, "battery"));
+    serial2TcpMap.insert(SERIAL_BATTERY, SSerial2TcpInfo(TCP_BATTERY, "battery"));
 
-    serial2TcpMap.insert(SERIAL_ACS_POWER, SSerial2TcpInfo(DATA_BYTE, "acspower"));
+    serial2TcpMap.insert(SERIAL_ACS_POWER, SSerial2TcpInfo(TCP_ACS_POWER, "acspower"));
 
-    serial2TcpMap.insert(SERIAL_MIC, SSerial2TcpInfo(DATA_WORD, "mic"));
+    serial2TcpMap.insert(SERIAL_MIC, SSerial2TcpInfo(TCP_MIC, "mic"));
 
-    serial2TcpMap.insert(SERIAL_LASTRC5, SSerial2TcpInfo(DATA_WORD, "rc5"));
+    serial2TcpMap.insert(SERIAL_LASTRC5, SSerial2TcpInfo(TCP_LASTRC5, "rc5"));
 }
 
 void CControl::initLua()
@@ -67,7 +84,7 @@ void CControl::initLua()
          it!=serial2TcpMap.end(); ++it)
     {
         lua_pushinteger(luaInterface, 0);
-        lua_setfield(luaInterface, -2, it.value().tcpVariable);
+        lua_setfield(luaInterface, -2, it.value().luaKey);
     }
     lua_setglobal(luaInterface, "sensortable");
     
@@ -82,8 +99,7 @@ CControl::TLuaScriptMap CControl::getLuaScripts()
 
 void CControl::sendLuaScripts()
 {
-    TLuaScriptMap scripts = getLuaScripts();
-    tcpServer->sendKeyValue("scripts", QVariant(scripts.keys()));
+    tcpServer->send(TCP_LUASCRIPTS, getLuaScripts().keys());
 }
 
 void CControl::handleSerialText(const QByteArray &text)
@@ -94,20 +110,27 @@ void CControl::handleSerialText(const QByteArray &text)
         QTimer::singleShot(4000, this, SLOT(enableRP6Slave()));
     }
     else
-        tcpServer->sendText("rawserial", text);
+        tcpServer->send(TCP_RAWSERIAL, text);
 }
 
 void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
 {
-    switch (serial2TcpMap[msg].dataType)
+/*    qDebug() << "Serial data: " << msg << " type: " <<
+        tcpDataTypes[serial2TcpMap[msg].tcpMessage] << " name: " <<
+        serial2TcpMap[msg].luaKey << " TCP type: " <<
+        serial2TcpMap[msg].tcpMessage;*/
+        
+    switch (tcpDataTypes[serial2TcpMap[msg].tcpMessage])
     {
         case DATA_BYTE:
-            tcpServer->sendKeyValue(serial2TcpMap[msg].tcpVariable, data[0]);
+            tcpServer->send(serial2TcpMap[msg].tcpMessage,
+                            static_cast<uint8_t>(data[0]));
             break;
         case DATA_WORD:
         {
-            const uint16_t d = (uint8_t)data[0] + ((uint8_t)data[1] << 8);
-            tcpServer->sendKeyValue(serial2TcpMap[msg].tcpVariable, d);
+            const uint16_t d = static_cast<uint8_t>(data[0]) +
+                (static_cast<uint8_t>(data[1]) << 8);
+            tcpServer->send(serial2TcpMap[msg].tcpMessage, d);
             break;
         }
     }    
@@ -115,25 +138,26 @@ void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
 
 void CControl::parseClientTcp(QDataStream &stream)
 {
-    QString msg;
-    stream >> msg;
-
-    if (msg == "command")
+    uint8_t m;
+    stream >> m;
+    ETcpMessage msg = static_cast<ETcpMessage>(m);
+    
+    if (msg == TCP_COMMAND)
     {
         QString cmd;
         stream >> cmd;
         serialPort->sendCommand(cmd);
         qDebug() << "Received client cmd:" << cmd;
     }
-    else if (msg == "getscripts")
+    else if (msg == TCP_GETSCRIPTS)
         sendLuaScripts();
-    else if (msg == "runlua")
+    else if (msg == TCP_RUNLUA)
     {
         QByteArray script;
         stream >> script;
         luaInterface.runScript(script.constData());
     }
-    else if ((msg == "uploadlua") || (msg == "uprunlua"))
+    else if ((msg == TCP_UPLOADLUA) || (msg == TCP_UPRUNLUA))
     {
         QString name;
         QByteArray script;
@@ -145,10 +169,10 @@ void CControl::parseClientTcp(QDataStream &stream)
 
         sendLuaScripts();
 
-        if (msg == "uprunlua")
+        if (msg == TCP_UPRUNLUA)
             luaInterface.runScript(script.constData());
     }
-    else if (msg == "runlocallua")
+    else if (msg == TCP_RUNSERVERLUA)
     {
         QString name;
         stream >> name;
@@ -157,7 +181,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         if (scripts.find(name) != scripts.end())
             luaInterface.runScript(scripts[name].toString().toLatin1().data());
     }
-    else if (msg == "removelocallua")
+    else if (msg == TCP_REMOVESERVERLUA)
     {
         QString name;
         stream >> name;
@@ -168,14 +192,14 @@ void CControl::parseClientTcp(QDataStream &stream)
         
         sendLuaScripts();
     }
-    else if (msg == "getlocallua")
+    else if (msg == TCP_GETSERVERLUA)
     {
         QString name;
         stream >> name;
         
         TLuaScriptMap scripts = getLuaScripts();
         if (scripts.find(name) != scripts.end())
-            tcpServer->sendKeyValue("reqscript", scripts[name]);
+            tcpServer->send(TCP_REQUESTEDSCRIPT, scripts[name].toByteArray());
     }
 }
 
@@ -198,6 +222,6 @@ int CControl::luaSendText(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
     const char *txt = luaL_checkstring(l, 1);
-    control->tcpServer->sendKeyValue("luatxt", QString(txt));
+    control->tcpServer->send(TCP_LUATEXT, QString(txt));
     return 0;
 }

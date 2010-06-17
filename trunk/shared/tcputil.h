@@ -23,6 +23,9 @@
 
 #include <QByteArray>
 #include <QDataStream>
+#include <QMap>
+
+#include "shared.h"
 
 class QTcpSocket;
 
@@ -43,5 +46,11 @@ public:
         return (*dataStream << data);
     }
 };
+
+typedef enum { DATA_BYTE=0, DATA_WORD } EDataType;
+extern QMap<ETcpMessage, EDataType> tcpDataTypes;
+
+void initTcpDataTypes(void);
+
 
 #endif

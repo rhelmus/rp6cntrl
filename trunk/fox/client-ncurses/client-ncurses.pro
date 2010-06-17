@@ -46,5 +46,11 @@ LIBS += -lncursesw
 
 INCLUDEPATH += ../../shared
 DEPENDPATH += ../../shared
+SOURCES += tcputil.cpp
+
+INCLUDEPATH += ../client-base
+DEPENDPATH += ../client-base
+HEADERS += client_base.h
+SOURCES += client_base.cpp
 
 OBJECTS_DIR = obj
