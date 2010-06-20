@@ -4,6 +4,7 @@
 #include "command.h"
 #include "interface.h"
 #include "plugin.h"
+#include "servo.h"
 
 void FlashLEDs(void)
 {   
@@ -33,11 +34,17 @@ int main(void)
     
     FlashLEDs();
 
-    // Stopwatch 1: Refresh delay
+    // Stopwatch 1: Reserved by servo lib
     // Stopwatch 2: ping
+    // Stopwatch 3: Refresh delay
     
     dischargePeakDetector();
-   
+
+    // Init IR turret
+    initSERVO(SERVO5);
+    setServo(MIDDLE_POSITION); // Place servo at middle
+    DDRA &= ~ADC2; // Enable sharp IR for readout
+
     for (;;)
     {
         updateInterface();
@@ -46,6 +53,7 @@ int main(void)
         pluginThink();
         
         task_I2CTWI();
+        task_SERVO();
     }
     
     return 0;

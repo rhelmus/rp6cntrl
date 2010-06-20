@@ -11,6 +11,10 @@ RC5data_t lastRC5Data;
 uint8_t slaveMode;
 uint16_t slaveMicUpdateTime;
 
+// Replaced macros from servolib to these
+uint8_t servoLeftTouch = 46;
+uint8_t servoRightTouch = 196;
+
 void sendSerialMSGByte(ESerialMessage msg, uint8_t data)
 {
     writeChar(SERIAL_MSG_START);
@@ -199,10 +203,31 @@ void setRotationFactor(uint16_t factor)
                           I2C_CMD_ROTATE_FACTOR, factor, (factor >> 8));
 }
 
+void setServoRange(uint8_t left, uint8_t right)
+{
+    servoLeftTouch = left;
+    servoRightTouch = right;
+}
+
+uint8_t getSharpIRDistance(void)
+{
+    uint16_t adc = readADC(ADC_2);
+
+    // UNDONE: Avoid float calculations?
+
+    // ADC to volt (assuming 5v supply))
+    float volt = adc * 5.0 / 1024.0;
+
+    // From http://www.robotshop.ca/PDF/Sharp_GP2Y0A02YK_Ranger.pdf
+    const float A = 0.008271, B = 939.6, C = -3.398, D = 17.339;
+
+    return (A + B * volt) / (1.0 + C * volt + D * volt * volt);
+}
+
 void updateInterface(void)
 {
-    if (!isStopwatch1Running())
-        startStopwatch1();
+    if (!isStopwatch3Running())
+        startStopwatch3();
 
     if (!I2CTWI_isBusy())
     {
@@ -215,11 +240,11 @@ void updateInterface(void)
             if (slaveMode)
                 sendSerialMSGByte(SERIAL_STATE_SENSORS, slaveData[I2C_STATE_SENSORS]);
         }
-        else if (getStopwatch1() > 50)
+        else if (getStopwatch3() > 50)
         {
             I2CTWI_requestRegisterFromDevice(I2C_SLAVEADDRESS, REQUEST_DUMP_BASE_DATA,
                                              I2C_LEDS, I2C_MAX_INDEX-I2C_LEDS);
-            setStopwatch1(0);
+            setStopwatch3(0);
             startStopwatch2();
         }
     }
