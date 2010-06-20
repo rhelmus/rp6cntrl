@@ -5,6 +5,7 @@
 #include "command.h"
 #include "interface.h"
 #include "plugin.h"
+#include "servo.h"
 
 static const char usageStr[] PROGMEM =
     "Usage:\n\n"
@@ -36,7 +37,9 @@ static const char setUsageStr[] PROGMEM =
     "rotf\t\tSets rotation error factor. Usage: factor\n"
     "beep\t\tSets beeper pitch. Usage: pitch\n"
     "slave\t\tEnables or disables slave mode. Usage: boolean.\n"
-    "slavemic\t\tSlave mic update time. Usage: time in msec.\n";
+    "slavemic\t\tSlave mic update time. Usage: time in msec.\n"
+    "servo\t\tServo position. Usage: 0..255.\n"
+    "srange\t\tServo touch range. Usage: left, right\n";
 
 static const char dumpUsageStr[] PROGMEM =
     "dump usage:\n\n"
@@ -51,7 +54,8 @@ static const char dumpUsageStr[] PROGMEM =
     "rc5\t\tDumps last received ir (rc5) info\n"
     "ping\t\tDumps last ping time\n"
     "mic\t\tDumps last mic value\n"
-    "key\t\tDumps pressed key\n";
+    "key\t\tDumps pressed key\n"
+    "sharp\t\tDumps distance from Sharp IR sensor\n";
 
 static const char pluginUsageStr[] PROGMEM =
     "plugin usage:\n\n"
@@ -183,6 +187,23 @@ void handleSetCommand(const char **cmd, uint8_t count)
         else
             stopStopwatch3();
     }
+    else if (!strcmp_P(cmd[0], PSTR("servo")))
+    {
+        uint16_t pos = atoi(cmd[1]); // uint16_t: for handy calculating
+        // Convert from 0 .. 255 --> Servo range
+        // The second part is to compensate for the addition of this
+        // value inside the servo lib
+//         setServo((uint16_t)pos * (RIGHT_TOUCH - LEFT_TOUCH) / 255);
+        //setServo((pos * RIGHT_TOUCH / 255) - (LEFT_TOUCH - (pos * LEFT_TOUCH / 255)));
+        setServo((uint16_t)pos * RIGHT_TOUCH / 255);
+    }
+    else if (!strcmp_P(cmd[0], PSTR("srange")))
+    {
+        if (count < 3)
+            writeString_P("Error: need atleast 3 arguments\n");
+        else
+            setServoRange(atoi(cmd[1]), atoi(cmd[2]));
+    }
 }
 
 void handleDumpCommand(const char **cmd, uint8_t count)
@@ -281,6 +302,9 @@ void handleDumpCommand(const char **cmd, uint8_t count)
     
     if (all || !strcmp_P(cmd[0], PSTR("key")))
         dumpVar_P("Pressed key: ", getPressedKeyNumber(), DEC);
+
+    if (all || !strcmp_P(cmd[0], PSTR("sharp")))
+        dumpVar_P("Sharp IR: ", getSharpIRDistance(), DEC);
 }
 
 void handlePluginCommand(const char **cmd, uint8_t count)
