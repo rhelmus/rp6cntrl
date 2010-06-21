@@ -95,6 +95,8 @@ void I2CRequestReady(uint8_t id)
             }
 
             sendSerialMSGWord(SERIAL_LASTRC5, getLastRC5().data);
+
+            sendSerialMSGByte(SERIAL_SHARPIR, getSharpIRDistance());
         }
     }
 }
@@ -216,12 +218,12 @@ uint8_t getSharpIRDistance(void)
     // UNDONE: Avoid float calculations?
 
     // ADC to volt (assuming 5v supply))
-    float volt = adc * 5.0 / 1024.0;
+    float volt = (float)adc * 5.0 / 1023.0;
 
     // From http://www.robotshop.ca/PDF/Sharp_GP2Y0A02YK_Ranger.pdf
     const float A = 0.008271, B = 939.6, C = -3.398, D = 17.339;
 
-    return (A + B * volt) / (1.0 + C * volt + D * volt * volt);
+    return (uint8_t)((A + B * volt) / (1.0 + C * volt + D * volt * volt));
 }
 
 void updateInterface(void)

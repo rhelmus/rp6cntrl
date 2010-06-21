@@ -183,6 +183,8 @@ typedef enum
     SERIAL_MIC,
 
     SERIAL_LASTRC5,
+
+    SERIAL_SHARPIR,
 } ESerialMessage;
 
 typedef enum
@@ -211,6 +213,7 @@ typedef enum
     TCP_ACS_POWER,
     TCP_MIC,
     TCP_LASTRC5,
+    TCP_SHARPIR,
     TCP_MAX_ROBOT_INDEX,
 
     // Fox

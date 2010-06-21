@@ -189,13 +189,12 @@ void handleSetCommand(const char **cmd, uint8_t count)
     }
     else if (!strcmp_P(cmd[0], PSTR("servo")))
     {
-        uint16_t pos = atoi(cmd[1]); // uint16_t: for handy calculating
-        // Convert from 0 .. 255 --> Servo range
-        // The second part is to compensate for the addition of this
-        // value inside the servo lib
-//         setServo((uint16_t)pos * (RIGHT_TOUCH - LEFT_TOUCH) / 255);
-        //setServo((pos * RIGHT_TOUCH / 255) - (LEFT_TOUCH - (pos * LEFT_TOUCH / 255)));
-        setServo((uint16_t)pos * RIGHT_TOUCH / 255);
+        uint8_t pos = atoi(cmd[1]);
+        if (pos > 180)
+            pos = 180;
+
+        // Degree --> servo pos
+        setServo((uint16_t)pos * RIGHT_TOUCH / 180);
     }
     else if (!strcmp_P(cmd[0], PSTR("srange")))
     {
