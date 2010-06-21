@@ -10,6 +10,7 @@
 class QCheckBox;
 class QComboBox;
 class QDataStream;
+class QDial;
 class QLabel;
 class QLCDNumber;
 class QLineEdit;
@@ -53,6 +54,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     QLCDNumber *motorCurrentLCD[2];
     QLabel *motorDirection[2];
     QLCDNumber *lightSensorsLCD[2];
+    QLCDNumber *sharpIRSensor;
     QLabel *RC5DeviceLabel, *RC5KeyLabel;
     QCheckBox *RC5ToggleBitBox;
     QCheckBox *ACSCollisionBox[2];
@@ -71,6 +73,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     CSensorPlot *ACSPlot;
     CSensorPlot *batteryPlot;
     CSensorPlot *micPlot;
+    CSensorPlot *sharpIRPlot;
     
     QSpinBox *micUpdateTimeSpinBox;
     QPushButton *micUpdateToggleButton;
@@ -78,13 +81,20 @@ class CQtClient: public QMainWindow, public CBaseClient
     QSignalMapper *driveMapper;
     QwtSlider *driveSpeedSlider[2];
     
-    QSpinBox *scanSpeedSpinBox;
-    QComboBox *scanPowerComboBox;
-    QPushButton *scanButton;
-    CScannerWidget *scannerWidget;
-    bool isScanning;
-    bool alternatingScan;
-    int remainingACSCycles; // Remaining cycles before switch
+    // ACS scanner
+    QSpinBox *ACSScanSpeedSpinBox;
+    QComboBox *ACSScanPowerComboBox;
+    QPushButton *ACSScanButton;
+    CScannerWidget *ACSScannerWidget;
+    bool isACSScanning;
+    bool alternatingACSScan;
+    int remainingACSScanCycles; // Remaining cycles before switch
+    
+    // IR turret
+    QDial *servoDial;
+    QSpinBox *turretScanRangeSpinBox, *turretScanResolutionSpinBox, *turretScanTimeSpinBox;
+    QPushButton *turretScanButton;
+    CScannerWidget *turrentScannerWidget;
     
     CEditor *scriptEditor;
     QPushButton *downloadButton;
@@ -110,10 +120,12 @@ class CQtClient: public QMainWindow, public CBaseClient
     QWidget *createACSWidget(void);
     QWidget *createBatteryWidget(void);
     QWidget *createMicWidget(void);
+    QWidget *createSharpIRWidget(void);
     
     QWidget *createConnectionWidget(void);
     QWidget *createDriveWidget(void);
     QWidget *createScannerWidget(void);
+    QWidget *createIRTurretWidget(void);
     
     QWidget *createLocalLuaWidget(void);
     QWidget *createServerLuaWidget(void);
@@ -138,7 +150,8 @@ private slots:
     void micPlotToggled(bool checked);
     void driveButtonPressed(int dir) { updateDriving(dir); }
     void stopDriveButtonPressed(void) { stopDrive(); }
-    void scanButtonPressed(void);
+    void ACSScanButtonPressed(void);
+    void servoButtonPressed(void);
     void localScriptChanged(QListWidgetItem *item);
     void newLocalScriptPressed(void);
     void addLocalScriptPressed(void);

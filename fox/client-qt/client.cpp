@@ -93,8 +93,8 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
 }
 
 
-CQtClient::CQtClient() : isScanning(false), alternatingScan(false),
-                     remainingACSCycles(0), previousScriptItem(NULL),
+CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
+                     remainingACSScanCycles(0), previousScriptItem(NULL),
                      firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
@@ -137,11 +137,13 @@ QWidget *CQtClient::createMainTab()
     tabWidget->addTab(createACSWidget(), "ACS");
     tabWidget->addTab(createBatteryWidget(), "Battery");
     tabWidget->addTab(createMicWidget(), "Microphone");
+    tabWidget->addTab(createSharpIRWidget(), "Sharp IR");
 
     splitter->addWidget(tabWidget = new QTabWidget);
     tabWidget->addTab(createConnectionWidget(), "Connection");
     tabWidget->addTab(createDriveWidget(), "Drive");
     tabWidget->addTab(createScannerWidget(), "Scan");
+    tabWidget->addTab(createIRTurretWidget(), "IR turret");
     
     return ret;
 }
@@ -260,6 +262,8 @@ QWidget *CQtClient::createOverviewWidget(void)
     hbox = new QHBoxLayout(w);
     hbox->addWidget(lightSensorsLCD[0] = new QLCDNumber);
     hbox->addWidget(lightSensorsLCD[1] = new QLCDNumber);
+    
+    form->addRow("Sharp IR", sharpIRSensor = new QLCDNumber);
     
     // RC5 group box
     group = new QGroupBox("RC5 remote control");
@@ -460,6 +464,20 @@ QWidget *CQtClient::createMicWidget(void)
     return ret;
 }
 
+QWidget *CQtClient::createSharpIRWidget(void)
+{
+    QWidget *ret = new QWidget;
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+
+    sharpIRPlot = new CSensorPlot("Measered sharp IR distance");
+    sharpIRPlot->addSensor("Sharp IR", Qt::red);
+
+    hbox->addWidget(sharpIRPlot);
+    
+    return ret;
+}
+
 QWidget *CQtClient::createConnectionWidget()
 {
     QWidget *ret = new QWidget;
@@ -536,20 +554,72 @@ QWidget *CQtClient::createScannerWidget()
     hbox->addWidget(w, 0, Qt::AlignVCenter);
     QFormLayout *form = new QFormLayout(w);
     
-    form->addRow("Speed", scanSpeedSpinBox = new QSpinBox);
-    scanSpeedSpinBox->setRange(0, 160);
-    scanSpeedSpinBox->setValue(60);
+    form->addRow("Speed", ACSScanSpeedSpinBox = new QSpinBox);
+    ACSScanSpeedSpinBox->setRange(0, 160);
+    ACSScanSpeedSpinBox->setValue(60);
 
-    form->addRow("Scan power", scanPowerComboBox = new QComboBox);
-    scanPowerComboBox->addItems(QStringList() << "Low" << "Medium" << "High" <<
+    form->addRow("Scan power", ACSScanPowerComboBox = new QComboBox);
+    ACSScanPowerComboBox->addItems(QStringList() << "Low" << "Medium" << "High" <<
             "Alternating");
-    scanPowerComboBox->setCurrentIndex(1);
+    ACSScanPowerComboBox->setCurrentIndex(1);
     
-    form->addRow(scanButton = new QPushButton("Scan"));
-    connect(scanButton, SIGNAL(clicked()), this, SLOT(scanButtonPressed()));
+    form->addRow(ACSScanButton = new QPushButton("Scan"));
+    connect(ACSScanButton, SIGNAL(clicked()), this, SLOT(ACSScanButtonPressed()));
     
     
-    hbox->addWidget(scannerWidget = new CScannerWidget, 0);
+    hbox->addWidget(ACSScannerWidget = new CScannerWidget(3), 0);
+
+    return ret;
+}
+
+QWidget *CQtClient::createIRTurretWidget()
+{
+    QWidget *ret = new QWidget;
+    connectionDependentWidgets << ret;
+    
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    
+    QGroupBox *group = new QGroupBox("Servo control");
+    hbox->addWidget(group);
+    
+    QHBoxLayout *subhbox = new QHBoxLayout(group);
+    
+    subhbox->addWidget(servoDial = new QDial);
+    servoDial->setRange(0, 180);
+    servoDial->setNotchesVisible(true);
+    
+    QPushButton *button = new QPushButton("Apply");
+    connect(button, SIGNAL(clicked()), this, SLOT(servoButtonPressed()));
+    subhbox->addWidget(button);
+    
+    
+    hbox->addWidget(group = new QGroupBox("Scanner"), 1);
+    
+    subhbox = new QHBoxLayout(group);
+    
+    QFormLayout *form = new QFormLayout;
+    subhbox->addLayout(form);
+    
+    form->addRow("Range", turretScanRangeSpinBox = new QSpinBox);
+    turretScanRangeSpinBox->setRange(1, 180);
+    turretScanRangeSpinBox->setValue(180);
+    turretScanRangeSpinBox->setSuffix(QChar(0x00B0)); // Degree
+    
+    form->addRow("Resolution", turretScanResolutionSpinBox = new QSpinBox);
+    turretScanResolutionSpinBox->setRange(1, 90);
+    turretScanResolutionSpinBox->setValue(30);
+    turretScanResolutionSpinBox->setSuffix(QChar(0x00B0)); // Degree
+    
+    form->addRow("Measure time", turretScanTimeSpinBox = new QSpinBox);
+    turretScanTimeSpinBox->setRange(1, 30000);
+    turretScanTimeSpinBox->setValue(250);
+    turretScanTimeSpinBox->setSuffix(" ms");
+    
+    form->addWidget(turretScanButton = new QPushButton("Scan"));
+    
+    subhbox->addWidget(turrentScannerWidget = new CScannerWidget(150, -90, 90), 0);
+    turrentScannerWidget->addPoint(0, 0);
+    turrentScannerWidget->addPoint(60, 0);
 
     return ret;
 }
@@ -793,10 +863,10 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
     
     // UNDONE: Which sensor?
     if (newstate.ACSLeft || newstate.ACSRight)
-        scannerWidget->addPoint(motorDistance[0] * 360 / destMotorDistance[0],
+        ACSScannerWidget->addPoint(motorDistance[0] * 360 / destMotorDistance[0],
                                 ACSPowerState);
     else
-        scannerWidget->endPoint();
+        ACSScannerWidget->endPoint();
     
     if (!firstStateUpdate && !oldstate.movementComplete && newstate.movementComplete)
     {
@@ -804,9 +874,9 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
         return;
     }
 
-    if (alternatingScan && (ACSPowerState != ACS_POWER_OFF))
+    if (alternatingACSScan && (ACSPowerState != ACS_POWER_OFF))
     {
-        if (!remainingACSCycles && (newstate.ACSState < 2))
+        if (!remainingACSScanCycles && (newstate.ACSState < 2))
         {
             appendLogOutput("ACS Cycle reached\n");
             
@@ -819,21 +889,21 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
             else // if (newacs == ACS_POWER_HIGH)
                 newpower = ACS_POWER_LOW;
             
-            remainingACSCycles = 2; // Wait two more cycles before next switch
+            remainingACSScanCycles = 2; // Wait two more cycles before next switch
             
             executeCommand(QString("set acs %1").arg(ACSPowerToString(newpower)));
         }
         
-        if (remainingACSCycles && (oldstate.ACSState != ACS_STATE_WAIT_RIGHT) &&
+        if (remainingACSScanCycles && (oldstate.ACSState != ACS_STATE_WAIT_RIGHT) &&
             (newstate.ACSState == ACS_STATE_WAIT_RIGHT))
-            --remainingACSCycles; // Reached another state cycle
+            --remainingACSScanCycles; // Reached another state cycle
     }
 }
 
 void CQtClient::stopScan()
 {
-    isScanning = false;
-    scanButton->setEnabled(true);
+    isACSScanning = false;
+    ACSScanButton->setEnabled(true);
 }
 
 bool CQtClient::checkScriptSave()
@@ -887,7 +957,7 @@ void CQtClient::tcpRobotStateUpdate(const SStateSensors &oldstate,
     ACSPlot->addData("Left", newstate.ACSLeft * ACSPowerSlider->value());
     ACSPlot->addData("Right", newstate.ACSRight * ACSPowerSlider->value());
     
-    if (isScanning)
+    if (isACSScanning)
         updateScan(oldstate, newstate);
     
     firstStateUpdate = false;
@@ -932,7 +1002,7 @@ void CQtClient::tcpHandleRobotData(ETcpMessage msg, int data)
             RC5ToggleBitBox->setChecked(rc5.toggle_bit);
             break;
         }
-            
+        
         // Averaged data?
         case TCP_LIGHT_LEFT:
         case TCP_LIGHT_RIGHT:
@@ -942,6 +1012,7 @@ void CQtClient::tcpHandleRobotData(ETcpMessage msg, int data)
         case TCP_MOTOR_CURRENT_RIGHT:
         case TCP_BATTERY:
         case TCP_MIC:
+        case TCP_SHARPIR:
             averagedSensorDataMap[msg].total += data;
             averagedSensorDataMap[msg].count++;
             break;
@@ -1055,6 +1126,11 @@ void CQtClient::updateSensors()
         }
         else if (it.key() == TCP_MIC)
             micPlot->addData("Microphone", data);
+        else if (it.key() == TCP_SHARPIR)
+        {
+            sharpIRSensor->display(data);
+            sharpIRPlot->addData("Sharp IR", data);
+        }
         
         it.value().total = it.value().count = 0;
     }
@@ -1094,32 +1170,37 @@ void CQtClient::micPlotToggled(bool checked)
         executeCommand("set slavemic 0");
 }
 
-void CQtClient::scanButtonPressed()
+void CQtClient::ACSScanButtonPressed()
 {
-    isScanning = true;
-    scannerWidget->clear();
-    scanButton->setEnabled(false);
+    isACSScanning = true;
+    ACSScannerWidget->clear();
+    ACSScanButton->setEnabled(false);
     
-    if (scanPowerComboBox->currentText() == "Alternating")
+    if (ACSScanPowerComboBox->currentText() == "Alternating")
     {
         appendLogOutput("Alternating scan started.\n");
         executeCommand("set acs low");
-        remainingACSCycles = 2;
-        alternatingScan = true;
+        remainingACSScanCycles = 2;
+        alternatingACSScan = true;
     }
     else
     {
-        alternatingScan = false;
+        alternatingACSScan = false;
         
-        if (scanPowerComboBox->currentText() == "Low")
+        if (ACSScanPowerComboBox->currentText() == "Low")
             executeCommand("set acs low");
-        else if (scanPowerComboBox->currentText() == "Medium")
+        else if (ACSScanPowerComboBox->currentText() == "Medium")
             executeCommand("set acs med");
-        else if (scanPowerComboBox->currentText() == "High")
+        else if (ACSScanPowerComboBox->currentText() == "High")
             executeCommand("set acs high");
     }
     
-    executeCommand(QString("rotate 360 %1").arg(scanSpeedSpinBox->value()));
+    executeCommand(QString("rotate 360 %1").arg(ACSScanSpeedSpinBox->value()));
+}
+
+void CQtClient::servoButtonPressed()
+{
+    executeCommand(QString("set servo %1").arg(servoDial->value()));
 }
 
 void CQtClient::localScriptChanged(QListWidgetItem *item)

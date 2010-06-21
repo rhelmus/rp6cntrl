@@ -69,4 +69,5 @@ void initTcpDataTypes()
     tcpDataTypes[TCP_ACS_POWER] = DATA_BYTE;
     tcpDataTypes[TCP_MIC] = DATA_WORD;
     tcpDataTypes[TCP_LASTRC5] = DATA_WORD;
+    tcpDataTypes[TCP_SHARPIR] = DATA_BYTE;
 }

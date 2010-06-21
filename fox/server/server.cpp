@@ -72,6 +72,8 @@ void CControl::initSerial2TcpMap()
     serial2TcpMap.insert(SERIAL_MIC, SSerial2TcpInfo(TCP_MIC, "mic"));
 
     serial2TcpMap.insert(SERIAL_LASTRC5, SSerial2TcpInfo(TCP_LASTRC5, "rc5"));
+
+    serial2TcpMap.insert(SERIAL_SHARPIR, SSerial2TcpInfo(TCP_SHARPIR, "sharpir"));
 }
 
 void CControl::initLua()
