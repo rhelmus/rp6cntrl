@@ -90,12 +90,33 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
     return ret;
 }
 
+float standardDeviation(const QList<int> &values)
+{
+    if (values.size() < 2)
+        return 1.0;
+    
+    const int size = values.size();
+    int sum = 0;
+    
+    for (QList<int>::const_iterator it=values.begin(); it!=values.end(); ++it)
+        sum += *it;
+    
+    float mean = static_cast<float>(sum) / size;
+    float qsum = 0.0;
+    
+    for (QList<int>::const_iterator it=values.begin(); it!=values.end(); ++it)
+        qsum += pow(*it - mean, 2.0);
+    
+    return sqrt(qsum / (size-1));
+}
+
 }
 
 
 CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
-                     remainingACSScanCycles(0), previousScriptItem(NULL),
-                     firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
+                         remainingACSScanCycles(0), isTurretScanning(false), turretScanRange(0),
+                         turretScanResolution(0), currentScanPosition(0), previousScriptItem(NULL),
+                         firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
@@ -113,6 +134,9 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     motorDistance[0] = motorDistance[1] = 0;
     destMotorDistance[0] = destMotorDistance[1] = 0;
     
+    turretScanTimer = new QTimer(this);
+    connect(turretScanTimer, SIGNAL(timeout()), this, SLOT(turretScanTimeout()));
+
     updateConnection(false);
 
     appendLogOutput("Started RP6 Qt frontend.\n");
@@ -588,9 +612,8 @@ QWidget *CQtClient::createIRTurretWidget()
     servoDial->setRange(0, 180);
     servoDial->setNotchesVisible(true);
     
-    QPushButton *button = new QPushButton("Apply");
-    connect(button, SIGNAL(clicked()), this, SLOT(servoButtonPressed()));
-    subhbox->addWidget(button);
+    subhbox->addWidget(servoButton = new QPushButton("Apply"));
+    connect(servoButton, SIGNAL(clicked()), this, SLOT(servoButtonPressed()));
     
     
     hbox->addWidget(group = new QGroupBox("Scanner"), 1);
@@ -611,11 +634,12 @@ QWidget *CQtClient::createIRTurretWidget()
     turretScanResolutionSpinBox->setSuffix(QChar(0x00B0)); // Degree
     
     form->addRow("Measure time", turretScanTimeSpinBox = new QSpinBox);
-    turretScanTimeSpinBox->setRange(1, 30000);
+    turretScanTimeSpinBox->setRange(50, 30000);
     turretScanTimeSpinBox->setValue(250);
     turretScanTimeSpinBox->setSuffix(" ms");
     
     form->addWidget(turretScanButton = new QPushButton("Scan"));
+    connect(turretScanButton, SIGNAL(clicked()), this, SLOT(turretScanButtonPressed()));
     
     subhbox->addWidget(turrentScannerWidget = new CScannerWidget(150, -90, 90), 0);
     turrentScannerWidget->addPoint(0, 0);
@@ -697,165 +721,6 @@ QWidget *CQtClient::createServerLuaWidget()
     
     return ret;
 }
-
-#if 0
-void CQtClient::parseTcp(QDataStream &stream)
-{
-    QString msg;
-    stream >> msg;
-
-    if (msg == "rawserial")
-    {
-        QString output;
-        stream >> output;
-        appendConsoleOutput(output + "\n");
-    }
-    else if (msg == "state")
-    {
-        QVariant var;
-        stream >> var;
-        SStateSensors state;
-        state.byte = var.toInt();
-        updateStateSensors(state);
-    }
-    else if (msg == "baseleds")
-    {
-        QVariant var;
-        stream >> var;
-        int leds = var.toInt();
-        for (int i=0; i<6; ++i)
-            mainLEDsBox[i]->setChecked(leds & (1<<i));
-    }
-    else if (msg == "m32leds")
-    {
-        QVariant var;
-        stream >> var;
-        int leds = var.toInt();
-
-        for (int i=0; i<4; ++i)
-            m32LEDsBox[i]->setChecked(leds & (1<<i));
-    }
-    else if (msg == "mic")
-    {
-        QVariant var;
-        stream >> var;
-        micPlot->addData("Microphone", var.toInt());
-    }
-    else if (msg == "destspeedleft")
-    {
-        QVariant var;
-        stream >> var;
-        motorSpeedPlot->addData("Left (destination)", var.toInt());
-    }
-    else if (msg == "destspeedright")
-    {
-        QVariant var;
-        stream >> var;
-        motorSpeedPlot->addData("Right (destination)", var.toInt());
-    }
-    else if (msg == "distleft")
-    {
-        QVariant var;
-        stream >> var;
-        motorDistanceLCD[0]->display(var.toInt());
-        motorDistancePlot->addData("Left", var.toInt());
-        motorDistance[0] = var.toInt();
-    }
-    else if (msg == "distright")
-    {
-        QVariant var;
-        stream >> var;
-        motorDistanceLCD[1]->display(var.toInt());
-        motorDistancePlot->addData("Right", var.toInt());
-        motorDistance[1] = var.toInt();
-    }
-    else if (msg == "destdistleft")
-    {
-        QVariant var;
-        stream >> var;
-        destMotorDistance[0] = var.toInt();
-    }
-    else if (msg == "destdistright")
-    {
-        QVariant var;
-        stream >> var;
-        destMotorDistance[1] = var.toInt();
-    }
-    else if (msg == "motordir")
-    {
-        QVariant var;
-        stream >> var;
-        SMotorDirections dir;
-        dir.byte = var.toInt();
-        updateMotorDirections(dir);
-    }
-    else if (msg == "rc5")
-    {
-        QVariant var;
-        stream >> var;
-        RC5data_t rc5;
-        rc5.data = var.toInt();
-        RC5DeviceLabel->setText(QString::number(rc5.device));
-        RC5KeyLabel->setText(QString::number(rc5.key_code));
-        RC5ToggleBitBox->setChecked(rc5.toggle_bit);
-    }
-    else if (msg == "scripts")
-    {
-        QVariant var;
-        stream >> var;
-        
-        serverScriptListWidget->clear();
-        serverScriptListWidget->addItems(var.toStringList());
-    }
-    else if (msg == "reqscript")
-    {
-        QVariant var;
-        stream >> var;
-        
-        QString fn = QFileDialog::getSaveFileName(this, "Save script", downloadScript,
-                tr("Lua scripts (*.lua)"));
-        
-        if (!fn.isEmpty())
-        {
-            QFile file(fn);
-            if (!file.open(QFile::WriteOnly | QFile::Truncate | QFile::Text))
-                QMessageBox::critical(this, "File error",
-                                        QString("Failed to create file"));
-            else
-            {
-                file.write(var.toByteArray());
-                
-                QSettings settings;
-                QStringList scripts = settings.value("scripts").toStringList();
-                scripts << fn;
-                settings.setValue("scripts", scripts);
-
-                QListWidgetItem *item = new QListWidgetItem(QFileInfo(file).fileName(),
-                        localScriptListWidget);
-                item->setData(Qt::UserRole, fn);
-                localScriptListWidget->setCurrentItem(item);
-            }
-        }
-        
-        downloadScript.clear();
-        downloadButton->setEnabled(true);
-    }
-    else if (msg == "luatxt")
-    {
-        QVariant var;
-        stream >> var;
-        appendLogOutput(QString("Lua: %1\n").arg(var.toString()));
-    }
-    else
-    {
-        // Other data that needs to be averaged
-        QVariant var;
-        stream >> var;
-        sensorDataMap[msg].total += var.toUInt();
-        sensorDataMap[msg].count++;
-    }
-}
-#endif
 
 void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &newstate)
 {
@@ -1012,7 +877,6 @@ void CQtClient::tcpHandleRobotData(ETcpMessage msg, int data)
         case TCP_MOTOR_CURRENT_RIGHT:
         case TCP_BATTERY:
         case TCP_MIC:
-        case TCP_SHARPIR:
             averagedSensorDataMap[msg].total += data;
             averagedSensorDataMap[msg].count++;
             break;
@@ -1030,6 +894,14 @@ void CQtClient::tcpHandleRobotData(ETcpMessage msg, int data)
         case TCP_MOTOR_DIST_RIGHT:
             motorDistance[1] = data;
             delayedSensorDataMap[msg] = data;
+            break;
+            
+        case TCP_SHARPIR:
+            if (isTurretScanning)
+                turretScanData << data;
+            
+            averagedSensorDataMap[msg].total += data;
+            averagedSensorDataMap[msg].count++;
             break;
 
         default: break;
@@ -1201,6 +1073,74 @@ void CQtClient::ACSScanButtonPressed()
 void CQtClient::servoButtonPressed()
 {
     executeCommand(QString("set servo %1").arg(servoDial->value()));
+}
+
+void CQtClient::turretScanButtonPressed()
+{
+    servoButton->setEnabled(false);
+    turretScanButton->setEnabled(false);
+    
+    turrentScannerWidget->clear();
+    
+    isTurretScanning = true;
+    turretScanRange = turretScanRangeSpinBox->value();
+    turretScanResolution = turretScanResolutionSpinBox->value();
+    currentScanPosition = 0;
+    turretScanData.clear();
+    
+    turretScanTimer->start(turretScanTimeSpinBox->value());
+    
+    executeCommand("set servo 0");
+    servoDial->setValue(0);
+    
+    appendLogOutput("Started turret scan.\n");
+}
+
+void CQtClient::turretScanTimeout()
+{
+    if (turretScanData.isEmpty())
+        appendLogOutput("WARNING: No sharp IR measurements!\n");
+    else
+    {
+        QStringList set; // UNDONE: Remove
+        int dist = 0;
+        for (QList<int>::iterator it=turretScanData.begin(); it!=turretScanData.end(); ++it)
+        {
+            dist += *it;
+            set << QString::number(*it);
+        }
+        
+        dist /= turretScanData.size(); // Mean
+        const float stdev = standardDeviation(turretScanData);
+        const float RSD = stdev / dist * 100.0;
+        
+        if ((dist >= 20) && (dist <= 150)) // Only take valid ranges (UNDONE: Move elsewhere?)
+        {
+            turrentScannerWidget->addPoint(currentScanPosition - 90, dist);
+            appendLogOutput(QString("Turret scan: %1 cm (n=%2, s=%3, RSD=%4%, set: [%5])\n").
+                    arg(dist).arg(turretScanData.size()).arg(stdev).arg(RSD).arg(set.join(", ")));
+        }
+        else
+            turrentScannerWidget->endPoint();
+        
+        turretScanData.clear();
+    }
+    
+    currentScanPosition += turretScanResolution;
+
+    // Finished?
+    if (currentScanPosition > turretScanRange)
+    {
+        isTurretScanning = false;
+        servoButton->setEnabled(true);
+        turretScanButton->setEnabled(true);
+        turretScanTimer->stop();
+        appendLogOutput("Finished turret scan.\n");
+        return;
+    }
+    
+    executeCommand(QString("set servo %1").arg(currentScanPosition));
+    servoDial->setValue(currentScanPosition);
 }
 
 void CQtClient::localScriptChanged(QListWidgetItem *item)
