@@ -21,6 +21,7 @@ class QPushButton;
 class QSignalMapper;
 class QSlider;
 class QSpinBox;
+class QTimer;
 
 class QwtSlider;
 
@@ -92,9 +93,15 @@ class CQtClient: public QMainWindow, public CBaseClient
     
     // IR turret
     QDial *servoDial;
+    QPushButton *servoButton;
+    bool isTurretScanning;
     QSpinBox *turretScanRangeSpinBox, *turretScanResolutionSpinBox, *turretScanTimeSpinBox;
     QPushButton *turretScanButton;
     CScannerWidget *turrentScannerWidget;
+    QTimer *turretScanTimer;
+    int turretScanRange, turretScanResolution;
+    int currentScanPosition;
+    QList<int> turretScanData;
     
     CEditor *scriptEditor;
     QPushButton *downloadButton;
@@ -152,6 +159,8 @@ private slots:
     void stopDriveButtonPressed(void) { stopDrive(); }
     void ACSScanButtonPressed(void);
     void servoButtonPressed(void);
+    void turretScanButtonPressed(void);
+    void turretScanTimeout(void);
     void localScriptChanged(QListWidgetItem *item);
     void newLocalScriptPressed(void);
     void addLocalScriptPressed(void);
