@@ -95,11 +95,12 @@ class CQtClient: public QMainWindow, public CBaseClient
     QDial *servoDial;
     QPushButton *servoButton;
     bool isTurretScanning;
-    QSpinBox *turretScanRangeSpinBox, *turretScanResolutionSpinBox, *turretScanTimeSpinBox;
+    QSpinBox *turretScanRangeSpinBox[2], *turretScanResolutionSpinBox, *turretScanTimeSpinBox;
+    QSpinBox *turretScanDelaySpinBox;
     QPushButton *turretScanButton;
     CScannerWidget *turrentScannerWidget;
     QTimer *turretScanTimer;
-    int turretScanRange, turretScanResolution;
+    int turretScanEndRange, turretScanResolution, turretScanTime, turretScanDelay;
     int currentScanPosition;
     QList<int> turretScanData;
     
@@ -137,8 +138,9 @@ class CQtClient: public QMainWindow, public CBaseClient
     QWidget *createLocalLuaWidget(void);
     QWidget *createServerLuaWidget(void);
     
-    void updateScan(const SStateSensors &oldstate, const SStateSensors &newstate);
-    void stopScan(void);
+    void updateACSScan(const SStateSensors &oldstate, const SStateSensors &newstate);
+    void stopACSScan(void);
+    void setServo(int pos);
     bool checkScriptSave(void);
     
     virtual void updateConnection(bool connected);
