@@ -114,9 +114,10 @@ float standardDeviation(const QList<int> &values)
 
 
 CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
-                         remainingACSScanCycles(0), isTurretScanning(false), turretScanRange(0),
-                         turretScanResolution(0), currentScanPosition(0), previousScriptItem(NULL),
-                         firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
+                         remainingACSScanCycles(0), isTurretScanning(false), turretScanEndRange(0),
+                         turretScanResolution(0), turretScanTime(0), turretScanDelay(0),
+                         currentScanPosition(0), previousScriptItem(NULL), firstStateUpdate(false),
+                         ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
@@ -623,10 +624,19 @@ QWidget *CQtClient::createIRTurretWidget()
     QFormLayout *form = new QFormLayout;
     subhbox->addLayout(form);
     
-    form->addRow("Range", turretScanRangeSpinBox = new QSpinBox);
-    turretScanRangeSpinBox->setRange(1, 180);
-    turretScanRangeSpinBox->setValue(180);
-    turretScanRangeSpinBox->setSuffix(QChar(0x00B0)); // Degree
+    QWidget *w = new QWidget;
+    form->addRow("Range", w);
+    QHBoxLayout *rhbox = new QHBoxLayout(w);
+    
+    rhbox->addWidget(turretScanRangeSpinBox[0] = new QSpinBox);
+    turretScanRangeSpinBox[0]->setRange(0, 179);
+    turretScanRangeSpinBox[0]->setValue(0);
+    turretScanRangeSpinBox[0]->setSuffix(QChar(0x00B0)); // Degree
+
+    rhbox->addWidget(turretScanRangeSpinBox[1] = new QSpinBox);
+    turretScanRangeSpinBox[1]->setRange(1, 180);
+    turretScanRangeSpinBox[1]->setValue(180);
+    turretScanRangeSpinBox[1]->setSuffix(QChar(0x00B0)); // Degree
     
     form->addRow("Resolution", turretScanResolutionSpinBox = new QSpinBox);
     turretScanResolutionSpinBox->setRange(1, 90);
@@ -638,6 +648,11 @@ QWidget *CQtClient::createIRTurretWidget()
     turretScanTimeSpinBox->setValue(250);
     turretScanTimeSpinBox->setSuffix(" ms");
     
+    form->addRow("Scan delay", turretScanDelaySpinBox = new QSpinBox);
+    turretScanDelaySpinBox->setRange(0, 30000);
+    turretScanDelaySpinBox->setValue(50);
+    turretScanDelaySpinBox->setSuffix(" ms");
+
     form->addWidget(turretScanButton = new QPushButton("Scan"));
     connect(turretScanButton, SIGNAL(clicked()), this, SLOT(turretScanButtonPressed()));
     
@@ -722,9 +737,9 @@ QWidget *CQtClient::createServerLuaWidget()
     return ret;
 }
 
-void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &newstate)
+void CQtClient::updateACSScan(const SStateSensors &oldstate, const SStateSensors &newstate)
 {
-    appendLogOutput("updateScan()\n");
+    appendLogOutput("updateACSScan()\n");
     
     // UNDONE: Which sensor?
     if (newstate.ACSLeft || newstate.ACSRight)
@@ -735,7 +750,7 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
     
     if (!firstStateUpdate && !oldstate.movementComplete && newstate.movementComplete)
     {
-        stopScan();
+        stopACSScan();
         return;
     }
 
@@ -765,10 +780,16 @@ void CQtClient::updateScan(const SStateSensors &oldstate, const SStateSensors &n
     }
 }
 
-void CQtClient::stopScan()
+void CQtClient::stopACSScan()
 {
     isACSScanning = false;
     ACSScanButton->setEnabled(true);
+}
+
+void CQtClient::setServo(int pos)
+{
+    executeCommand(QString("set servo %1").arg(pos));
+    servoDial->setValue(pos);
 }
 
 bool CQtClient::checkScriptSave()
@@ -823,7 +844,7 @@ void CQtClient::tcpRobotStateUpdate(const SStateSensors &oldstate,
     ACSPlot->addData("Right", newstate.ACSRight * ACSPowerSlider->value());
     
     if (isACSScanning)
-        updateScan(oldstate, newstate);
+        updateACSScan(oldstate, newstate);
     
     firstStateUpdate = false;
 }
@@ -1082,22 +1103,29 @@ void CQtClient::turretScanButtonPressed()
     
     turrentScannerWidget->clear();
     
-    isTurretScanning = true;
-    turretScanRange = turretScanRangeSpinBox->value();
+    currentScanPosition = turretScanRangeSpinBox[0]->value();
+    turretScanEndRange = turretScanRangeSpinBox[1]->value();
     turretScanResolution = turretScanResolutionSpinBox->value();
-    currentScanPosition = 0;
+    turretScanTime = turretScanTimeSpinBox->value();
+    turretScanDelay = turretScanDelaySpinBox->value();
     turretScanData.clear();
     
-    turretScanTimer->start(turretScanTimeSpinBox->value());
+    turretScanTimer->start(turretScanDelay);
     
-    executeCommand("set servo 0");
-    servoDial->setValue(0);
+    setServo(currentScanPosition);
     
     appendLogOutput("Started turret scan.\n");
 }
 
 void CQtClient::turretScanTimeout()
 {
+    if (!isTurretScanning) // Init scan?
+    {
+        isTurretScanning = true; // Enable data collection
+        turretScanTimer->setInterval(turretScanTime);
+        return;
+    }
+
     if (turretScanData.isEmpty())
         appendLogOutput("WARNING: No sharp IR measurements!\n");
     else
@@ -1129,7 +1157,7 @@ void CQtClient::turretScanTimeout()
     currentScanPosition += turretScanResolution;
 
     // Finished?
-    if (currentScanPosition > turretScanRange)
+    if (currentScanPosition > turretScanEndRange)
     {
         isTurretScanning = false;
         servoButton->setEnabled(true);
@@ -1139,8 +1167,11 @@ void CQtClient::turretScanTimeout()
         return;
     }
     
-    executeCommand(QString("set servo %1").arg(currentScanPosition));
-    servoDial->setValue(currentScanPosition);
+    setServo(currentScanPosition);
+    
+    // Delay measurements
+    isTurretScanning = false;
+    turretScanTimer->setInterval(turretScanDelay);
 }
 
 void CQtClient::localScriptChanged(QListWidgetItem *item)
