@@ -7,6 +7,7 @@
 
 #include "client.h"
 #include "editor.h"
+#include "navmap.h"
 #include "scanner.h"
 #include "sensorplot.h"
 #include "tcputil.h"
@@ -125,6 +126,7 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     
     mainTab->addTab(createMainTab(), "Main");
     mainTab->addTab(createLuaTab(), "Lua");
+    mainTab->addTab(createNavTab(), "Navigation");
     mainTab->addTab(createConsoleTab(), "Console");
     mainTab->addTab(createLogTab(), "Log");
     
@@ -137,6 +139,10 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     
     turretScanTimer = new QTimer(this);
     connect(turretScanTimer, SIGNAL(timeout()), this, SLOT(turretScanTimeout()));
+
+    simNavTimer = new QTimer(this);
+    simNavTimer->setInterval(1000);
+    connect(simNavTimer, SIGNAL(timeout()), this, SLOT(simNavTimeout()));
 
     updateConnection(false);
 
@@ -197,6 +203,28 @@ QWidget *CQtClient::createLuaTab()
     split->setStretchFactor(0, 66);
     split->setStretchFactor(1, 33);
     return split;
+}
+
+QWidget *CQtClient::createNavTab()
+{
+    QWidget *ret = new QWidget;
+
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+
+    hbox->addWidget(simNavMap = new CNavMap);
+    simNavMap->setGrid(QSize(10, 10));
+    simNavMap->markObstacle(5, 4);
+    simNavMap->connectCells(3, 3, 4, 3);
+    simNavMap->setRobot(0, 0);
+
+    QVBoxLayout *vbox = new QVBoxLayout;
+    hbox->addLayout(vbox);
+
+    QPushButton *button = new QPushButton("Start");
+    connect(button, SIGNAL(clicked()), this, SLOT(startSimNav()));
+    vbox->addWidget(button);
+
+    return ret;
 }
 
 QWidget *CQtClient::createConsoleTab()
@@ -1320,6 +1348,31 @@ void CQtClient::downloadServerScriptPressed()
         downloadButton->setEnabled(false);
         downloadServerScript(downloadScript);
     }
+}
+
+void CQtClient::startSimNav()
+{
+    simNavMap->clearCells();
+    simNavMap->setRobot(0, 0);
+    simNavTimer->start();
+}
+
+void CQtClient::simNavTimeout()
+{
+    const QPoint currentPos = simNavMap->getRobot();
+    const QSize gridSize = simNavMap->getGridSize();
+
+    if (currentPos.x()+1 >= gridSize.width())
+    {
+        if (currentPos.y()+1 >= gridSize.height())
+            simNavTimer->stop();
+        else
+        {
+            simNavMap->setRobot(0, currentPos.y()+1);
+        }
+    }
+    else
+        simNavMap->setRobot(currentPos.x()+1, currentPos.y());
 }
 
 void CQtClient::sendConsolePressed()

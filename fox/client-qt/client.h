@@ -26,6 +26,7 @@ class QTimer;
 class QwtSlider;
 
 class CEditor;
+class CNavMap;
 class CScannerWidget;
 class CSensorPlot;
 
@@ -109,6 +110,10 @@ class CQtClient: public QMainWindow, public CBaseClient
     QListWidget *localScriptListWidget, *serverScriptListWidget;
     QListWidgetItem *previousScriptItem;
     QString downloadScript;
+
+    // Naviagtion
+    CNavMap *simNavMap;
+    QTimer *simNavTimer;
     
     bool firstStateUpdate;
     int motorDistance[2];
@@ -117,6 +122,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     
     QWidget *createMainTab(void);
     QWidget *createLuaTab(void);
+    QWidget *createNavTab(void);
     QWidget *createConsoleTab(void);
     QWidget *createLogTab(void);
     
@@ -173,6 +179,8 @@ private slots:
     void runServerScriptPressed(void);
     void removeServerScriptPressed(void);
     void downloadServerScriptPressed(void);
+    void startSimNav(void);
+    void simNavTimeout(void);
     void sendConsolePressed(void);
     
 protected:
