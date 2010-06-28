@@ -12,4 +12,6 @@ INCLUDEPATH += ../../shared
 DEPENDPATH += ../../shared
 SOURCES += tcputil.cpp
 
+INCLUDEPATH += /usr/include/lua5.1
+
 LIBS += -llua
