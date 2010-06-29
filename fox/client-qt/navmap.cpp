@@ -4,7 +4,8 @@
 
 #include "navmap.h"
 
-CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f), robotPos(-1, -1), addObstacleMode(false)
+CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f),
+                  robotPos(-1, -1), addObstacleMode(false)
 {
 }
 
@@ -65,7 +66,8 @@ void CNavMap::paintEvent(QPaintEvent *)
                 }
 
                 if (grid[x][y].isObstacle ||
-                    (addObstacleMode && (currentObstacleMousePos.x() == x) && (currentObstacleMousePos.y() == y)))
+                    (addObstacleMode && (currentObstacleMousePos.x() == x) &&
+                     (currentObstacleMousePos.y() == y)))
                     painter.fillRect(rect, Qt::blue);
 
             }
@@ -86,6 +88,13 @@ void CNavMap::mouseMoveEvent(QMouseEvent *event)
     }
 
     event->accept();
+}
+
+void CNavMap::leaveEvent(QEvent *)
+{
+    currentObstacleMousePos.setX(-1);
+    currentObstacleMousePos.setY(-1);
+    update();
 }
 
 void CNavMap::mouseReleaseEvent(QMouseEvent *event)
@@ -146,6 +155,18 @@ void CNavMap::clearConnections()
     }
 
     update();
+}
+
+bool CNavMap::isObstacle(const QPoint &pos) const
+{
+    return grid[pos.x()][pos.y()].isObstacle;
+}
+
+bool CNavMap::inGrid(const QPoint &pos) const
+{
+    const QSize size = getGridSize();
+    return ((pos.x() >= 0) && (pos.x() < size.width()) &&
+            (pos.y() >= 0) && (pos.y() < size.height()));
 }
 
 void CNavMap::clearCells()
