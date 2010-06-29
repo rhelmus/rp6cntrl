@@ -780,12 +780,13 @@ QWidget *CQtClient::createServerLuaWidget()
 
 void CQtClient::updateACSScan(const SStateSensors &oldstate, const SStateSensors &newstate)
 {
-    appendLogOutput("updateACSScan()\n");
-    
     // UNDONE: Which sensor?
     if (newstate.ACSLeft || newstate.ACSRight)
+    {
         ACSScannerWidget->addPoint(motorDistance[0] * 360 / destMotorDistance[0],
-                                ACSPowerState);
+                                   ACSPowerState);
+        appendLogOutput(QString("Added ACS scan point: %1\n").arg(ACSPowerToString(ACSPowerState)));
+    }
     else
         ACSScannerWidget->endPoint();
     
@@ -858,6 +859,17 @@ void CQtClient::stopSimNav()
     startSimNavButton->setText("Start");
     clearSimNavButton->setEnabled(true);
     addSimNavObstacleButton->setEnabled(true);
+}
+
+QPoint CQtClient::simNavAdvanceCell()
+{
+    QPoint ret(simNavMap->getRobot());
+    if (simNavMoveForward)
+        ret.rx()++;
+    else
+        ret.rx()--;
+    
+    return ret;
 }
 
 void CQtClient::updateConnection(bool connected)
@@ -1023,6 +1035,9 @@ void CQtClient::updateDriveSpeed(int left, int right)
 
 void CQtClient::updateSensors()
 {
+    if (!connected())
+        return;
+    
     for (QMap<ETcpMessage, SSensorData>::iterator it=averagedSensorDataMap.begin();
          it!=averagedSensorDataMap.end(); ++it)
     {
@@ -1380,6 +1395,8 @@ void CQtClient::startSimNav()
     {
         simNavMap->clearConnections();
         simNavMap->setRobot(QPoint(0, 0));
+        simNavMoveForward = true;
+        simNavTurnAtEnd = false;
         simNavTimer->start(simMoveTimeSpinBox->value());
 
         startSimNavButton->setText("Abort");
@@ -1393,21 +1410,63 @@ void CQtClient::simNavTimeout()
     const QPoint currentPos = simNavMap->getRobot();
     const QSize gridSize = simNavMap->getGridSize();
 
-    if (currentPos.x()+1 >= gridSize.width())
+    // Scan
+    QList<QPoint> cells;
+    cells << QPoint(currentPos.x(), currentPos.y()-1); // Left
+    cells << QPoint(currentPos.x(), currentPos.y()+1); // Right
+    // Front
+    if (simNavMoveForward)
+        cells << QPoint(currentPos.x()+1, currentPos.y());
+    else
+        cells << QPoint(currentPos.x()-1, currentPos.y());
+    
+    foreach(QPoint c, cells)
     {
-        if (currentPos.y()+1 >= gridSize.height())
-            stopSimNav();
+        if ((c.x() >= 0) && (c.x() < gridSize.width()) &&
+            (c.y() >= 0) && (c.y() < gridSize.height()))
+        {
+            if (!simNavMap->isObstacle(c))
+                simNavMap->connectCells(currentPos, c);
+        }
+    }
+    
+    // Move
+    QPoint newPos = currentPos;
+    
+    if (simNavMoveForward)
+        newPos.rx()++;
+    else
+        newPos.rx()--;
+    
+    const bool ingrid = simNavMap->inGrid(newPos);
+    
+    if (!ingrid || simNavMap->isObstacle(newPos))
+    {
+        if (simNavTurnAtEnd)
+        {
+            simNavTurnAtEnd = false;
+            simNavMoveForward = !simNavMoveForward;
+        }
         else
         {
-            simNavMap->setRobot(QPoint(0, currentPos.y()+1));
+            newPos.ry()++;
+            if (newPos.y() >= gridSize.height())
+                stopSimNav();
+            else
+            {
+                newPos.setX(currentPos.x());
+                simNavMap->setRobot(newPos);
+                simNavMoveForward = !simNavMoveForward;
+                
+                if (ingrid)
+                {
+                    simNavTurnAtEnd = simNavMap->inGrid(QPoint(newPos.x());
+                    if 
+            }
         }
     }
     else
-    {
-        QPoint pos = currentPos;
-        pos.rx()++;
-        simNavMap->setRobot(pos);
-    }
+        simNavMap->setRobot(newPos);
 }
 
 void CQtClient::sendConsolePressed()

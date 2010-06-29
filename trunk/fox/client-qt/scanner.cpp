@@ -22,8 +22,9 @@ void drawArc(QPainter &painter, const QRect &rect, int start, int stop)
 
 
 CScannerWidget::CScannerWidget(int maxdist, int mina, int maxa, QWidget *parent,
-                               Qt::WindowFlags f) : QWidget(parent, f), newPoint(false), maxDistance(maxdist),
-                                                    minAngle(mina), maxAngle(maxa)
+                               Qt::WindowFlags f) : QWidget(parent, f), newPoint(false),
+                                                    maxDistance(maxdist), minAngle(mina),
+                                                    maxAngle(maxa)
 {
 }
 

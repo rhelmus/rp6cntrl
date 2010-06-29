@@ -96,8 +96,8 @@ class CQtClient: public QMainWindow, public CBaseClient
     QDial *servoDial;
     QPushButton *servoButton;
     bool isTurretScanning;
-    QSpinBox *turretScanRangeSpinBox[2], *turretScanResolutionSpinBox, *turretScanTimeSpinBox;
-    QSpinBox *turretScanDelaySpinBox;
+    QSpinBox *turretScanRangeSpinBox[2], *turretScanResolutionSpinBox;
+    QSpinBox *turretScanTimeSpinBox, *turretScanDelaySpinBox;
     QPushButton *turretScanButton;
     CScannerWidget *turrentScannerWidget;
     QTimer *turretScanTimer;
@@ -116,6 +116,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     QPushButton *startSimNavButton, *clearSimNavButton, *addSimNavObstacleButton;
     QSpinBox *simMoveTimeSpinBox;
     QTimer *simNavTimer;
+    bool simNavMoveForward, simNavTurnAtEnd;
     
     bool firstStateUpdate;
     int motorDistance[2];
@@ -151,6 +152,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     void setServo(int pos);
     bool checkScriptSave(void);
     void stopSimNav(void);
+    QPoint simNavAdvanceCell(void);
     
     virtual void updateConnection(bool connected);
     virtual void tcpError(const QString &error);

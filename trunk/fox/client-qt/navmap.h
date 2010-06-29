@@ -26,9 +26,8 @@ class CNavMap: public QWidget
 protected:
     void paintEvent(QPaintEvent *);
     void mouseMoveEvent(QMouseEvent *event);
-    void leaveEvent(QEvent *) { currentObstacleMousePos.setX(-1); currentObstacleMousePos.setY(-1); update(); }
+    void leaveEvent(QEvent *);
     void mouseReleaseEvent(QMouseEvent *event);
-
 
 public:
     CNavMap(QWidget *parent = 0, Qt::WindowFlags f = 0);
@@ -40,6 +39,8 @@ public:
     QPoint getRobot(void) const { return robotPos; }
     QSize getGridSize(void) const;
     void clearConnections(void);
+    bool isObstacle(const QPoint &pos) const;
+    bool inGrid(const QPoint &pos) const;
 
     QSize minimumSizeHint() const { return QSize(250, 250); }
     QSize sizeHint() const { return QSize(400, 400); }
