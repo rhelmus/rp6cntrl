@@ -141,7 +141,6 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     connect(turretScanTimer, SIGNAL(timeout()), this, SLOT(turretScanTimeout()));
 
     simNavTimer = new QTimer(this);
-    simNavTimer->setInterval(1000);
     connect(simNavTimer, SIGNAL(timeout()), this, SLOT(simNavTimeout()));
 
     updateConnection(false);
@@ -207,24 +206,38 @@ QWidget *CQtClient::createLuaTab()
 
 QWidget *CQtClient::createNavTab()
 {
-    QWidget *ret = new QWidget;
+    QSplitter *split = new QSplitter(Qt::Vertical);
 
-    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    QGroupBox *group = new QGroupBox("Navigation sim map");
+    split->addWidget(group);
 
-    hbox->addWidget(simNavMap = new CNavMap);
+    QVBoxLayout *vbox = new QVBoxLayout(group);
+
+    vbox->addWidget(simNavMap = new CNavMap);
     simNavMap->setGrid(QSize(10, 10));
-    simNavMap->markObstacle(5, 4);
-    simNavMap->connectCells(3, 3, 4, 3);
-    simNavMap->setRobot(0, 0);
+    simNavMap->setRobot(QPoint(0, 0));
 
-    QVBoxLayout *vbox = new QVBoxLayout;
-    hbox->addLayout(vbox);
+    split->addWidget(group = new QGroupBox("Control"));
+    QGridLayout *grid = new QGridLayout(group);
 
-    QPushButton *button = new QPushButton("Start");
-    connect(button, SIGNAL(clicked()), this, SLOT(startSimNav()));
-    vbox->addWidget(button);
+    grid->addWidget(startSimNavButton = new QPushButton("Start"), 0, 0);
+    connect(startSimNavButton, SIGNAL(clicked()), this, SLOT(startSimNav()));
 
-    return ret;
+    grid->addWidget(clearSimNavButton = new QPushButton("Clear map"), 1, 0);
+    connect(clearSimNavButton, SIGNAL(clicked()), simNavMap, SLOT(clearCells()));
+
+    grid->addWidget(addSimNavObstacleButton = new QPushButton("Add obstacle"), 2, 0);
+    addSimNavObstacleButton->setCheckable(true);
+    connect(addSimNavObstacleButton, SIGNAL(toggled(bool)), simNavMap, SLOT(toggleObstacleAdd(bool)));
+
+    QLabel *label = new QLabel("Move time");
+    label->setAlignment(Qt::AlignRight);
+    grid->addWidget(label, 0, 1);
+    grid->addWidget(simMoveTimeSpinBox = new QSpinBox, 0, 2);
+    simMoveTimeSpinBox->setRange(0, 10000);
+    simMoveTimeSpinBox->setValue(500);
+
+    return split;
 }
 
 QWidget *CQtClient::createConsoleTab()
@@ -839,6 +852,14 @@ bool CQtClient::checkScriptSave()
     return true;
 }
 
+void CQtClient::stopSimNav()
+{
+    simNavTimer->stop();
+    startSimNavButton->setText("Start");
+    clearSimNavButton->setEnabled(true);
+    addSimNavObstacleButton->setEnabled(true);
+}
+
 void CQtClient::updateConnection(bool connected)
 {
     if (connected)
@@ -1352,9 +1373,19 @@ void CQtClient::downloadServerScriptPressed()
 
 void CQtClient::startSimNav()
 {
-    simNavMap->clearCells();
-    simNavMap->setRobot(0, 0);
-    simNavTimer->start();
+    // Already running? --> Abort
+    if (simNavTimer->isActive())
+        stopSimNav();
+    else
+    {
+        simNavMap->clearConnections();
+        simNavMap->setRobot(QPoint(0, 0));
+        simNavTimer->start(simMoveTimeSpinBox->value());
+
+        startSimNavButton->setText("Abort");
+        clearSimNavButton->setEnabled(false);
+        addSimNavObstacleButton->setEnabled(false);
+    }
 }
 
 void CQtClient::simNavTimeout()
@@ -1365,14 +1396,18 @@ void CQtClient::simNavTimeout()
     if (currentPos.x()+1 >= gridSize.width())
     {
         if (currentPos.y()+1 >= gridSize.height())
-            simNavTimer->stop();
+            stopSimNav();
         else
         {
-            simNavMap->setRobot(0, currentPos.y()+1);
+            simNavMap->setRobot(QPoint(0, currentPos.y()+1));
         }
     }
     else
-        simNavMap->setRobot(currentPos.x()+1, currentPos.y());
+    {
+        QPoint pos = currentPos;
+        pos.rx()++;
+        simNavMap->setRobot(pos);
+    }
 }
 
 void CQtClient::sendConsolePressed()
