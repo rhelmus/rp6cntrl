@@ -111,8 +111,10 @@ class CQtClient: public QMainWindow, public CBaseClient
     QListWidgetItem *previousScriptItem;
     QString downloadScript;
 
-    // Naviagtion
+    // Navigation
     CNavMap *simNavMap;
+    QPushButton *startSimNavButton, *clearSimNavButton, *addSimNavObstacleButton;
+    QSpinBox *simMoveTimeSpinBox;
     QTimer *simNavTimer;
     
     bool firstStateUpdate;
@@ -148,6 +150,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     void stopACSScan(void);
     void setServo(int pos);
     bool checkScriptSave(void);
+    void stopSimNav(void);
     
     virtual void updateConnection(bool connected);
     virtual void tcpError(const QString &error);
