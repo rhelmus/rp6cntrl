@@ -116,7 +116,8 @@ class CQtClient: public QMainWindow, public CBaseClient
     QPushButton *startSimNavButton, *clearSimNavButton, *addSimNavObstacleButton;
     QSpinBox *simMoveTimeSpinBox;
     QTimer *simNavTimer;
-    bool simNavMoveForward, simNavTurnAtEnd;
+    bool simNavMoveForward, simNavIgnoreRight;
+    QVector<QVector<bool> > simNavVisitedCells;
     
     bool firstStateUpdate;
     int motorDistance[2];
@@ -152,7 +153,6 @@ class CQtClient: public QMainWindow, public CBaseClient
     void setServo(int pos);
     bool checkScriptSave(void);
     void stopSimNav(void);
-    QPoint simNavAdvanceCell(void);
     
     virtual void updateConnection(bool connected);
     virtual void tcpError(const QString &error);

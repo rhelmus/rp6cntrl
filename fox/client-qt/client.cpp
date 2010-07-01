@@ -861,17 +861,6 @@ void CQtClient::stopSimNav()
     addSimNavObstacleButton->setEnabled(true);
 }
 
-QPoint CQtClient::simNavAdvanceCell()
-{
-    QPoint ret(simNavMap->getRobot());
-    if (simNavMoveForward)
-        ret.rx()++;
-    else
-        ret.rx()--;
-    
-    return ret;
-}
-
 void CQtClient::updateConnection(bool connected)
 {
     if (connected)
@@ -1396,8 +1385,14 @@ void CQtClient::startSimNav()
         simNavMap->clearConnections();
         simNavMap->setRobot(QPoint(0, 0));
         simNavMoveForward = true;
-        simNavTurnAtEnd = false;
+        simNavIgnoreRight = false;
         simNavTimer->start(simMoveTimeSpinBox->value());
+
+        // UNDONE: Only reconstruct if necessary
+        const QSize gridsize = simNavMap->getGridSize();
+        simNavVisitedCells.clear();
+        simNavVisitedCells.resize(gridsize.width());
+        simNavVisitedCells.fill(QVector<bool>(gridsize.height()));
 
         startSimNavButton->setText("Abort");
         clearSimNavButton->setEnabled(false);
@@ -1409,6 +1404,161 @@ void CQtClient::simNavTimeout()
 {
     const QPoint currentPos = simNavMap->getRobot();
     const QSize gridSize = simNavMap->getGridSize();
+
+    simNavVisitedCells[currentPos.x()][currentPos.y()] = true;
+
+    QPoint dest = currentPos;
+    bool turn = false;
+    const QPoint left(currentPos.x(), currentPos.y()-1);
+    const bool canleft = (simNavMap->inGrid(left) && !simNavMap->isObstacle(left));
+
+    if (canleft && !simNavVisitedCells[left.x()][left.y()])
+    {
+        // Go left --> always preferred
+        dest = left;
+    }
+    else
+    {
+        const QPoint forward(currentPos.x() + ((simNavMoveForward) ? 1 : -1), currentPos.y());
+        const QPoint right(currentPos.x(), currentPos.y()+1);
+        const bool canforward = (simNavMap->inGrid(forward) && !simNavMap->isObstacle(forward));
+        const bool canright = (simNavMap->inGrid(right) && !simNavMap->isObstacle(right));
+
+        // Check for unvisited cells in current row which are directly accessible
+        bool unvisited = false;
+        QPoint cell(currentPos);
+        while (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
+        {
+            if (!simNavVisitedCells[cell.x()][cell.y()])
+            {
+                unvisited = true;
+                break;
+            }
+
+            if (simNavMoveForward)
+                cell.rx()--;
+            else
+                cell.rx()++;
+        }
+
+        if (canforward && canright)
+        {
+            if (simNavIgnoreRight || !simNavVisitedCells[forward.x()][forward.y()])
+                dest = forward;
+            else if (unvisited)
+                turn = true;
+            else
+                dest = right;
+        }
+        else if (canforward)
+            dest = forward;
+        else
+        {
+            if (unvisited || !canright)
+                turn = true;
+            else
+            {
+#if 0 // UNDONE
+                // Check for ANY unvisited cells in current row
+                cell = currentPos;
+                cell.setX(0);
+                bool anyunvisited = false;
+                while (cell.x() < gridSize.width())
+                {
+                    if (!simNavMap->isObstacle(cell) && !simNavVisitedCells[cell.x()][cell.y()])
+                    {
+                        QPoint p(cell);
+                        p.ry()--;
+                        if (simNavMap->inGrid(p) && simNavVisitedCells[p.x()][p.y()])
+                        {
+                            anyunvisited = true;
+                            break;
+                        }
+                    }
+                    cell.rx()++;
+                }
+
+                if (anyunvisited)
+                {
+                    dest = left;
+                    simNavMoveForward = (cell.x() > currentPos.x());
+                    simNavIgnoreRightOnce = true; // So we won't go back right away
+                }
+                else
+#endif
+                    dest = right;
+            }
+            simNavIgnoreRight = unvisited;
+        }
+    }
+
+    if (turn)
+    {
+        simNavMoveForward = !simNavMoveForward;
+
+        if (simNavMoveForward)
+            dest = QPoint(currentPos.x()+1, currentPos.y());
+        else
+            dest = QPoint(currentPos.x()-1, currentPos.y());
+    }
+
+#if 0
+        // Forward
+        if (simNavMoveForward)
+            cell = QPoint(currentPos.x()+1, currentPos.y());
+        else
+            cell = QPoint(currentPos.x()-1, currentPos.y());
+
+        if (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
+        {
+            // Go forward
+            dest = cell;
+        }
+        else
+        {
+            // Check for unvisited cells in this row
+            bool turn = false;
+            cell = currentPos;
+            while (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
+            {
+                if (!simNavVisitedCells[cell.x()][cell.y()])
+                {
+                    turn = true;
+                    simNavIgnoreRight = true;
+                    break;
+                }
+
+                if (simNavMoveForward)
+                    cell.rx()--;
+                else
+                    cell.rx()++;
+            }
+
+            if (!turn)
+            {
+                cell = QPoint(currentPos.x(), currentPos.y()+1); // Right
+                if (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
+                    dest = cell;
+                else
+                    turn = true;
+            }
+
+            if (turn)
+            {
+                // Turn around & go forward
+                simNavMoveForward = !simNavMoveForward;
+
+                if (simNavMoveForward)
+                    cell = QPoint(currentPos.x()+1, currentPos.y());
+                else
+                    cell = QPoint(currentPos.x()-1, currentPos.y());
+
+                dest = cell;
+            }
+        }
+    }
+#endif
+    simNavMap->setRobot(dest);
 
     // Scan
     QList<QPoint> cells;
@@ -1430,6 +1580,7 @@ void CQtClient::simNavTimeout()
         }
     }
     
+#if 0
     // Move
     QPoint newPos = currentPos;
     
@@ -1467,6 +1618,7 @@ void CQtClient::simNavTimeout()
     }
     else
         simNavMap->setRobot(newPos);
+#endif
 }
 
 void CQtClient::sendConsolePressed()
