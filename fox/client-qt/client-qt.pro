@@ -6,9 +6,11 @@ HEADERS += client.h \
     ../client-base/client_base.h \
     scanner.h \
     editor.h \
-    navmap.h
+    navmap.h \
+    ../../shared/pathengine.h
 SOURCES += main.cpp \
-    navmap.cpp
+    navmap.cpp \
+    ../../shared/pathengine.cpp
 QT += network
 DEPENDPATH += ../../shared \
     ../client-base
@@ -25,3 +27,5 @@ INCLUDEPATH += ../client-base/ \
     /usr/include/qwt/ \
     ../../shared \
     /usr/include/qwt-qt4
+
+CONFIG += debug
