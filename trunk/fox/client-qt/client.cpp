@@ -8,6 +8,7 @@
 #include "client.h"
 #include "editor.h"
 #include "navmap.h"
+#include "pathengine.h"
 #include "scanner.h"
 #include "sensorplot.h"
 #include "tcputil.h"
@@ -146,6 +147,13 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     updateConnection(false);
 
     appendLogOutput("Started RP6 Qt frontend.\n");
+
+    // UNDONE: REMOVE
+
+    CPathEngine patheng;
+    patheng.setGrid(QSize(4, 4));
+    patheng.initPath(QPoint(0, 0), QPoint(3, 3));
+    patheng.calcPath();
 }
 
 QWidget *CQtClient::createMainTab()
