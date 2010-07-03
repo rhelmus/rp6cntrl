@@ -1,6 +1,7 @@
 #ifndef PATHENGINE_H
 #define PATHENGINE_H
 
+#include <set>
 #include <stdint.h>
 
 #include <QList>
@@ -8,6 +9,8 @@
 #include <QPoint>
 #include <QSize>
 #include <QVector>
+
+//#define USE_QTMAP
 
 class CPathEngine
 {
@@ -27,23 +30,27 @@ private:
 
         SCell(void) : xPos(0), yPos(0), score(0), distCost(0), open(false), closed(false), parent(NULL)
         { for (int i=0; i<MAX_CONNECTIONS; ++i) connections[i] = NULL;  }
-        bool operator<(SCell *other) { return distCost < other->distCost; }
     };
 
-    struct SCellCostCompare
+    struct SCellCostCompare // To compare pointers
     {
         bool operator()(SCell *c1, SCell *c2) { return c1->distCost < c2->distCost; }
     };
 
     typedef QVector<QVector<SCell> > TGrid;
-    typedef QMultiMap<SCell *, bool> TOpenList;
-
+#ifdef USE_QTMAP
+    typedef QMultiMap<int, SCell *> TOpenList;
+#else
+    typedef std::multiset<SCell *, SCellCostCompare> TOpenList;
+#endif
     TGrid grid;
     SCell *startCell, *goalCell;
     TOpenList openList;
 
     QSize getGridSize(void) const;
-    int getCellLength(SCell *c1, SCell *c2) const;
+    int getCellLength(const SCell *c1, const SCell *c2) const;
+    EConnection getCellConnection(const SCell *c1, const SCell *c2) const;
+    int pathScore(const SCell *c1, const SCell *c2) const;
 
 public:
     CPathEngine(void);

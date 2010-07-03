@@ -117,6 +117,7 @@ class CQtClient: public QMainWindow, public CBaseClient
 
     // Navigation
     CPathEngine simNavPathEngine;
+    bool simNavUpdatePathGrid;
     QList<QPoint> simNavPathList;
     CNavMap *simNavMap;
     QGroupBox *simNavMapGroup;

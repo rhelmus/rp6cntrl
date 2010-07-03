@@ -125,8 +125,8 @@ float standardDeviation(const QList<int> &values)
 CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
                          remainingACSScanCycles(0), isTurretScanning(false), turretScanEndRange(0),
                          turretScanResolution(0), turretScanTime(0), turretScanDelay(0),
-                         currentScanPosition(0), previousScriptItem(NULL), firstStateUpdate(false),
-                         ACSPowerState(ACS_POWER_OFF)
+                         currentScanPosition(0), previousScriptItem(NULL), simNavUpdatePathGrid(true),
+                         firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
@@ -214,7 +214,7 @@ QWidget *CQtClient::createLuaTab()
 
 QWidget *CQtClient::createNavTab()
 {
-    const QSize gridsize(10, 10);
+    const QSize gridsize(100, 100);
 
     QSplitter *split = new QSplitter(Qt::Vertical);
 
@@ -1438,12 +1438,14 @@ void CQtClient::simNavWidthSpinBoxChanged(int w)
 {
     const QSize size(w, simNavHeightSpinBox->value());
     simNavMap->setGrid(size);
+    simNavUpdatePathGrid = true;
 }
 
 void CQtClient::simNavHeightSpinBoxChanged(int h)
 {
     const QSize size(simNavWidthSpinBox->value(), h);
     simNavMap->setGrid(size);
+    simNavUpdatePathGrid = true;
 }
 
 void CQtClient::simNavEditButtonToggled(bool e)
@@ -1463,7 +1465,12 @@ void CQtClient::startSimNav()
         stopSimNav();
     else
     {
-        simNavPathEngine.setGrid(simNavMap->getGridSize()); // UNDONE: Only do this if necessary
+        if (simNavUpdatePathGrid)
+        {
+            simNavPathEngine.setGrid(simNavMap->getGridSize());
+            simNavUpdatePathGrid = false;
+        }
+
         simNavPathEngine.initPath(simNavMap->getStart(), simNavMap->getGoal());
         simNavPathList.clear();
 
@@ -1491,8 +1498,6 @@ void CQtClient::simNavTimeout()
 
     if (obstacles)
     {
-        qDebug() << "Checking for obstacles.";
-
         // See if next cell is reachable
         // As movement is ristricted to just 4 directions, the following checks are simplified
 
