@@ -5,12 +5,16 @@
 #include <QTcpSocket>
 
 #include "client_base.h"
+#include "pathengine.h"
 #include "shared.h"
 
+class QButtonGroup;
 class QCheckBox;
 class QComboBox;
 class QDataStream;
 class QDial;
+class QFrame;
+class QGroupBox;
 class QLabel;
 class QLCDNumber;
 class QLineEdit;
@@ -112,12 +116,15 @@ class CQtClient: public QMainWindow, public CBaseClient
     QString downloadScript;
 
     // Navigation
+    CPathEngine simNavPathEngine;
+    QList<QPoint> simNavPathList;
     CNavMap *simNavMap;
-    QPushButton *startSimNavButton, *clearSimNavButton, *addSimNavObstacleButton;
-    QSpinBox *simMoveTimeSpinBox;
+    QGroupBox *simNavMapGroup;
+    QSpinBox *simMoveTimeSpinBox, *simNavWidthSpinBox, *simNavHeightSpinBox;
+    QFrame *simNavEditFrame;
+    QButtonGroup *simNavEditButtonGroup;
+    QPushButton *startSimNavButton, *clearSimNavButton;
     QTimer *simNavTimer;
-    bool simNavMoveForward, simNavIgnoreRight;
-    QVector<QVector<bool> > simNavVisitedCells;
     
     bool firstStateUpdate;
     int motorDistance[2];
@@ -184,6 +191,9 @@ private slots:
     void runServerScriptPressed(void);
     void removeServerScriptPressed(void);
     void downloadServerScriptPressed(void);
+    void simNavWidthSpinBoxChanged(int w);
+    void simNavHeightSpinBoxChanged(int h);
+    void simNavEditButtonToggled(bool e);
     void startSimNav(void);
     void simNavTimeout(void);
     void sendConsolePressed(void);

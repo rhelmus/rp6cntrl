@@ -11,7 +11,10 @@
 
 class CPathEngine
 {
-    enum { MAX_CONNECTIONS = 4 }; // Four possible directions: left/right/forward/back
+public:
+    enum EConnection { CONNECTION_LEFT=0, CONNECTION_RIGHT, CONNECTION_UP, CONNECTION_DOWN, MAX_CONNECTIONS };
+
+private:
 
     struct SCell
     {
@@ -23,7 +26,7 @@ class CPathEngine
         SCell *parent;
 
         SCell(void) : xPos(0), yPos(0), score(0), distCost(0), open(false), closed(false), parent(NULL)
-        { for (int i=0; i<4; ++i) connections[i] = NULL;  }
+        { for (int i=0; i<MAX_CONNECTIONS; ++i) connections[i] = NULL;  }
         bool operator<(SCell *other) { return distCost < other->distCost; }
     };
 
@@ -47,7 +50,8 @@ public:
 
     void setGrid(const QSize &size);
     void initPath(const QPoint &start, const QPoint &goal);
-    bool calcPath(void);
+    bool calcPath(QList<QPoint> &output);
+    void breakConnection(const QPoint &cell, EConnection connection);
 };
 
 #endif // PATHENGINE_H

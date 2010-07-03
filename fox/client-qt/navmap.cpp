@@ -4,8 +4,8 @@
 
 #include "navmap.h"
 
-CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f),
-                  robotPos(-1, -1), addObstacleMode(false)
+CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f), startPos(-1, -1), goalPos(-1, -1),
+                  robotPos(-1, -1), robotVisible(true), editMode(EDIT_NONE), blockEditMode(false)
 {
 }
 
@@ -17,10 +17,10 @@ int CNavMap::getCellSize() const
     return std::min(widthSize, heightSize);
 }
 
-QRect CNavMap::getCellRect(int x, int y) const
+QRect CNavMap::getCellRect(const QPoint &cell) const
 {
     const int size = getCellSize();
-    const int xpos = x * size, ypos = y * size;
+    const int xpos = cell.x() * size, ypos = cell.y() * size;
     return QRect(xpos, ypos, size, size);
 }
 
@@ -30,7 +30,55 @@ QPoint CNavMap::getCellFromPos(const QPoint &pos) const
     return QPoint(pos.x() / size, pos.y() / size);
 }
 
-void CNavMap::paintEvent(QPaintEvent *)
+CNavMap::EObstacle CNavMap::getObstacleFromPos(const QPoint &pos, const QPoint &cell)
+{
+    const QRect rect(getCellRect(cell));
+    const int xdiff = pos.x() - rect.x(), ydiff = pos.y() - rect.y();
+    const int wdiff = (rect.x() + rect.width()) - pos.x(), hdiff = (rect.y() + rect.height()) - pos.y();
+    const int mindiff = std::min(std::min(xdiff, ydiff), std::min(wdiff, hdiff));
+
+    if (mindiff == xdiff)
+        return OBSTACLE_LEFT;
+    else if (mindiff == ydiff)
+        return OBSTACLE_UP;
+    else if (mindiff == wdiff)
+        return OBSTACLE_RIGHT;
+    else
+        return OBSTACLE_DOWN;
+}
+
+void CNavMap::drawObstacle(QRect rect, QPainter &painter, int obstacles)
+{
+    painter.setPen(QPen(Qt::blue, 3));
+
+    // Decrease rect to make obstacles look more inward
+    rect.adjust(3, 3, -3, -3);
+
+    if (obstacles & OBSTACLE_LEFT)
+        painter.drawLine(rect.topLeft(), rect.bottomLeft());
+    if (obstacles & OBSTACLE_RIGHT)
+        painter.drawLine(rect.topRight(), rect.bottomRight());
+    if (obstacles & OBSTACLE_UP)
+        painter.drawLine(rect.topLeft(), rect.topRight());
+    if (obstacles & OBSTACLE_DOWN)
+        painter.drawLine(rect.bottomLeft(), rect.bottomRight());
+}
+
+void CNavMap::drawStart(const QRect &rect, QPainter &painter)
+{
+    painter.setPen(QPen(Qt::green, 3));
+    painter.drawEllipse(rect.adjusted(10, 10, -10, -10));
+    painter.drawText(rect, Qt::AlignCenter, "S");
+}
+
+void CNavMap::drawGoal(const QRect &rect, QPainter &painter)
+{
+    painter.setPen(QPen(Qt::red, 3));
+    painter.drawEllipse(rect.adjusted(10, 10, -10, -10));
+    painter.drawText(rect, Qt::AlignCenter, "G");
+}
+
+void CNavMap::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
     painter.save();
@@ -40,36 +88,53 @@ void CNavMap::paintEvent(QPaintEvent *)
     if (!grid.isEmpty())
     {
         const QSize size = getGridSize();
+        const QRect uprect(event->rect());
+        const QPoint start(getCellFromPos(QPoint(uprect.x(), uprect.y())));
+        QPoint end(getCellFromPos(QPoint(uprect.x() + uprect.width(), uprect.y() + uprect.height())));
 
-        for (int x=0; x<size.width(); ++x)
+        if ((end.x() >= size.width()) || (end.y() >= size.height()))
+            end = QPoint(size.width()-1, size.height()-1);
+
+        for (int x=start.x(); x<=end.x(); ++x)
         {
-            for (int y=0; y<size.height(); ++y)
+            for (int y=start.y(); y<=end.y(); ++y)
             {
-                QRect rect = getCellRect(x, y);
+                QRect rect = getCellRect(QPoint(x, y));
 
-                painter.setPen(QPen(Qt::gray, 1));
-                painter.drawRect(rect);
-
-                if ((robotPos.x() == x) && (robotPos.y() == y))
-                {
-                    painter.setPen(QPen(Qt::red, 3));
-                    painter.drawEllipse(rect.adjusted(10, 10, -10, -10));
-                    painter.drawText(rect, Qt::AlignCenter, "R");
-                }
-
-                painter.setPen(QPen(Qt::black, 1));
-                for (QList<QPoint>::iterator it=grid[x][y].connections.begin();
-                     it!=grid[x][y].connections.end(); ++it)
-                {
-                    QRect otherRect = getCellRect(it->x(), it->y());
-                    painter.drawLine(rect.center(), otherRect.center());
-                }
-
-                if (grid[x][y].isObstacle ||
-                    (addObstacleMode && (currentObstacleMousePos.x() == x) &&
-                     (currentObstacleMousePos.y() == y)))
+                if (blockEditMode && (editMode == EDIT_OBSTACLE) &&
+                    (currentMouseCell.x() == x) && (currentMouseCell.y() == y))
                     painter.fillRect(rect, Qt::blue);
+                else
+                {
+                    painter.setPen(QPen(Qt::gray, 1));
+                    painter.drawRect(rect);
+                    painter.fillRect(rect, Qt::white);
 
+                    if ((editMode != EDIT_NONE) && (currentMouseCell.x() == x) && (currentMouseCell.y() == y))
+                    {
+                        switch(editMode)
+                        {
+                        case EDIT_OBSTACLE: drawObstacle(rect, painter, currentMouseObstacle); break;
+                        case EDIT_START: drawStart(rect, painter); break;
+                        case EDIT_GOAL: drawGoal(rect, painter); break;
+                        default: break;
+                        }
+                    }
+                    else if ((startPos.x() == x) && (startPos.y() == y))
+                        drawStart(rect, painter);
+                    else if ((goalPos.x() == x) && (goalPos.y() == y))
+                        drawGoal(rect, painter);
+
+                    if (robotVisible && (robotPos.x() == x) && (robotPos.y() == y))
+                    {
+                        painter.setPen(QPen(Qt::black, 3));
+                        painter.drawRect(rect.adjusted(10, 15, -10, -15));
+                        painter.drawText(rect, Qt::AlignCenter, "R");
+                    }
+
+                    if (grid[x][y].obstacles != OBSTACLE_NONE)
+                        drawObstacle(rect, painter, grid[x][y].obstacles);
+                }
             }
         }
     }
@@ -79,29 +144,45 @@ void CNavMap::paintEvent(QPaintEvent *)
 
 void CNavMap::mouseMoveEvent(QMouseEvent *event)
 {
-    QPoint pos = getCellFromPos(event->pos());
-
-    if (pos != currentObstacleMousePos)
+    QPoint cell(getCellFromPos(event->pos()));
+    if (!inGrid(cell))
     {
-        currentObstacleMousePos = pos;
-        update();
+        currentMouseCell.setX(-1); // Invalidate
+        return;
     }
 
+    currentMouseCell = cell;
+
+    if (!blockEditMode)
+        currentMouseObstacle = getObstacleFromPos(event->pos(), cell);
+
+    update();
     event->accept();
 }
 
 void CNavMap::leaveEvent(QEvent *)
 {
-    currentObstacleMousePos.setX(-1);
-    currentObstacleMousePos.setY(-1);
+    currentMouseCell.setX(-1); // Invalidate
     update();
 }
 
 void CNavMap::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (addObstacleMode && (event->button() == Qt::LeftButton))
+    if ((editMode != EDIT_NONE) && (event->button() == Qt::LeftButton))
     {
-        markObstacle(currentObstacleMousePos);
+        if (editMode == EDIT_OBSTACLE)
+        {
+            if (blockEditMode)
+                markObstacle(currentMouseCell, (OBSTACLE_LEFT | OBSTACLE_RIGHT | OBSTACLE_UP | OBSTACLE_DOWN));
+            else
+                markObstacle(currentMouseCell, currentMouseObstacle);
+
+        }
+        else if (editMode == EDIT_START)
+            setStart(currentMouseCell);
+        else if (editMode == EDIT_GOAL)
+            setGoal(currentMouseCell);
+
         event->accept();
     }
     else
@@ -113,23 +194,12 @@ void CNavMap::setGrid(const QSize &size)
     grid.clear();
     grid.resize(size.width());
     grid.fill(QVector<SCell>(size.height()));
-    update();
+    adjustSize();
 }
 
-void CNavMap::setRobot(const QPoint &pos)
+void CNavMap::markObstacle(const QPoint &pos, int o)
 {
-    robotPos = pos;
-    update();
-}
-
-void CNavMap::markObstacle(const QPoint &pos)
-{
-    grid[pos.x()][pos.y()].isObstacle = true;
-}
-
-void CNavMap::connectCells(const QPoint &pos1, const QPoint &pos2)
-{
-    grid[pos1.x()][pos1.y()].connections.push_back(pos2);
+    grid[pos.x()][pos.y()].obstacles |= o;
 }
 
 QSize CNavMap::getGridSize() const
@@ -140,33 +210,33 @@ QSize CNavMap::getGridSize() const
     return QSize(grid.size(), grid[0].size());
 }
 
-void CNavMap::clearConnections()
-{
-    if (grid.isEmpty())
-        return;
-
-    const QSize size = getGridSize();
-    for (int w=0; w<size.width(); ++w)
-    {
-        for (int h=0; h<size.height(); ++h)
-        {
-            grid[w][h].connections.clear();
-        }
-    }
-
-    update();
-}
-
-bool CNavMap::isObstacle(const QPoint &pos) const
-{
-    return grid[pos.x()][pos.y()].isObstacle;
-}
-
 bool CNavMap::inGrid(const QPoint &pos) const
 {
     const QSize size = getGridSize();
     return ((pos.x() >= 0) && (pos.x() < size.width()) &&
             (pos.y() >= 0) && (pos.y() < size.height()));
+}
+
+QSize CNavMap::minimumSizeHint() const
+{
+    const int mincellsize = 40;
+    const QSize gridsize(getGridSize());
+
+    if (gridsize.isNull())
+        return QSize(250, 250);
+
+    return gridsize * mincellsize;
+}
+
+QSize CNavMap::sizeHint() const
+{
+    const int cellsize = 60;
+    const QSize gridsize(getGridSize());
+
+    if (gridsize.isNull())
+        return QSize(400, 400);
+
+    return gridsize * cellsize;
 }
 
 void CNavMap::clearCells()
@@ -179,16 +249,15 @@ void CNavMap::clearCells()
     {
         for (int h=0; h<size.height(); ++h)
         {
-            grid[w][h].connections.clear();
-            grid[w][h].isObstacle = false;
+            grid[w][h].obstacles = OBSTACLE_NONE;
         }
     }
 
     update();
 }
 
-void CNavMap::toggleObstacleAdd(bool e)
+void CNavMap::setEditMode(int mode)
 {
-    addObstacleMode = e;
-    setMouseTracking(e);
+    editMode = static_cast<EEditMode>(mode);
+    setMouseTracking(editMode != EDIT_NONE);
 }
