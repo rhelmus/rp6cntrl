@@ -92,6 +92,13 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
     return ret;
 }
 
+QPushButton *createCompatPushButton(const QString &label)
+{
+    QPushButton *ret = new QPushButton(label);
+    ret->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    return ret;
+}
+
 float standardDeviation(const QList<int> &values)
 {
     if (values.size() < 2)
@@ -147,13 +154,6 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     updateConnection(false);
 
     appendLogOutput("Started RP6 Qt frontend.\n");
-
-    // UNDONE: REMOVE
-
-    CPathEngine patheng;
-    patheng.setGrid(QSize(4, 4));
-    patheng.initPath(QPoint(0, 0), QPoint(3, 3));
-    patheng.calcPath();
 }
 
 QWidget *CQtClient::createMainTab()
@@ -214,6 +214,8 @@ QWidget *CQtClient::createLuaTab()
 
 QWidget *CQtClient::createNavTab()
 {
+    const QSize gridsize(10, 10);
+
     QSplitter *split = new QSplitter(Qt::Vertical);
 
     QGroupBox *group = new QGroupBox("Navigation sim map");
@@ -221,29 +223,78 @@ QWidget *CQtClient::createNavTab()
 
     QVBoxLayout *vbox = new QVBoxLayout(group);
 
-    vbox->addWidget(simNavMap = new CNavMap);
-    simNavMap->setGrid(QSize(10, 10));
-    simNavMap->setRobot(QPoint(0, 0));
+    QScrollArea *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    vbox->addWidget(scroll);
 
-    split->addWidget(group = new QGroupBox("Control"));
-    QGridLayout *grid = new QGridLayout(group);
+    scroll->setWidget(simNavMap = new CNavMap);
+    simNavMap->setGrid(gridsize);
+    simNavMap->setStart(QPoint(0, 0));
+    simNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
 
-    grid->addWidget(startSimNavButton = new QPushButton("Start"), 0, 0);
-    connect(startSimNavButton, SIGNAL(clicked()), this, SLOT(startSimNav()));
 
-    grid->addWidget(clearSimNavButton = new QPushButton("Clear map"), 1, 0);
-    connect(clearSimNavButton, SIGNAL(clicked()), simNavMap, SLOT(clearCells()));
+    QWidget *w = new QWidget;
+    split->addWidget(w);
 
-    grid->addWidget(addSimNavObstacleButton = new QPushButton("Add obstacle"), 2, 0);
-    addSimNavObstacleButton->setCheckable(true);
-    connect(addSimNavObstacleButton, SIGNAL(toggled(bool)), simNavMap, SLOT(toggleObstacleAdd(bool)));
+    QHBoxLayout *hbox = new QHBoxLayout(w);
 
-    QLabel *label = new QLabel("Move time");
-    label->setAlignment(Qt::AlignRight);
-    grid->addWidget(label, 0, 1);
-    grid->addWidget(simMoveTimeSpinBox = new QSpinBox, 0, 2);
+
+    hbox->addWidget(simNavMapGroup = new QGroupBox("Map settings"));
+    QFormLayout *form = new QFormLayout(simNavMapGroup);
+
+    form->addRow("Move time", simMoveTimeSpinBox = new QSpinBox);
     simMoveTimeSpinBox->setRange(0, 10000);
     simMoveTimeSpinBox->setValue(500);
+
+    form->addRow("Width", simNavWidthSpinBox = new QSpinBox);
+    simNavWidthSpinBox->setRange(1, 2000);
+    simNavWidthSpinBox->setValue(gridsize.width());
+    connect(simNavWidthSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavWidthSpinBoxChanged(int)));
+
+    form->addRow("Height", simNavHeightSpinBox = new QSpinBox);
+    simNavHeightSpinBox->setRange(1, 2000);
+    simNavHeightSpinBox->setValue(gridsize.height());
+    connect(simNavHeightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavHeightSpinBoxChanged(int)));
+
+    QPushButton *button = createCompatPushButton("Edit...");
+    button->setCheckable(true);
+    connect(button, SIGNAL(toggled(bool)), this, SLOT(simNavEditButtonToggled(bool)));
+    form->addRow(button);
+
+    form->addRow(simNavEditFrame = new QFrame);
+    simNavEditFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    simNavEditFrame->setEnabled(false);
+
+    vbox = new QVBoxLayout(simNavEditFrame);
+
+    QCheckBox *check = new QCheckBox("Block edit mode");
+    vbox->addWidget(check);
+    check->setChecked(false);
+    connect(check, SIGNAL(toggled(bool)), simNavMap, SLOT(setBlockEditMode(bool)));
+
+    simNavEditButtonGroup = new QButtonGroup(this);
+    connect(simNavEditButtonGroup, SIGNAL(buttonClicked(int)), simNavMap, SLOT(setEditMode(int)));
+
+    QRadioButton *radio = new QRadioButton("Add obstacle");
+    simNavEditButtonGroup->addButton(radio, CNavMap::EDIT_OBSTACLE);
+    radio->setChecked(true);
+    vbox->addWidget(radio);
+
+    simNavEditButtonGroup->addButton(radio = new QRadioButton("Set start"), CNavMap::EDIT_START);
+    vbox->addWidget(radio);
+
+    simNavEditButtonGroup->addButton(radio = new QRadioButton("Set goal"), CNavMap::EDIT_GOAL);
+    vbox->addWidget(radio);
+
+
+    hbox->addWidget(group = new QGroupBox("Control"));
+    vbox = new QVBoxLayout(group);
+
+    vbox->addWidget(startSimNavButton = new QPushButton("Start"));
+    connect(startSimNavButton, SIGNAL(clicked()), this, SLOT(startSimNav()));
+
+    vbox->addWidget(clearSimNavButton = new QPushButton("Clear map"));
+    connect(clearSimNavButton, SIGNAL(clicked()), simNavMap, SLOT(clearCells()));
 
     return split;
 }
@@ -865,8 +916,8 @@ void CQtClient::stopSimNav()
 {
     simNavTimer->stop();
     startSimNavButton->setText("Start");
+    simNavMapGroup->setEnabled(true);
     clearSimNavButton->setEnabled(true);
-    addSimNavObstacleButton->setEnabled(true);
 }
 
 void CQtClient::updateConnection(bool connected)
@@ -1383,6 +1434,28 @@ void CQtClient::downloadServerScriptPressed()
     }
 }
 
+void CQtClient::simNavWidthSpinBoxChanged(int w)
+{
+    const QSize size(w, simNavHeightSpinBox->value());
+    simNavMap->setGrid(size);
+}
+
+void CQtClient::simNavHeightSpinBoxChanged(int h)
+{
+    const QSize size(simNavWidthSpinBox->value(), h);
+    simNavMap->setGrid(size);
+}
+
+void CQtClient::simNavEditButtonToggled(bool e)
+{
+    simNavEditFrame->setEnabled(e);
+
+    if (!e)
+        simNavMap->setEditMode(CNavMap::EDIT_NONE);
+    else
+        simNavMap->setEditMode(static_cast<CNavMap::EEditMode>(simNavEditButtonGroup->checkedId()));
+}
+
 void CQtClient::startSimNav()
 {
     // Already running? --> Abort
@@ -1390,21 +1463,21 @@ void CQtClient::startSimNav()
         stopSimNav();
     else
     {
-        simNavMap->clearConnections();
-        simNavMap->setRobot(QPoint(0, 0));
-        simNavMoveForward = true;
-        simNavIgnoreRight = false;
-        simNavTimer->start(simMoveTimeSpinBox->value());
+        simNavPathEngine.setGrid(simNavMap->getGridSize()); // UNDONE: Only do this if necessary
+        simNavPathEngine.initPath(simNavMap->getStart(), simNavMap->getGoal());
+        simNavPathList.clear();
 
-        // UNDONE: Only reconstruct if necessary
-        const QSize gridsize = simNavMap->getGridSize();
-        simNavVisitedCells.clear();
-        simNavVisitedCells.resize(gridsize.width());
-        simNavVisitedCells.fill(QVector<bool>(gridsize.height()));
+        if (!simNavPathEngine.calcPath(simNavPathList))
+            QMessageBox::critical(this, "Path error", "Failed to create A* path!");
+        else
+        {
+            simNavMap->setRobot(simNavMap->getStart());
+            simNavTimer->start(simMoveTimeSpinBox->value());
 
-        startSimNavButton->setText("Abort");
-        clearSimNavButton->setEnabled(false);
-        addSimNavObstacleButton->setEnabled(false);
+            startSimNavButton->setText("Abort");
+            simNavMapGroup->setEnabled(false);
+            clearSimNavButton->setEnabled(false);
+        }
     }
 }
 
@@ -1413,220 +1486,50 @@ void CQtClient::simNavTimeout()
     const QPoint currentPos = simNavMap->getRobot();
     const QSize gridSize = simNavMap->getGridSize();
 
-    simNavVisitedCells[currentPos.x()][currentPos.y()] = true;
+    const QPoint cell(simNavPathList.takeFirst());
+    const int obstacles = simNavMap->obstacles(cell);
 
-    QPoint dest = currentPos;
-    bool turn = false;
-    const QPoint left(currentPos.x(), currentPos.y()-1);
-    const bool canleft = (simNavMap->inGrid(left) && !simNavMap->isObstacle(left));
-
-    if (canleft && !simNavVisitedCells[left.x()][left.y()])
+    if (obstacles)
     {
-        // Go left --> always preferred
-        dest = left;
-    }
-    else
-    {
-        const QPoint forward(currentPos.x() + ((simNavMoveForward) ? 1 : -1), currentPos.y());
-        const QPoint right(currentPos.x(), currentPos.y()+1);
-        const bool canforward = (simNavMap->inGrid(forward) && !simNavMap->isObstacle(forward));
-        const bool canright = (simNavMap->inGrid(right) && !simNavMap->isObstacle(right));
+        qDebug() << "Checking for obstacles.";
 
-        // Check for unvisited cells in current row which are directly accessible
-        bool unvisited = false;
-        QPoint cell(currentPos);
-        while (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
-        {
-            if (!simNavVisitedCells[cell.x()][cell.y()])
-            {
-                unvisited = true;
-                break;
-            }
+        // See if next cell is reachable
+        // As movement is ristricted to just 4 directions, the following checks are simplified
 
-            if (simNavMoveForward)
-                cell.rx()--;
-            else
-                cell.rx()++;
-        }
+        const QPoint next(simNavPathList.first());
+        bool newpath = true;
 
-        if (canforward && canright)
-        {
-            if (simNavIgnoreRight || !simNavVisitedCells[forward.x()][forward.y()])
-                dest = forward;
-            else if (unvisited)
-                turn = true;
-            else
-                dest = right;
-        }
-        else if (canforward)
-            dest = forward;
+        if ((obstacles & CNavMap::OBSTACLE_LEFT) && (next.x() < cell.x()))
+            simNavPathEngine.breakConnection(cell, CPathEngine::CONNECTION_LEFT);
+        else if ((obstacles & CNavMap::OBSTACLE_RIGHT) && (next.x() > cell.x()))
+            simNavPathEngine.breakConnection(cell, CPathEngine::CONNECTION_RIGHT);
+        else if ((obstacles & CNavMap::OBSTACLE_UP) && (next.y() < cell.y()))
+            simNavPathEngine.breakConnection(cell, CPathEngine::CONNECTION_UP);
+        else if ((obstacles & CNavMap::OBSTACLE_DOWN) && (next.y() > cell.y()))
+            simNavPathEngine.breakConnection(cell, CPathEngine::CONNECTION_DOWN);
         else
+            newpath = false;
+
+        if (newpath)
         {
-            if (unvisited || !canright)
-                turn = true;
-            else
+            qDebug() << "doing new A*.";
+
+            simNavPathEngine.initPath(cell, simNavMap->getGoal());
+            simNavPathList.clear();
+            if (!simNavPathEngine.calcPath(simNavPathList))
             {
-#if 0 // UNDONE
-                // Check for ANY unvisited cells in current row
-                cell = currentPos;
-                cell.setX(0);
-                bool anyunvisited = false;
-                while (cell.x() < gridSize.width())
-                {
-                    if (!simNavMap->isObstacle(cell) && !simNavVisitedCells[cell.x()][cell.y()])
-                    {
-                        QPoint p(cell);
-                        p.ry()--;
-                        if (simNavMap->inGrid(p) && simNavVisitedCells[p.x()][p.y()])
-                        {
-                            anyunvisited = true;
-                            break;
-                        }
-                    }
-                    cell.rx()++;
-                }
-
-                if (anyunvisited)
-                {
-                    dest = left;
-                    simNavMoveForward = (cell.x() > currentPos.x());
-                    simNavIgnoreRightOnce = true; // So we won't go back right away
-                }
-                else
-#endif
-                    dest = right;
-            }
-            simNavIgnoreRight = unvisited;
-        }
-    }
-
-    if (turn)
-    {
-        simNavMoveForward = !simNavMoveForward;
-
-        if (simNavMoveForward)
-            dest = QPoint(currentPos.x()+1, currentPos.y());
-        else
-            dest = QPoint(currentPos.x()-1, currentPos.y());
-    }
-
-#if 0
-        // Forward
-        if (simNavMoveForward)
-            cell = QPoint(currentPos.x()+1, currentPos.y());
-        else
-            cell = QPoint(currentPos.x()-1, currentPos.y());
-
-        if (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
-        {
-            // Go forward
-            dest = cell;
-        }
-        else
-        {
-            // Check for unvisited cells in this row
-            bool turn = false;
-            cell = currentPos;
-            while (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
-            {
-                if (!simNavVisitedCells[cell.x()][cell.y()])
-                {
-                    turn = true;
-                    simNavIgnoreRight = true;
-                    break;
-                }
-
-                if (simNavMoveForward)
-                    cell.rx()--;
-                else
-                    cell.rx()++;
-            }
-
-            if (!turn)
-            {
-                cell = QPoint(currentPos.x(), currentPos.y()+1); // Right
-                if (simNavMap->inGrid(cell) && !simNavMap->isObstacle(cell))
-                    dest = cell;
-                else
-                    turn = true;
-            }
-
-            if (turn)
-            {
-                // Turn around & go forward
-                simNavMoveForward = !simNavMoveForward;
-
-                if (simNavMoveForward)
-                    cell = QPoint(currentPos.x()+1, currentPos.y());
-                else
-                    cell = QPoint(currentPos.x()-1, currentPos.y());
-
-                dest = cell;
-            }
-        }
-    }
-#endif
-    simNavMap->setRobot(dest);
-
-    // Scan
-    QList<QPoint> cells;
-    cells << QPoint(currentPos.x(), currentPos.y()-1); // Left
-    cells << QPoint(currentPos.x(), currentPos.y()+1); // Right
-    // Front
-    if (simNavMoveForward)
-        cells << QPoint(currentPos.x()+1, currentPos.y());
-    else
-        cells << QPoint(currentPos.x()-1, currentPos.y());
-    
-    foreach(QPoint c, cells)
-    {
-        if ((c.x() >= 0) && (c.x() < gridSize.width()) &&
-            (c.y() >= 0) && (c.y() < gridSize.height()))
-        {
-            if (!simNavMap->isObstacle(c))
-                simNavMap->connectCells(currentPos, c);
-        }
-    }
-    
-#if 0
-    // Move
-    QPoint newPos = currentPos;
-    
-    if (simNavMoveForward)
-        newPos.rx()++;
-    else
-        newPos.rx()--;
-    
-    const bool ingrid = simNavMap->inGrid(newPos);
-    
-    if (!ingrid || simNavMap->isObstacle(newPos))
-    {
-        if (simNavTurnAtEnd)
-        {
-            simNavTurnAtEnd = false;
-            simNavMoveForward = !simNavMoveForward;
-        }
-        else
-        {
-            newPos.ry()++;
-            if (newPos.y() >= gridSize.height())
+                QMessageBox::critical(this, "Path error", "Failed to create new A* path!");
                 stopSimNav();
-            else
-            {
-                newPos.setX(currentPos.x());
-                simNavMap->setRobot(newPos);
-                simNavMoveForward = !simNavMoveForward;
-                
-                if (ingrid)
-                {
-                    simNavTurnAtEnd = simNavMap->inGrid(QPoint(newPos.x());
-                    if 
             }
+
+            return;
         }
     }
-    else
-        simNavMap->setRobot(newPos);
-#endif
+
+    simNavMap->setRobot(cell);
+
+    if (simNavPathList.isEmpty())
+        stopSimNav();
 }
 
 void CQtClient::sendConsolePressed()

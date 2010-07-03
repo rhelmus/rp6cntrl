@@ -36,13 +36,13 @@ void CPathEngine::setGrid(const QSize &size)
             grid[x][y].yPos = y;
 
             if ((x-1) >= 0)
-                grid[x][y].connections[0] = &grid[x-1][y]; // Left
+                grid[x][y].connections[CONNECTION_LEFT] = &grid[x-1][y];
             if ((x+1) < size.width())
-                grid[x][y].connections[1] = &grid[x+1][y]; // Right
+                grid[x][y].connections[CONNECTION_RIGHT] = &grid[x+1][y];
             if ((y-1) >= 0)
-                grid[x][y].connections[2] = &grid[x][y-1]; // Backward
-            if ((y+1) < size.width())
-                grid[x][y].connections[3] = &grid[x][y+1]; // Forward
+                grid[x][y].connections[CONNECTION_UP] = &grid[x][y-1];
+            if ((y+1) < size.height())
+                grid[x][y].connections[CONNECTION_DOWN] = &grid[x][y+1];
         }
     }
 }
@@ -68,7 +68,7 @@ void CPathEngine::initPath(const QPoint &start, const QPoint &goal)
     openList.insert(startCell, true);
 }
 
-bool CPathEngine::calcPath()
+bool CPathEngine::calcPath(QList<QPoint> &output)
 {
     const QSize gridsize = getGridSize();
 
@@ -82,11 +82,10 @@ bool CPathEngine::calcPath()
 
         if (cell == goalCell)
         {
-            qDebug() << "Generated path (reversed order):";
             SCell *c = cell;
             while (c)
             {
-                qDebug() << c->xPos << ", " << c->yPos;
+                output.push_front(QPoint(c->xPos, c->yPos));
                 c = c->parent;
             }
             return true;
@@ -120,4 +119,10 @@ bool CPathEngine::calcPath()
     qDebug() << "Failed to generate path!";
 
     return false;
+}
+
+void CPathEngine::breakConnection(const QPoint &cell, EConnection connection)
+{
+    qDebug() << "Breaking connection " << (int)connection;
+    grid[cell.x()][cell.y()].connections[connection] = NULL;
 }
