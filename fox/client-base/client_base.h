@@ -62,9 +62,9 @@ protected:
     void executeCommand(const QString &cmd);
     void updateDriving(int dir);
     void stopDrive(void);
-    void uploadLocalScript(const QString &name, const QString &text);
-    void runLocalScript(const QString &text);
-    void uploadRunLocalScript(const QString &name, const QString &text);
+    void uploadLocalScript(const QString &name, const QByteArray &text);
+    void runLocalScript(const QByteArray &text);
+    void uploadRunLocalScript(const QString &name, const QByteArray &text);
     void runServerScript(const QString &name);
     void removeServerScript(const QString &name);
     void downloadServerScript(const QString &name);

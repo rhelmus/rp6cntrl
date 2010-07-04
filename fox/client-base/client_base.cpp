@@ -323,7 +323,7 @@ void CBaseClient::stopDrive()
     updateDriveSpeed(0, 0);
 }
 
-void CBaseClient::uploadLocalScript(const QString &name, const QString &text)
+void CBaseClient::uploadLocalScript(const QString &name, const QByteArray &text)
 {
     CTcpWriter tcpWriter(tcpHandler.getSocket());
     tcpWriter << static_cast<uint8_t>(TCP_UPLOADLUA);
@@ -332,7 +332,7 @@ void CBaseClient::uploadLocalScript(const QString &name, const QString &text)
     tcpWriter.write();   
 }
 
-void CBaseClient::runLocalScript(const QString &text)
+void CBaseClient::runLocalScript(const QByteArray &text)
 {
     CTcpWriter tcpWriter(tcpHandler.getSocket());
     tcpWriter << static_cast<uint8_t>(TCP_RUNLUA);
@@ -340,7 +340,7 @@ void CBaseClient::runLocalScript(const QString &text)
     tcpWriter.write();   
 }
 
-void CBaseClient::uploadRunLocalScript(const QString &name, const QString &text)
+void CBaseClient::uploadRunLocalScript(const QString &name, const QByteArray &text)
 {
     CTcpWriter tcpWriter(tcpHandler.getSocket());
     tcpWriter << static_cast<uint8_t>(TCP_UPRUNLUA);
