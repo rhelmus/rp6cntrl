@@ -80,6 +80,7 @@ void CControl::initLua()
 {
     luaInterface.registerFunction(luaExecCmd, "exec", this);
     luaInterface.registerFunction(luaSendText, "sendtext", this);
+    luaInterface.registerFunction(luaUpdate, "update");
 
     lua_newtable(luaInterface);
     for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
@@ -143,6 +144,8 @@ void CControl::parseClientTcp(QDataStream &stream)
     uint8_t m;
     stream >> m;
     ETcpMessage msg = static_cast<ETcpMessage>(m);
+
+    qDebug() << "msg: " << m;
     
     if (msg == TCP_COMMAND)
     {
@@ -157,6 +160,7 @@ void CControl::parseClientTcp(QDataStream &stream)
     {
         QByteArray script;
         stream >> script;
+        qDebug() << "Received script:\n" << script;
         luaInterface.runScript(script.constData());
     }
     else if ((msg == TCP_UPLOADLUA) || (msg == TCP_UPRUNLUA))
@@ -225,5 +229,11 @@ int CControl::luaSendText(lua_State *l)
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
     const char *txt = luaL_checkstring(l, 1);
     control->tcpServer->send(TCP_LUATEXT, QString(txt));
+    return 0;
+}
+
+int CControl::luaUpdate(lua_State *)
+{
+    QCoreApplication::processEvents();
     return 0;
 }

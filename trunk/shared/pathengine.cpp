@@ -23,9 +23,6 @@ int CPathEngine::getCellLength(const SCell *c1, const SCell *c2) const
 {
     // Manhatten distance
     return abs(c1->xPos - c2->xPos) + abs(c1->yPos - c2->yPos);
-//    const float xc = (float)(c1->xPos - c2->xPos) * (float)(c1->xPos - c2->xPos);
-//    const float yc = (float)(c1->yPos - c2->yPos) * (float)(c1->yPos - c2->yPos);
-//    return sqrt(xc + yc);
 }
 
 CPathEngine::EConnection CPathEngine::getCellConnection(const SCell *c1, const SCell *c2) const
@@ -52,7 +49,7 @@ int CPathEngine::pathScore(const SCell *c1, const SCell *c2) const
     {
         EConnection first = getCellConnection(c1, c2), parent = getCellConnection(c1->parent, c1);
         if (first != parent) // Changing direction?
-            ret+=10; // Increase score
+            ret++; // Increase score
     }
 
     return ret;
@@ -119,6 +116,8 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
     QTime starttime;
     starttime.start();
 
+    int investigated = 0;
+
 #ifdef USE_QTMAP
     while (!openList.isEmpty())
 #else
@@ -132,6 +131,8 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
 #endif
         openList.erase(openList.begin());
 
+        ++investigated;
+
         cell->open = false;
         cell->closed = true;
 
@@ -143,7 +144,7 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
                 output.push_front(QPoint(c->xPos, c->yPos));
                 c = c->parent;
             }
-            qDebug() << "Path done: " << starttime.elapsed() << " ms";
+            qDebug() << "Path done: " << starttime.elapsed() << " ms. Investigated: " << investigated;
 //            for (int y=0; y<gridsize.height(); ++y)
 //            {
 //                for (int x=0; x<gridsize.width(); ++x)
@@ -164,9 +165,9 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
             SCell *child = cell->connections[i];
             int newscore = cell->score + pathScore(cell, child);
 
-            if (child->open /*|| child->closed*/)
+            if (child->open)
             {
-                if ((newscore >= child->score))
+                if (newscore >= child->score)
                     continue;
 
                 // Remove any present in open list so we can change the distCost
@@ -218,7 +219,7 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
     }
 
     qDebug() << "Failed to generate path!";
-    qDebug() << "Time: " << starttime.elapsed();
+    qDebug() << "Time: " << starttime.elapsed() << " investigated: " << investigated;
 
     return false;
 }
