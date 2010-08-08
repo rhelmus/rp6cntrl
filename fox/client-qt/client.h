@@ -116,6 +116,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     QString downloadScript;
 
     // Navigation
+    QGroupBox *robotNavControlGroup;
     CPathEngine simNavPathEngine;
     bool simNavUpdatePathGrid;
     QList<QPoint> simNavPathList;
@@ -156,6 +157,9 @@ class CQtClient: public QMainWindow, public CBaseClient
     QWidget *createLocalLuaWidget(void);
     QWidget *createServerLuaWidget(void);
     
+    QWidget *createRobotNavWidget(void);
+    QWidget *createSimNavWidget(void);
+    
     void updateACSScan(const SStateSensors &oldstate, const SStateSensors &newstate);
     void stopACSScan(void);
     void setServo(int pos);
@@ -192,6 +196,7 @@ private slots:
     void runServerScriptPressed(void);
     void removeServerScriptPressed(void);
     void downloadServerScriptPressed(void);
+    void robotNavStartPressed(void);
     void simNavWidthSpinBoxChanged(int w);
     void simNavHeightSpinBoxChanged(int h);
     void simNavEditButtonToggled(bool e);

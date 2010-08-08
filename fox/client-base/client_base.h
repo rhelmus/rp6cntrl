@@ -1,4 +1,5 @@
 #include <QObject>
+#include <QStringList>
 #include <QTcpSocket>
 
 #include "shared.h"
@@ -68,6 +69,8 @@ protected:
     void runServerScript(const QString &name);
     void removeServerScript(const QString &name);
     void downloadServerScript(const QString &name);
+    void executeScriptCommand(const QString &cmd,
+                              const QStringList &args=QStringList());
 
     virtual void appendConsoleOutput(const QString &text) = 0;
     virtual void appendLogOutput(const QString &text) = 0;
