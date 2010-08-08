@@ -165,23 +165,23 @@ QWidget *CQtClient::createMainTab()
     QSplitter *splitter = new QSplitter(Qt::Vertical);
     vbox->addWidget(splitter);
     
-    QTabWidget *tabWidget = new QTabWidget;
-    splitter->addWidget(tabWidget);
-    tabWidget->addTab(createOverviewWidget(), "Overview");
-    tabWidget->addTab(createSpeedWidget(), "Motor speed");
-    tabWidget->addTab(createDistWidget(), "Motor distance");
-    tabWidget->addTab(createCurrentWidget(), "Motor current");
-    tabWidget->addTab(createLightWidget(), "Light sensors");
-    tabWidget->addTab(createACSWidget(), "ACS");
-    tabWidget->addTab(createBatteryWidget(), "Battery");
-    tabWidget->addTab(createMicWidget(), "Microphone");
-    tabWidget->addTab(createSharpIRWidget(), "Sharp IR");
+    QTabWidget *tabwidget = new QTabWidget;
+    splitter->addWidget(tabwidget);
+    tabwidget->addTab(createOverviewWidget(), "Overview");
+    tabwidget->addTab(createSpeedWidget(), "Motor speed");
+    tabwidget->addTab(createDistWidget(), "Motor distance");
+    tabwidget->addTab(createCurrentWidget(), "Motor current");
+    tabwidget->addTab(createLightWidget(), "Light sensors");
+    tabwidget->addTab(createACSWidget(), "ACS");
+    tabwidget->addTab(createBatteryWidget(), "Battery");
+    tabwidget->addTab(createMicWidget(), "Microphone");
+    tabwidget->addTab(createSharpIRWidget(), "Sharp IR");
 
-    splitter->addWidget(tabWidget = new QTabWidget);
-    tabWidget->addTab(createConnectionWidget(), "Connection");
-    tabWidget->addTab(createDriveWidget(), "Drive");
-    tabWidget->addTab(createScannerWidget(), "Scan");
-    tabWidget->addTab(createIRTurretWidget(), "IR turret");
+    splitter->addWidget(tabwidget = new QTabWidget);
+    tabwidget->addTab(createConnectionWidget(), "Connection");
+    tabwidget->addTab(createDriveWidget(), "Drive");
+    tabwidget->addTab(createScannerWidget(), "Scan");
+    tabwidget->addTab(createIRTurretWidget(), "IR turret");
     
     return ret;
 }
@@ -214,89 +214,17 @@ QWidget *CQtClient::createLuaTab()
 
 QWidget *CQtClient::createNavTab()
 {
-    const QSize gridsize(100, 100);
-
-    QSplitter *split = new QSplitter(Qt::Vertical);
-
-    QGroupBox *group = new QGroupBox("Navigation sim map");
-    split->addWidget(group);
-
-    QVBoxLayout *vbox = new QVBoxLayout(group);
-
-    QScrollArea *scroll = new QScrollArea;
-    scroll->setWidgetResizable(true);
-    vbox->addWidget(scroll);
-
-    scroll->setWidget(simNavMap = new CNavMap);
-    simNavMap->setGrid(gridsize);
-    simNavMap->setStart(QPoint(0, 0));
-    simNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
-
-
-    QWidget *w = new QWidget;
-    split->addWidget(w);
-
-    QHBoxLayout *hbox = new QHBoxLayout(w);
-
-
-    hbox->addWidget(simNavMapGroup = new QGroupBox("Map settings"));
-    QFormLayout *form = new QFormLayout(simNavMapGroup);
-
-    form->addRow("Move time", simMoveTimeSpinBox = new QSpinBox);
-    simMoveTimeSpinBox->setRange(0, 10000);
-    simMoveTimeSpinBox->setValue(500);
-
-    form->addRow("Width", simNavWidthSpinBox = new QSpinBox);
-    simNavWidthSpinBox->setRange(1, 2000);
-    simNavWidthSpinBox->setValue(gridsize.width());
-    connect(simNavWidthSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavWidthSpinBoxChanged(int)));
-
-    form->addRow("Height", simNavHeightSpinBox = new QSpinBox);
-    simNavHeightSpinBox->setRange(1, 2000);
-    simNavHeightSpinBox->setValue(gridsize.height());
-    connect(simNavHeightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavHeightSpinBoxChanged(int)));
-
-    QPushButton *button = createCompatPushButton("Edit...");
-    button->setCheckable(true);
-    connect(button, SIGNAL(toggled(bool)), this, SLOT(simNavEditButtonToggled(bool)));
-    form->addRow(button);
-
-    form->addRow(simNavEditFrame = new QFrame);
-    simNavEditFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
-    simNavEditFrame->setEnabled(false);
-
-    vbox = new QVBoxLayout(simNavEditFrame);
-
-    QCheckBox *check = new QCheckBox("Block edit mode");
-    vbox->addWidget(check);
-    check->setChecked(false);
-    connect(check, SIGNAL(toggled(bool)), simNavMap, SLOT(setBlockEditMode(bool)));
-
-    simNavEditButtonGroup = new QButtonGroup(this);
-    connect(simNavEditButtonGroup, SIGNAL(buttonClicked(int)), simNavMap, SLOT(setEditMode(int)));
-
-    QRadioButton *radio = new QRadioButton("Add obstacle");
-    simNavEditButtonGroup->addButton(radio, CNavMap::EDIT_OBSTACLE);
-    radio->setChecked(true);
-    vbox->addWidget(radio);
-
-    simNavEditButtonGroup->addButton(radio = new QRadioButton("Set start"), CNavMap::EDIT_START);
-    vbox->addWidget(radio);
-
-    simNavEditButtonGroup->addButton(radio = new QRadioButton("Set goal"), CNavMap::EDIT_GOAL);
-    vbox->addWidget(radio);
-
-
-    hbox->addWidget(group = new QGroupBox("Control"));
-    vbox = new QVBoxLayout(group);
-
-    vbox->addWidget(startSimNavButton = new QPushButton("Start"));
-    connect(startSimNavButton, SIGNAL(clicked()), this, SLOT(startSimNav()));
-
-    vbox->addWidget(clearSimNavButton = new QPushButton("Clear map"));
-    connect(clearSimNavButton, SIGNAL(clicked()), simNavMap, SLOT(clearCells()));
-
-    return split;
+    QWidget *ret = new QWidget;
+    
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+    
+    QTabWidget *tabwidget = new QTabWidget;
+    vbox->addWidget(tabwidget);
+    
+    tabwidget->addTab(createRobotNavWidget(), "Robot navigation");
+    tabwidget->addTab(createSimNavWidget(), "Navigation simulation");
+    
+    return ret;
 }
 
 QWidget *CQtClient::createConsoleTab()
@@ -835,6 +763,134 @@ QWidget *CQtClient::createServerLuaWidget()
     connectionDependentWidgets << downloadButton;
     
     return ret;
+}
+
+QWidget *CQtClient::createRobotNavWidget()
+{
+    const QSize gridsize(10, 10);
+
+    QSplitter *split = new QSplitter(Qt::Vertical);
+
+    QGroupBox *group = new QGroupBox("Navigation map");
+    split->addWidget(group);
+
+    QVBoxLayout *vbox = new QVBoxLayout(group);
+
+    QScrollArea *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    vbox->addWidget(scroll);
+
+    scroll->setWidget(simNavMap = new CNavMap);
+    simNavMap->setGrid(gridsize);
+    simNavMap->setStart(QPoint(0, 0));
+    simNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
+
+
+    QWidget *w = new QWidget;
+    split->addWidget(w);
+
+    QHBoxLayout *hbox = new QHBoxLayout(w);
+
+    hbox->addWidget(robotNavControlGroup = new QGroupBox("Control"));
+    
+    vbox = new QVBoxLayout(robotNavControlGroup);
+    
+    QPushButton *button = new QPushButton("Start");
+    connect(button, SIGNAL(clicked()), this, SLOT(robotNavStartPressed()));
+    vbox->addWidget(button);
+    
+    vbox->addWidget(button = new QPushButton("Set start"));
+    
+    vbox->addWidget(button = new QPushButton("Set goal"));
+
+    return split;
+}
+
+QWidget *CQtClient::createSimNavWidget()
+{
+    const QSize gridsize(10, 10);
+
+    QSplitter *split = new QSplitter(Qt::Vertical);
+
+    QGroupBox *group = new QGroupBox("Navigation sim map");
+    split->addWidget(group);
+
+    QVBoxLayout *vbox = new QVBoxLayout(group);
+
+    QScrollArea *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    vbox->addWidget(scroll);
+
+    scroll->setWidget(simNavMap = new CNavMap);
+    simNavMap->setGrid(gridsize);
+    simNavMap->setStart(QPoint(0, 0));
+    simNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
+
+
+    QWidget *w = new QWidget;
+    split->addWidget(w);
+
+    QHBoxLayout *hbox = new QHBoxLayout(w);
+
+
+    hbox->addWidget(simNavMapGroup = new QGroupBox("Map settings"));
+    QFormLayout *form = new QFormLayout(simNavMapGroup);
+
+    form->addRow("Move time", simMoveTimeSpinBox = new QSpinBox);
+    simMoveTimeSpinBox->setRange(0, 10000);
+    simMoveTimeSpinBox->setValue(500);
+
+    form->addRow("Width", simNavWidthSpinBox = new QSpinBox);
+    simNavWidthSpinBox->setRange(1, 2000);
+    simNavWidthSpinBox->setValue(gridsize.width());
+    connect(simNavWidthSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavWidthSpinBoxChanged(int)));
+
+    form->addRow("Height", simNavHeightSpinBox = new QSpinBox);
+    simNavHeightSpinBox->setRange(1, 2000);
+    simNavHeightSpinBox->setValue(gridsize.height());
+    connect(simNavHeightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavHeightSpinBoxChanged(int)));
+
+    QPushButton *button = createCompatPushButton("Edit...");
+    button->setCheckable(true);
+    connect(button, SIGNAL(toggled(bool)), this, SLOT(simNavEditButtonToggled(bool)));
+    form->addRow(button);
+
+    form->addRow(simNavEditFrame = new QFrame);
+    simNavEditFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    simNavEditFrame->setEnabled(false);
+
+    vbox = new QVBoxLayout(simNavEditFrame);
+
+    QCheckBox *check = new QCheckBox("Block edit mode");
+    vbox->addWidget(check);
+    check->setChecked(false);
+    connect(check, SIGNAL(toggled(bool)), simNavMap, SLOT(setBlockEditMode(bool)));
+
+    simNavEditButtonGroup = new QButtonGroup(this);
+    connect(simNavEditButtonGroup, SIGNAL(buttonClicked(int)), simNavMap, SLOT(setEditMode(int)));
+
+    QRadioButton *radio = new QRadioButton("Add obstacle");
+    simNavEditButtonGroup->addButton(radio, CNavMap::EDIT_OBSTACLE);
+    radio->setChecked(true);
+    vbox->addWidget(radio);
+
+    simNavEditButtonGroup->addButton(radio = new QRadioButton("Set start"), CNavMap::EDIT_START);
+    vbox->addWidget(radio);
+
+    simNavEditButtonGroup->addButton(radio = new QRadioButton("Set goal"), CNavMap::EDIT_GOAL);
+    vbox->addWidget(radio);
+
+
+    hbox->addWidget(group = new QGroupBox("Control"));
+    vbox = new QVBoxLayout(group);
+
+    vbox->addWidget(startSimNavButton = new QPushButton("Start"));
+    connect(startSimNavButton, SIGNAL(clicked()), this, SLOT(startSimNav()));
+
+    vbox->addWidget(clearSimNavButton = new QPushButton("Clear map"));
+    connect(clearSimNavButton, SIGNAL(clicked()), simNavMap, SLOT(clearCells()));
+
+    return split;
 }
 
 void CQtClient::updateACSScan(const SStateSensors &oldstate, const SStateSensors &newstate)
@@ -1432,6 +1488,11 @@ void CQtClient::downloadServerScriptPressed()
         downloadButton->setEnabled(false);
         downloadServerScript(downloadScript);
     }
+}
+
+void CQtClient::robotNavStartPressed()
+{
+    executeScriptCommand("start");
 }
 
 void CQtClient::simNavWidthSpinBoxChanged(int w)

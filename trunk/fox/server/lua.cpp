@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <QCoreApplication>
+#include <QStringList>
 
 #include "lua.h"
 
@@ -108,8 +109,24 @@ void CLuaInterface::registerFunction(lua_CFunction f, const char *n, void *d)
     lua_setglobal(luaState, n);
 }
 
-void CLuaInterface::runScript(const char *s)
+void CLuaInterface::runScript(const QByteArray &s)
 {
-    if (luaL_dostring(luaState, s))
+    lua_getglobal(luaState, "runscript");
+    lua_pushstring(luaState, s.constData());
+
+    if (lua_pcall(luaState, 1, 0, 0))
+        luaError(luaState);
+}
+
+void CLuaInterface::execScriptCmd(const QString &cmd, const QStringList &args)
+{
+    lua_getglobal(luaState, "execcmd");
+    lua_pushstring(luaState, cmd.toLatin1().data());
+    foreach(QString a, args)
+    {
+        lua_pushstring(luaState, a.toLatin1().data());
+    }
+
+    if (lua_pcall(luaState, 1 + args.size(), 0, 0))
         luaError(luaState);
 }

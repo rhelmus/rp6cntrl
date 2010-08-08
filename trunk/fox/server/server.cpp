@@ -176,7 +176,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         sendLuaScripts();
 
         if (msg == TCP_UPRUNLUA)
-            luaInterface.runScript(script.constData());
+            luaInterface.runScript(script);
     }
     else if (msg == TCP_RUNSERVERLUA)
     {
@@ -185,7 +185,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         
         TLuaScriptMap scripts = getLuaScripts();
         if (scripts.find(name) != scripts.end())
-            luaInterface.runScript(scripts[name].toString().toLatin1().data());
+            luaInterface.runScript(scripts[name].toByteArray());
     }
     else if (msg == TCP_REMOVESERVERLUA)
     {
@@ -206,6 +206,13 @@ void CControl::parseClientTcp(QDataStream &stream)
         TLuaScriptMap scripts = getLuaScripts();
         if (scripts.find(name) != scripts.end())
             tcpServer->send(TCP_REQUESTEDSCRIPT, scripts[name].toByteArray());
+    }
+    else if (msg == TCP_LUACOMMAND)
+    {
+        QString cmd;
+        QStringList args;
+        stream >> cmd >> args;
+        luaInterface.execScriptCmd(cmd, args);
     }
 }
 
@@ -232,8 +239,9 @@ int CControl::luaSendText(lua_State *l)
     return 0;
 }
 
-int CControl::luaUpdate(lua_State *)
+int CControl::luaUpdate(lua_State *l)
 {
-    QCoreApplication::processEvents();
+    int timeout = luaL_checkint(l, 1);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, timeout);
     return 0;
 }

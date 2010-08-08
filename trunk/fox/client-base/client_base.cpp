@@ -372,3 +372,11 @@ void CBaseClient::downloadServerScript(const QString &name)
     tcpWriter << name;
     tcpWriter.write();
 }
+
+void CBaseClient::executeScriptCommand(const QString &cmd, const QStringList &args)
+{
+    CTcpWriter tcpWriter(tcpHandler.getSocket());
+    tcpWriter << static_cast<uint8_t>(TCP_LUACOMMAND);
+    tcpWriter << cmd << args;
+    tcpWriter.write();
+}
