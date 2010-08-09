@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QStringList>
+#include <QTimer>
 
 #include "lua.h"
 
@@ -57,6 +58,21 @@ void stackDump(lua_State *l)
 }
 
 
+void CLuaThinker::timeOut()
+{
+    lua_getglobal(luaState, "think");
+    if (lua_pcall(luaState, 0, 0, 0))
+        luaError(luaState);
+}
+
+void CLuaThinker::start()
+{
+    QTimer *timer = new QTimer(this);
+    timer->setInterval(5);
+    connect(timer, SIGNAL(timeout()), this, SLOT(timeOut()));
+}
+
+
 CLuaInterface::CLuaInterface()
 {
     // Initialize lua
@@ -76,6 +92,8 @@ CLuaInterface::CLuaInterface()
         lua_call(luaState, 1, 0);
         lua_settop(luaState, 0);  // Clear stack
     }
+
+    luaThinker = new CLuaThinker(luaState);
 }
 
 CLuaInterface::~CLuaInterface()
@@ -89,12 +107,30 @@ CLuaInterface::~CLuaInterface()
         lua_close(luaState);
         luaState = NULL;
     }
+
+    delete luaThinker;
+}
+
+void CLuaInterface::getClassMT(const char *type)
+{
+    bool init = (luaL_newmetatable(luaState, type) != 0);
+
+    if (init)
+    {
+        int mt = lua_gettop(luaState);
+
+        lua_pushstring(luaState, "__index");
+        lua_pushvalue(luaState, mt);
+        lua_settable(luaState, mt); // __index = metatable
+    }
 }
 
 void CLuaInterface::exec()
 {
     if (luaL_dofile(luaState, "main.lua"))
         luaError(luaState);
+
+    luaThinker->start();
 }
 
 void CLuaInterface::registerFunction(lua_CFunction f, const char *n, void *d)
@@ -107,6 +143,50 @@ void CLuaInterface::registerFunction(lua_CFunction f, const char *n, void *d)
     else
         lua_pushcfunction(luaState, f);
     lua_setglobal(luaState, n);
+}
+
+void CLuaInterface::registerClassFunction(lua_CFunction f, const char *n,
+                                          const char *t, void *d)
+{
+    getClassMT(t);
+    const int mt = lua_gettop(luaState);
+
+    lua_pushstring(luaState, n);
+
+    if (d)
+    {
+        lua_pushlightuserdata(luaState, d);
+        lua_pushcclosure(luaState, f, 1);
+    }
+    else
+        lua_pushcfunction(luaState, f);
+
+    lua_settable(luaState, mt);
+    lua_remove(luaState, mt);
+}
+
+void CLuaInterface::createClass(void *data, const char *type, lua_CFunction destr)
+{
+    void **p = static_cast<void **>(lua_newuserdata(luaState, sizeof(void **)));
+    *p = data;
+    const int ud = lua_gettop(luaState);
+
+    getClassMT(type);
+    const int mt = lua_gettop(luaState);
+
+    lua_pushvalue(luaState, mt);
+    lua_setmetatable(luaState, ud); // Set metatable for userdata
+
+    if (destr) // Add destructor?
+    {
+        lua_pushstring(luaState, "__gc");
+        lua_pushcfunction(luaState, destr);
+        lua_settable(luaState, mt);
+    }
+
+    lua_remove(luaState, mt);
+
+    // New userdata is left on stack
 }
 
 void CLuaInterface::runScript(const QByteArray &s)

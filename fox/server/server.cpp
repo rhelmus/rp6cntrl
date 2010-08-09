@@ -2,6 +2,7 @@
 
 #include <QtCore>
 
+#include "pathengine.h"
 #include "serial.h"
 #include "server.h"
 #include "shared.h"
@@ -81,6 +82,11 @@ void CControl::initLua()
     luaInterface.registerFunction(luaExecCmd, "exec", this);
     luaInterface.registerFunction(luaSendText, "sendtext", this);
     luaInterface.registerFunction(luaUpdate, "update");
+    luaInterface.registerFunction(luaNewPE, "newpathengine", this);
+
+    luaInterface.registerClassFunction(luaPESetGrid, "setgrid", "pathengine");
+    luaInterface.registerClassFunction(luaPEInitPath, "initpath", "pathengine");
+    luaInterface.registerClassFunction(luaPECalcPath, "calcpath", "pathengine");
 
     lua_newtable(luaInterface);
     for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
@@ -244,4 +250,75 @@ int CControl::luaUpdate(lua_State *l)
     int timeout = luaL_checkint(l, 1);
     QCoreApplication::processEvents(QEventLoop::AllEvents, timeout);
     return 0;
+}
+
+int CControl::luaNewPE(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    control->luaInterface.createClass(new CPathEngine, "pathengine", luaDelPE);
+    return 1;
+}
+
+int CControl::luaDelPE(lua_State *l)
+{
+    qDebug() << "Removing pathengine";
+    void **p = static_cast<void **>(lua_touserdata(l, 1));
+    delete static_cast<CPathEngine *>(*p);
+    *p = NULL;
+    return 0;
+}
+
+int CControl::luaPESetGrid(lua_State *l)
+{
+    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
+    const int w = luaL_checkint(l, 2), h = luaL_checkint(l, 3);
+    pe->setGrid(QSize(w, h));
+    return 0;
+}
+
+int CControl::luaPEInitPath(lua_State *l)
+{
+    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
+    const QPoint start(luaL_checkint(l, 2), luaL_checkint(l, 3));
+    const QPoint goal(luaL_checkint(l, 4), luaL_checkint(l, 5));
+    pe->initPath(start, goal);
+    return 0;
+}
+
+int CControl::luaPECalcPath(lua_State *l)
+{
+    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
+    QList<QPoint> path;
+    if (pe->calcPath(path))
+    {
+        lua_pushboolean(l, true); // Success
+
+        const int size = path.size();
+
+        lua_newtable(l); // Returning path array
+        const int tab = lua_gettop(l);
+
+        for (int i=1; i<=size; ++i)
+        {
+            lua_newtable(l); // X&Y pair
+
+            lua_pushinteger(l, path[i-1].x());
+            lua_setfield(l, -2, "x");
+
+            lua_pushinteger(l, path[i-1].y());
+            lua_setfield(l, -2, "y");
+
+            lua_rawseti(l, tab, i);
+        }
+
+        qDebug() << "Returning lua vars: " << luaL_typename(l, 1) << ", " <<
+                luaL_typename(l, 2);
+
+        return 2;
+    }
+    else
+    {
+        lua_pushboolean(l, false); // Failed to calc path
+        return 1;
+    }
 }

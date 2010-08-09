@@ -9,7 +9,8 @@ SOURCES += serial.cpp \
     tcp.cpp \
     server.cpp \
     main.cpp \
-    lua.cpp
+    lua.cpp \
+    ../../shared/pathengine.cpp
 QT -= gui
 QT += network
 INCLUDEPATH += ../qextserialport/include
@@ -19,4 +20,5 @@ DEPENDPATH += ../../shared
 SOURCES += tcputil.cpp
 INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua
-OTHER_FILES += main.lua
+OTHER_FILES += main.lua \
+    main.lua
