@@ -47,6 +47,11 @@ public:
     static int luaExecCmd(lua_State *l);
     static int luaSendText(lua_State *l);
     static int luaUpdate(lua_State *l);
+    static int luaNewPE(lua_State *l);
+    static int luaDelPE(lua_State *l);
+    static int luaPESetGrid(lua_State *l);
+    static int luaPEInitPath(lua_State *l);
+    static int luaPECalcPath(lua_State *l);
 };
 
 #endif

@@ -1,4 +1,4 @@
---Generate access functions
+-- Generate access functions
 for k, v in pairs(sensortable) do
     _G[string.format("get%s", k)] = function()
         return sensortable[k]
@@ -19,17 +19,24 @@ end
 local curscript = nil
 function runscript(s)
     curscript = assert(loadstring(s))()
+    
+    curscript.corun = coroutine.create(curscript.run)
+    
     if curscript.init then
         curscript.init()
     end
+end
 
-    curscript.run()
-
-    if curscript.finish then
-        curscript.finish()
-    end
-
-    curscript = nil
+function think()
+    if curscript then
+        assert(coroutine.resume(curscript.corun))
+        if coroutine.status(curscript.corun) == "dead" then
+            if curscript.finish then
+                curscript.finish()
+            end
+            curscript = nil
+        end
+    end 
 end
 
 function execcmd(cmd, ...)
