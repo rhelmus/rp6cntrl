@@ -4,8 +4,9 @@
 
 #include "navmap.h"
 
-CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f), startPos(-1, -1), goalPos(-1, -1),
-                  robotPos(-1, -1), robotVisible(true), editMode(EDIT_NONE), blockEditMode(false)
+CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f),
+                  startPos(-1, -1), goalPos(-1, -1), robotPos(-1, -1),
+                  robotVisible(true), editMode(EDIT_NONE), blockEditMode(false)
 {
 }
 
