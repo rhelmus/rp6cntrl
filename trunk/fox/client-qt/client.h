@@ -117,6 +117,8 @@ class CQtClient: public QMainWindow, public CBaseClient
 
     // Navigation
     QGroupBox *robotNavControlGroup;
+    QPushButton *robotNavSetStartButton, *robotNavSetGoalButton;
+    CNavMap *robotNavMap;
     CPathEngine simNavPathEngine;
     bool simNavUpdatePathGrid;
     QList<QPoint> simNavPathList;
@@ -197,6 +199,9 @@ private slots:
     void removeServerScriptPressed(void);
     void downloadServerScriptPressed(void);
     void robotNavStartPressed(void);
+    void robotNavSetStartToggled(bool e);
+    void robotNavSetGoalToggled(bool e);
+    void robotNavSetGridPressed(void);
     void simNavWidthSpinBoxChanged(int w);
     void simNavHeightSpinBoxChanged(int h);
     void simNavEditButtonToggled(bool e);

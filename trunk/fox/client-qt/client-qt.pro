@@ -26,6 +26,7 @@ RESOURCES += editor.qrc
 INCLUDEPATH += ../client-base/ \
     /usr/include/qwt/ \
     ../../shared \
-    /usr/include/qwt-qt4
+    /usr/include/qwt-qt4 \
+    /usr/include/QCodeEdit
 
 CONFIG += debug

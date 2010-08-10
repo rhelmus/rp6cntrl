@@ -85,8 +85,8 @@ void CControl::initLua()
     luaInterface.registerFunction(luaNewPE, "newpathengine", this);
 
     luaInterface.registerClassFunction(luaPESetGrid, "setgrid", "pathengine");
-    luaInterface.registerClassFunction(luaPEInitPath, "initpath", "pathengine");
-    luaInterface.registerClassFunction(luaPECalcPath, "calcpath", "pathengine");
+    luaInterface.registerClassFunction(luaPEInitPath, "init", "pathengine");
+    luaInterface.registerClassFunction(luaPECalcPath, "calc", "pathengine");
 
     lua_newtable(luaInterface);
     for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();

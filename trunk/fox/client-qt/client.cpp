@@ -780,11 +780,10 @@ QWidget *CQtClient::createRobotNavWidget()
     scroll->setWidgetResizable(true);
     vbox->addWidget(scroll);
 
-    scroll->setWidget(simNavMap = new CNavMap);
-    simNavMap->setGrid(gridsize);
-    simNavMap->setStart(QPoint(0, 0));
-    simNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
-
+    scroll->setWidget(robotNavMap = new CNavMap);
+    robotNavMap->setGrid(gridsize);
+    robotNavMap->setStart(QPoint(0, 0));
+    robotNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
 
     QWidget *w = new QWidget;
     split->addWidget(w);
@@ -793,15 +792,24 @@ QWidget *CQtClient::createRobotNavWidget()
 
     hbox->addWidget(robotNavControlGroup = new QGroupBox("Control"));
     
-    vbox = new QVBoxLayout(robotNavControlGroup);
-    
+    QHBoxLayout *subhbox = new QHBoxLayout(robotNavControlGroup);
+
     QPushButton *button = new QPushButton("Start");
     connect(button, SIGNAL(clicked()), this, SLOT(robotNavStartPressed()));
-    vbox->addWidget(button);
-    
-    vbox->addWidget(button = new QPushButton("Set start"));
-    
-    vbox->addWidget(button = new QPushButton("Set goal"));
+    subhbox->addWidget(button);
+
+    subhbox->addWidget(robotNavSetStartButton = new QPushButton("Set start"));
+    connect(robotNavSetStartButton, SIGNAL(toggled(bool)), this,
+            SLOT(robotNavSetStartToggled(bool)));
+    robotNavSetStartButton->setCheckable(true);
+
+    subhbox->addWidget(robotNavSetGoalButton = new QPushButton("Set goal"));
+    connect(robotNavSetGoalButton, SIGNAL(toggled(bool)), this,
+            SLOT(robotNavSetGoalToggled(bool)));
+    robotNavSetGoalButton->setCheckable(true);
+
+    subhbox->addWidget(button = new QPushButton("Grid size..."));
+    connect(button, SIGNAL(clicked()), this, SLOT(robotNavSetGridPressed()));
 
     return split;
 }
@@ -1493,6 +1501,72 @@ void CQtClient::downloadServerScriptPressed()
 void CQtClient::robotNavStartPressed()
 {
     executeScriptCommand("start");
+}
+
+void CQtClient::robotNavSetStartToggled(bool e)
+{
+    if (e)
+    {
+        robotNavMap->setEditMode(CNavMap::EDIT_START);
+        robotNavSetGoalButton->setChecked(false);
+    }
+    else
+    {
+        robotNavMap->setEditMode(CNavMap::EDIT_NONE);
+        const QPoint cell(robotNavMap->getStart());
+        executeScriptCommand("setstart", QStringList() << QString::number(cell.x()) <<
+                             QString::number(cell.y()));
+    }
+}
+
+void CQtClient::robotNavSetGoalToggled(bool e)
+{
+    if (e)
+    {
+        robotNavMap->setEditMode(CNavMap::EDIT_GOAL);
+        robotNavSetStartButton->setChecked(false);
+    }
+    else
+    {
+        robotNavMap->setEditMode(CNavMap::EDIT_NONE);
+        const QPoint cell(robotNavMap->getGoal());
+        executeScriptCommand("setgoal", QStringList() << QString::number(cell.x()) <<
+                             QString::number(cell.y()));
+    }
+}
+
+void CQtClient::robotNavSetGridPressed()
+{
+    QDialog dialog;
+    dialog.setModal(true);
+
+    QFormLayout *form = new QFormLayout(&dialog);
+
+    const QSize cursize(robotNavMap->getGridSize());
+
+    QSpinBox *widthspin = new QSpinBox;
+    widthspin->setRange(1, 10000);
+    widthspin->setValue(cursize.width());
+    form->addRow("Width", widthspin);
+
+    QSpinBox *heightspin = new QSpinBox;
+    heightspin->setRange(1, 10000);
+    heightspin->setValue(cursize.height());
+    form->addRow("Height", heightspin);
+
+    QDialogButtonBox *bbox = new QDialogButtonBox(QDialogButtonBox::Ok |
+                QDialogButtonBox::Cancel);
+    connect(bbox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+    connect(bbox, SIGNAL(rejected()), &dialog, SLOT(reject()));
+    form->addWidget(bbox);
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        const QSize size(widthspin->value(), heightspin->value());
+        robotNavMap->setGrid(size);
+        executeScriptCommand("setgrid", QStringList() << QString::number(size.width()) <<
+                             QString::number(size.height()));
+    }
 }
 
 void CQtClient::simNavWidthSpinBoxChanged(int w)
