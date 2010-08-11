@@ -81,6 +81,7 @@ void CControl::initLua()
 {
     luaInterface.registerFunction(luaExecCmd, "exec", this);
     luaInterface.registerFunction(luaSendText, "sendtext", this);
+    luaInterface.registerFunction(luaSendMsg, "sendmsg", this);
     luaInterface.registerFunction(luaUpdate, "update");
     luaInterface.registerFunction(luaNewPE, "newpathengine", this);
 
@@ -244,6 +245,22 @@ int CControl::luaSendText(lua_State *l)
     control->tcpServer->send(TCP_LUATEXT, QString(txt));
     return 0;
 }
+
+int CControl::luaSendMsg(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    const char *msg = luaL_checkstring(l, 1);
+    const int nargs = lua_gettop(l) - 1;
+    QStringList args;
+
+    for (int i=2; i<=nargs; ++i)
+        args << lua_tostring(l, i);
+
+    control->tcpServer->send(TCP_LUAMSG, msg, args);
+
+    return 0;
+}
+
 
 int CControl::luaUpdate(lua_State *l)
 {

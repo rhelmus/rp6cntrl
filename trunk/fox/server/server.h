@@ -46,6 +46,7 @@ public:
     // Lua bindings
     static int luaExecCmd(lua_State *l);
     static int luaSendText(lua_State *l);
+    static int luaSendMsg(lua_State *l);
     static int luaUpdate(lua_State *l);
     static int luaNewPE(lua_State *l);
     static int luaDelPE(lua_State *l);

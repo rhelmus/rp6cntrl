@@ -1139,6 +1139,16 @@ void CQtClient::tcpRequestedScript(const QByteArray &text)
     downloadButton->setEnabled(true);
 }
 
+void CQtClient::tcpHandleLuaMsg(const QString &msg, const QStringList &args)
+{
+    // UNDONE: Check if bot is actually navigating
+    if (msg == "robotcell")
+    {
+        const QPoint cell(args[0].toInt(), args[1].toInt());
+        robotNavMap->setRobot(cell);
+    }
+}
+
 void CQtClient::updateDriveSpeed(int left, int right)
 {
     driveSpeedSlider[0]->setValue(left);

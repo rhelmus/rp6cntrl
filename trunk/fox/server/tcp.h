@@ -41,6 +41,19 @@ public:
         }
     }
 
+    template <typename C, typename D> void send(ETcpMessage msg, const C &value1,
+                                                const D &value2)
+    {
+        for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
+            it!=clientInfo.end(); ++it)
+        {
+            CTcpWriter tcpWriter(it.key());
+            tcpWriter << static_cast<uint8_t>(msg);
+            tcpWriter << value1 << value2;
+            tcpWriter.write();
+        }
+    }
+
 signals:
     void clientTcpReceived(QDataStream &stream);
 };

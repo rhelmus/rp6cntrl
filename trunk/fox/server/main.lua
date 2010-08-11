@@ -5,6 +5,51 @@ for k, v in pairs(sensortable) do
     end
 end
 
+-- Util functions to control robot
+
+function move(dist, speed, dir)
+    local cmd = "move " .. tostring(dist)
+    if speed then
+        cmd = cmd .. " " .. tostring(speed)
+        if dir then
+            cmd = cmd .. " " .. dir
+        end
+    end
+end
+
+function rotate(angle, speed, dir)
+    local cmd = "rotate " .. tostring(angle)
+    if speed then
+        cmd = cmd .. " " .. tostring(speed)
+        if dir then
+            cmd = cmd .. " " .. dir
+        end
+    end    
+end
+
+function stop()
+    exec("stop")
+end
+
+function setbaseleds(s)
+    exec(string.format("set leds1 %s", s))
+end
+
+function setm32leds(s)
+    exec(string.format("set leds2 %s", s))
+end
+
+function setacs(s)
+    exec(string.format("set acs %s", s))
+end
+
+function setservo(angle)
+    exec(string.format("set servo %d", angle))
+end
+
+
+-- Misc functions
+
 local oldprint = print
 function print(s, ...)
     oldprint(s, ...)
