@@ -183,6 +183,13 @@ void CBaseClient::parseTcp(QDataStream &stream)
         stream >> text;
         appendLogOutput(QString("Lua: %1\n").arg(text));
     }
+    else if (msg == TCP_LUAMSG)
+    {
+        QString msg;
+        QStringList args;
+        stream >> msg >> args;
+        tcpHandleLuaMsg(msg, args);
+    }
 }
 
 void CBaseClient::updateMotorDirections(const SMotorDirections &dir)

@@ -175,6 +175,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     virtual void tcpHandleRobotData(ETcpMessage msg, int data);
     virtual void tcpLuaScripts(const QStringList &list);
     virtual void tcpRequestedScript(const QByteArray &text);
+    virtual void tcpHandleLuaMsg(const QString &msg, const QStringList &args);
     virtual void updateDriveSpeed(int left, int right);
     
 private slots:

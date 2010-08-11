@@ -220,6 +220,7 @@ typedef enum
     TCP_LUASCRIPTS,
     TCP_REQUESTEDSCRIPT,
     TCP_LUATEXT,
+    TCP_LUAMSG,
 
     // Client
     TCP_COMMAND,
