@@ -15,6 +15,8 @@ function move(dist, speed, dir)
             cmd = cmd .. " " .. dir
         end
     end
+
+    exec(cmd)
 end
 
 function rotate(angle, speed, dir)
@@ -24,7 +26,9 @@ function rotate(angle, speed, dir)
         if dir then
             cmd = cmd .. " " .. dir
         end
-    end    
+    end
+
+    exec(cmd)
 end
 
 function shortrotate(angle, speed)
