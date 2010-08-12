@@ -48,6 +48,9 @@ public:
     static int luaSendText(lua_State *l);
     static int luaSendMsg(lua_State *l);
     static int luaUpdate(lua_State *l);
+    static int luaGetTimeMS(lua_State *l);
+
+    // Bindings for Lua pathengine class
     static int luaNewPE(lua_State *l);
     static int luaDelPE(lua_State *l);
     static int luaPESetGrid(lua_State *l);

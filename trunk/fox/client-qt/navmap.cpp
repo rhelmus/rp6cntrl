@@ -6,7 +6,7 @@
 
 CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f),
                   startPos(-1, -1), goalPos(-1, -1), robotPos(-1, -1),
-                  robotVisible(true), editMode(EDIT_NONE), blockEditMode(false)
+                  editMode(EDIT_NONE), blockEditMode(false)
 {
 }
 
@@ -126,7 +126,7 @@ void CNavMap::paintEvent(QPaintEvent *event)
                     else if ((goalPos.x() == x) && (goalPos.y() == y))
                         drawGoal(rect, painter);
 
-                    if (robotVisible && (robotPos.x() == x) && (robotPos.y() == y))
+                    if ((robotPos.x() == x) && (robotPos.y() == y))
                     {
                         painter.setPen(QPen(Qt::black, 3));
                         painter.drawRect(rect.adjusted(10, 15, -10, -15));

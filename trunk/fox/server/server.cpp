@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <sys/time.h>
 
 #include <QtCore>
 
@@ -83,6 +84,7 @@ void CControl::initLua()
     luaInterface.registerFunction(luaSendText, "sendtext", this);
     luaInterface.registerFunction(luaSendMsg, "sendmsg", this);
     luaInterface.registerFunction(luaUpdate, "update");
+    luaInterface.registerFunction(luaGetTimeMS, "gettimems");
     luaInterface.registerFunction(luaNewPE, "newpathengine", this);
 
     luaInterface.registerClassFunction(luaPESetGrid, "setgrid", "pathengine");
@@ -93,9 +95,29 @@ void CControl::initLua()
     for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
          it!=serial2TcpMap.end(); ++it)
     {
-        lua_pushinteger(luaInterface, 0);
+        if (it.key() == SERIAL_STATE_SENSORS)
+        {
+            // Save state sensors in subtable
+            lua_newtable(luaInterface);
+
+            lua_pushboolean(luaInterface, false);
+            lua_setfield(luaInterface, -2, "bumperleft");           
+            lua_pushboolean(luaInterface, false);
+            lua_setfield(luaInterface, -2, "bumperright");
+            lua_pushboolean(luaInterface, false);
+            lua_setfield(luaInterface, -2, "acsleft");
+            lua_pushboolean(luaInterface, false);
+            lua_setfield(luaInterface, -2, "acsright");
+            lua_pushboolean(luaInterface, false);
+            lua_setfield(luaInterface, -2, "movecomplete");
+            lua_pushstring(luaInterface, "idle");
+            lua_setfield(luaInterface, -2, "acsstate");
+        }
+        else
+            lua_pushinteger(luaInterface, 0);
         lua_setfield(luaInterface, -2, it.value().luaKey);
     }
+
     lua_setglobal(luaInterface, "sensortable");
     
     luaInterface.exec();
@@ -129,21 +151,62 @@ void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
         tcpDataTypes[serial2TcpMap[msg].tcpMessage] << " name: " <<
         serial2TcpMap[msg].luaKey << " TCP type: " <<
         serial2TcpMap[msg].tcpMessage;*/
-        
+
+    int luaval;
+
     switch (tcpDataTypes[serial2TcpMap[msg].tcpMessage])
     {
         case DATA_BYTE:
             tcpServer->send(serial2TcpMap[msg].tcpMessage,
                             static_cast<uint8_t>(data[0]));
+            luaval = static_cast<uint8_t>(data[0]);
             break;
         case DATA_WORD:
         {
             const uint16_t d = static_cast<uint8_t>(data[0]) +
                 (static_cast<uint8_t>(data[1]) << 8);
+            luaval = d;
             tcpServer->send(serial2TcpMap[msg].tcpMessage, d);
             break;
         }
-    }    
+    }
+
+    lua_getglobal(luaInterface, "sensortable");
+
+    if (msg == SERIAL_STATE_SENSORS)
+    {
+        SStateSensors state;
+        state.byte = luaval;
+
+        lua_getfield(luaInterface, -1, serial2TcpMap[msg].luaKey);
+
+        lua_pushboolean(luaInterface, state.bumperLeft);
+        lua_setfield(luaInterface, -2, "bumperleft");
+        lua_pushboolean(luaInterface, state.bumperRight);
+        lua_setfield(luaInterface, -2, "bumperright");
+        lua_pushboolean(luaInterface, state.ACSLeft);
+        lua_setfield(luaInterface, -2, "acsleft");
+        lua_pushboolean(luaInterface, state.ACSRight);
+        lua_setfield(luaInterface, -2, "acsright");
+        lua_pushboolean(luaInterface, state.movementComplete);
+        lua_setfield(luaInterface, -2, "movecomplete");
+
+        switch (state.ACSState)
+        {
+        case ACS_STATE_IDLE: lua_pushstring(luaInterface, "idle"); break;
+        case ACS_STATE_IRCOMM_DELAY: lua_pushstring(luaInterface, "ircomm"); break;
+        case ACS_STATE_SEND_LEFT: lua_pushstring(luaInterface, "sendleft"); break;
+        case ACS_STATE_WAIT_LEFT: lua_pushstring(luaInterface, "waitleft"); break;
+        case ACS_STATE_SEND_RIGHT: lua_pushstring(luaInterface, "sendright"); break;
+        case ACS_STATE_WAIT_RIGHT: lua_pushstring(luaInterface, "waitright"); break;
+        }
+        lua_setfield(luaInterface, -2, "acsstate");
+    }
+    else
+        lua_pushinteger(luaInterface, luaval);
+
+    lua_setfield(luaInterface, -2, serial2TcpMap[msg].luaKey);
+    lua_pop(luaInterface, 1); // Pop sensortable
 }
 
 void CControl::parseClientTcp(QDataStream &stream)
@@ -250,13 +313,13 @@ int CControl::luaSendMsg(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
     const char *msg = luaL_checkstring(l, 1);
-    const int nargs = lua_gettop(l) - 1;
+    const int nargs = lua_gettop(l);
     QStringList args;
 
     for (int i=2; i<=nargs; ++i)
         args << lua_tostring(l, i);
 
-    control->tcpServer->send(TCP_LUAMSG, msg, args);
+    control->tcpServer->send(TCP_LUAMSG, QString(msg), args);
 
     return 0;
 }
@@ -267,6 +330,24 @@ int CControl::luaUpdate(lua_State *l)
     int timeout = luaL_checkint(l, 1);
     QCoreApplication::processEvents(QEventLoop::AllEvents, timeout);
     return 0;
+}
+
+int CControl::luaGetTimeMS(lua_State *l)
+{
+    static timeval start, current;
+    static bool started = false;
+
+    if (!started)
+    {
+        gettimeofday(&start, NULL);
+        started = true;
+    }
+
+    gettimeofday(&current, NULL);
+    lua_pushinteger(l, ((current.tv_sec-start.tv_sec) * 1000 ) +
+                    ((current.tv_usec-start.tv_usec) / 1000));
+
+    return 1;
 }
 
 int CControl::luaNewPE(lua_State *l)
@@ -328,8 +409,8 @@ int CControl::luaPECalcPath(lua_State *l)
             lua_rawseti(l, tab, i);
         }
 
-        qDebug() << "Returning lua vars: " << luaL_typename(l, 1) << ", " <<
-                luaL_typename(l, 2);
+        qDebug() << "Returning lua vars: " << luaL_typename(l, lua_gettop(l)-1) << ", " <<
+                luaL_typename(l, lua_gettop(l));
 
         return 2;
     }

@@ -68,8 +68,8 @@ void CLuaThinker::timeOut()
 void CLuaThinker::start()
 {
     QTimer *timer = new QTimer(this);
-    timer->setInterval(5);
     connect(timer, SIGNAL(timeout()), this, SLOT(timeOut()));
+    timer->start(5);
 }
 
 

@@ -82,6 +82,8 @@ CEditor::CEditor(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f)
     vbox->addWidget(createToolbars());
     vbox->addWidget(editControl->editor());
 
+    editor()->setFlag(QEditor::ReplaceTabs, true);
+
     loadSettings(QList<QEditor *>() << editor());
 }
 
