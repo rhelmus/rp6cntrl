@@ -25,7 +25,6 @@ private:
 
     QVector<QVector<SCell> > grid;
     QPoint startPos, goalPos, robotPos;
-    bool robotVisible;
     EEditMode editMode;
     bool blockEditMode;
     QPoint currentMouseCell;
@@ -52,7 +51,6 @@ public:
     void setStart(const QPoint &pos) { startPos = pos; update(); }
     void setGoal(const QPoint &pos) { goalPos = pos; update(); }
     void setRobot(const QPoint &pos) { robotPos = pos; update(); }
-    void setRobotVisible(bool v);
     void markObstacle(const QPoint &pos, int o);
     QPoint getRobot(void) const { return robotPos; }
     QPoint getStart(void) const { return startPos; }

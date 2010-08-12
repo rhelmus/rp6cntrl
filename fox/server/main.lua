@@ -27,6 +27,15 @@ function rotate(angle, speed, dir)
     end    
 end
 
+function shortrotate(angle, speed)
+    speed = speed or 80
+    if angle <= 180 then
+        rotate(angle, speed, "right")
+    else
+        rotate(360 - angle, speed, "left")
+    end
+end
+
 function stop()
     exec("stop")
 end
@@ -63,7 +72,14 @@ end
 
 local curscript = nil
 function runscript(s)
-    curscript = assert(loadstring(s))()
+    local stat, ret = pcall(assert(loadstring(s)))
+
+    if stat then
+        curscript = ret
+    else
+        print("Failed to run script:", ret)
+        return
+    end
     
     curscript.corun = coroutine.create(curscript.run)
     
