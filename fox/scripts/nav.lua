@@ -78,20 +78,22 @@ taskMoveToNextNode =
                 a = a + 360
             end
             print(string.format("Rotating %d degrees (%d->%d)", a, currentangle, targetangle))
-            --shortrotate(a)
+            shortrotate(a)
             self.status = "rotating"
             currentangle = targetangle
         elseif self.status == "rotating" then
-            if true or getstate().movecomplete then
+            if getstate().movecomplete then
                 self.status = "startmove"
+                getstate().movecomplete = false
             end
         elseif self.status == "startmove" then
             print("Moving 300 mm")
-            --move(300) -- UNDONE: Grid size
+            move(300) -- UNDONE: Grid size
             self.status = "moving"
         elseif self.status == "moving" then
-            if true or getstate().movecomplete then
+            if getstate().movecomplete then
                 sendmsg("robotcell", currentcell.x, currentcell.y)
+                getstate().movecomplete = false
                 
                 -- Done?
                 if #currentpath == 0 then
