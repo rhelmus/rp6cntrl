@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QStringList>
 #include <QTimer>
 
@@ -24,7 +25,7 @@ const luaL_Reg libtable[] = {
 void luaError(lua_State *l)
 {
     const char *errmsg = lua_tostring(l, -1);
-    std::cerr << "Lua error: " << errmsg << "\n";
+    qCritical() << "Lua error: " << errmsg << "\n";
 //     QCoreApplication::exit(1);
 }
 
@@ -79,10 +80,7 @@ CLuaInterface::CLuaInterface()
     luaState = lua_open();
     
     if (!luaState)
-    {
-        std::cerr << "Could not open lua VM\n";
-        QCoreApplication::exit(1);
-    }
+        qFatal("Could not open lua VM\n");
     
     const luaL_Reg *lib = libtable;
     for (; lib->func; lib++)

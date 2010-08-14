@@ -12,8 +12,26 @@
 CControl::CControl(QObject *parent) : QObject(parent)
 {
     QStringList args(QCoreApplication::arguments());
-    QString port = (args.size() > 1) ? args.at(1) : "/dev/ttyUSB0";
-    
+    QString port = "/dev/ttyUSB0";
+    QString preva;
+    bool daemonize = false;
+
+    foreach(QString a, args)
+    {
+        if (preva == "-d")
+            port = a;
+        else if (a == "-D")
+            daemonize = true;
+        preva = a;
+    }
+
+    if (daemonize)
+    {
+        qInstallMsgHandler(daemonMsgHandler);
+        if (daemon(1, 0) == -1) // Keep working dir, close standard fd's
+            qFatal("Failed to daemonize!");
+    }
+
     serialPort = new CSerialPort(this, port);
     connect(serialPort, SIGNAL(textAvailable(const QByteArray &)), this,
             SLOT(handleSerialText(const QByteArray &)));
@@ -418,5 +436,36 @@ int CControl::luaPECalcPath(lua_State *l)
     {
         lua_pushboolean(l, false); // Failed to calc path
         return 1;
+    }
+}
+
+void CControl::daemonMsgHandler(QtMsgType type, const char *msg)
+{
+    QFile logfile("server.log");
+    QFile::OpenMode om = QFile::WriteOnly;
+
+    if (logfile.size() > (1024 * 1024 * 1024))
+        om |= QFile::Truncate;
+    else
+        om |= QFile::Append;
+
+    if (logfile.open(om))
+    {
+        QTextStream stream(&logfile);
+
+        stream << QDateTime::currentDateTime().toString() << " - ";
+
+        switch (type)
+        {
+        case QtDebugMsg: stream << "[Debug]: "; break;
+        case QtWarningMsg: stream << "[Warning]: "; break;
+        case QtCriticalMsg: stream << "[Critical]: "; break;
+        case QtFatalMsg: stream << "[Fatal]: "; break;
+        }
+
+        stream << " " << msg << "\n";
+
+        if (type == QtFatalMsg)
+            abort();
     }
 }

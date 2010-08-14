@@ -56,6 +56,8 @@ public:
     static int luaPESetGrid(lua_State *l);
     static int luaPEInitPath(lua_State *l);
     static int luaPECalcPath(lua_State *l);
+
+    static void daemonMsgHandler(QtMsgType type, const char *msg);
 };
 
 #endif
