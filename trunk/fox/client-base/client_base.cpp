@@ -36,9 +36,7 @@ CBaseClientTcpHandler::CBaseClientTcpHandler(CBaseClient *b) : baseClient(b),
 
 void CBaseClientTcpHandler::connectedToServer(void)
 {
-    CTcpWriter tcpWriter(clientSocket);
-    tcpWriter << static_cast<uint8_t>(TCP_GETSCRIPTS);
-    tcpWriter.write();
+    clientSocket->write(CTcpMsgComposer(TCP_GETSCRIPTS));
     
     baseClient->updateConnection(true);
     baseClient->appendLogOutput(QString("Connected to server (%1:%2)\n").
@@ -177,6 +175,12 @@ void CBaseClient::parseTcp(QDataStream &stream)
         stream >> script;
         tcpRequestedScript(script);
     }
+    else if (msg == TCP_SCRIPTRUNNING)
+    {
+        bool r;
+        stream >> r;
+        tcpScriptRunning(r);
+    }
     else if (msg == TCP_LUATEXT)
     {
         QString text;
@@ -245,12 +249,7 @@ void CBaseClient::executeCommand(const QString &cmd)
     appendLogOutput(QString("Executing RP6 console command: \"%1\"\n").arg(cmd));
     
     if (connected())
-    {
-        CTcpWriter tcpWriter(tcpHandler.getSocket());
-        tcpWriter << static_cast<uint8_t>(TCP_COMMAND);
-        tcpWriter << cmd;
-        tcpWriter.write();
-    }
+        tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_COMMAND) << cmd);
     else
         appendLogOutput("WARNING: Cannot execute command: not connected!\n");
 }
@@ -332,58 +331,35 @@ void CBaseClient::stopDrive()
 
 void CBaseClient::uploadLocalScript(const QString &name, const QByteArray &text)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_UPLOADLUA);
-    tcpWriter << name;
-    tcpWriter << text;
-    tcpWriter.write();   
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_UPLOADLUA) << name << text);
 }
 
 void CBaseClient::runLocalScript(const QByteArray &text)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_RUNLUA);
-    tcpWriter << text;
-    tcpWriter.write();   
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_RUNLUA) << text);
 }
 
 void CBaseClient::uploadRunLocalScript(const QString &name, const QByteArray &text)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_UPRUNLUA);
-    tcpWriter << name;
-    tcpWriter << text;
-    tcpWriter.write();
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_UPRUNLUA) << name << text);
 }
 
 void CBaseClient::runServerScript(const QString &name)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_RUNSERVERLUA);
-    tcpWriter << name;
-    tcpWriter.write();
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_RUNSERVERLUA) << name);
 }
 
 void CBaseClient::removeServerScript(const QString &name)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_REMOVESERVERLUA);
-    tcpWriter << name;
-    tcpWriter.write();
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_REMOVESERVERLUA) << name);
 }
 
 void CBaseClient::downloadServerScript(const QString &name)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_GETSERVERLUA);
-    tcpWriter << name;
-    tcpWriter.write();
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_GETSERVERLUA) << name);
 }
 
 void CBaseClient::executeScriptCommand(const QString &cmd, const QStringList &args)
 {
-    CTcpWriter tcpWriter(tcpHandler.getSocket());
-    tcpWriter << static_cast<uint8_t>(TCP_LUACOMMAND);
-    tcpWriter << cmd << args;
-    tcpWriter.write();
+    tcpHandler.getSocket()->write(CTcpMsgComposer(TCP_LUACOMMAND) << cmd << args);
 }

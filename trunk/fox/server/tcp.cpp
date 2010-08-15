@@ -73,3 +73,12 @@ void CTcpServer::clientHasData(QObject *obj)
         clientInfo[socket] = 0;
     }
 }
+
+void CTcpServer::send(const QByteArray &by)
+{
+    for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
+        it!=clientInfo.end(); ++it)
+    {
+        it.key()->write(by);
+    }
+}

@@ -132,6 +132,7 @@ function init()
     pathengine:setgrid(10, 10)
     setcell(startcell, 0, 0)
     setcell(goalcell, 0, 0)
+    sendmsg("enablepathclient", true)
 end
 
 function handlecmd(cmd, ...)
@@ -163,6 +164,10 @@ function run()
         end
         coroutine.yield()
     end
+end
+
+function finish()
+    sendmsg("enablepathclient", false)
 end
 
 return ret

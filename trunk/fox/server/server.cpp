@@ -98,6 +98,7 @@ void CControl::initSerial2TcpMap()
 
 void CControl::initLua()
 {
+    luaInterface.registerFunction(luaScriptRunning, "scriptrunning", this);
     luaInterface.registerFunction(luaExecCmd, "exec", this);
     luaInterface.registerFunction(luaSendText, "sendtext", this);
     luaInterface.registerFunction(luaSendMsg, "sendmsg", this);
@@ -310,6 +311,13 @@ void CControl::enableRP6Slave()
     serialPort->sendCommand("set slave 1");
 }
 
+int CControl::luaScriptRunning(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    control->tcpServer->send(TCP_SCRIPTRUNNING, static_cast<bool>(lua_toboolean(l, 1)));
+    return 0;
+}
+
 int CControl::luaExecCmd(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
@@ -337,7 +345,7 @@ int CControl::luaSendMsg(lua_State *l)
     for (int i=2; i<=nargs; ++i)
         args << lua_tostring(l, i);
 
-    control->tcpServer->send(TCP_LUAMSG, QString(msg), args);
+    control->tcpServer->send(CTcpMsgComposer(TCP_LUAMSG) << QString(msg) << args);
 
     return 0;
 }

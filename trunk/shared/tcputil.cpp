@@ -23,26 +23,27 @@
 #include "shared.h"
 #include "tcputil.h"
 
-CTcpWriter::CTcpWriter(QTcpSocket *s) : socket(s)
+CTcpMsgComposer::CTcpMsgComposer(ETcpMessage msg)
 {
     dataStream = new QDataStream(&block, QIODevice::WriteOnly);
     dataStream->setVersion(QDataStream::Qt_4_4);
     *dataStream << (quint32)0; // Reserve place for size
+    *dataStream << (quint8)msg;
 }
 
-CTcpWriter::~CTcpWriter()
+CTcpMsgComposer::~CTcpMsgComposer()
 {
     delete dataStream;
 }
 
-void CTcpWriter::write()
+CTcpMsgComposer::operator QByteArray()
 {
     // Put in the size
+    const quint64 pos = dataStream->device()->pos();
     dataStream->device()->seek(0);
     *dataStream << (quint32)(block.size() - sizeof(quint32));
-    
-    socket->write(block);
-    block.clear();
+    dataStream->device()->seek(pos); // Restore old position
+    return block;
 }
 
 

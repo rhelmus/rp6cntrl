@@ -40,7 +40,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     
     QLineEdit *serverEdit;
     QPushButton *connectButton;
-    QList<QWidget *> connectionDependentWidgets;
+    QList<QWidget *> connectionDependentWidgets, scriptDisabledWidgets;
     QPlainTextEdit *consoleOut;
     QLineEdit *consoleIn;
     QPlainTextEdit *logWidget;
@@ -109,6 +109,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     int currentScanPosition;
     QList<int> turretScanData;
     
+    // Lua editing
     CEditor *scriptEditor;
     QPushButton *downloadButton;
     QListWidget *localScriptListWidget, *serverScriptListWidget;
@@ -116,6 +117,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     QString downloadScript;
 
     // Navigation
+    bool robotNavEnabled;
     QGroupBox *robotNavControlGroup;
     QPushButton *robotNavSetStartButton, *robotNavSetGoalButton;
     CNavMap *robotNavMap;
@@ -175,6 +177,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     virtual void tcpHandleRobotData(ETcpMessage msg, int data);
     virtual void tcpLuaScripts(const QStringList &list);
     virtual void tcpRequestedScript(const QByteArray &text);
+    virtual void tcpScriptRunning(bool r);
     virtual void tcpHandleLuaMsg(const QString &msg, const QStringList &args);
     virtual void updateDriveSpeed(int left, int right);
     

@@ -28,30 +28,12 @@ private slots:
 
 public:
     CTcpServer(QObject *parent);
+    void send(const QByteArray &by);
 
+    // Convenience function
     template <typename C> void send(ETcpMessage msg, const C &value)
     {
-        for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
-            it!=clientInfo.end(); ++it)
-        {
-            CTcpWriter tcpWriter(it.key());
-            tcpWriter << static_cast<uint8_t>(msg);
-            tcpWriter << value;
-            tcpWriter.write();
-        }
-    }
-
-    template <typename C, typename D> void send(ETcpMessage msg, const C &value1,
-                                                const D &value2)
-    {
-        for (QMap<QTcpSocket *, quint32>::iterator it=clientInfo.begin();
-            it!=clientInfo.end(); ++it)
-        {
-            CTcpWriter tcpWriter(it.key());
-            tcpWriter << static_cast<uint8_t>(msg);
-            tcpWriter << value1 << value2;
-            tcpWriter.write();
-        }
+        send(CTcpMsgComposer(msg) << value);
     }
 
 signals:

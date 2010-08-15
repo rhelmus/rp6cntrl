@@ -90,6 +90,8 @@ function runscript(s)
     if curscript.init then
         curscript.init()
     end
+
+    scriptrunning(true)
 end
 
 function think()
@@ -100,6 +102,7 @@ function think()
                 curscript.finish()
             end
             curscript = nil
+            scriptrunning(false)
         end
     end 
 end

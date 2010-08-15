@@ -219,6 +219,7 @@ typedef enum
     // Fox
     TCP_LUASCRIPTS,
     TCP_REQUESTEDSCRIPT,
+    TCP_SCRIPTRUNNING,
     TCP_LUATEXT,
     TCP_LUAMSG,
 
