@@ -27,24 +27,22 @@
 
 #include "shared.h"
 
-class QTcpSocket;
-
-class CTcpWriter
+class CTcpMsgComposer
 {
-    QTcpSocket *socket;
     QByteArray block;
     QDataStream *dataStream;
-    
+
 public:
-    CTcpWriter(QTcpSocket *s);
-    ~CTcpWriter(void);
+    CTcpMsgComposer(ETcpMessage msg);
+    ~CTcpMsgComposer(void);
 
-    void write(void);
-
-    template <typename C> QDataStream &operator <<(const C &data)
+    template <typename C> CTcpMsgComposer &operator <<(const C &data)
     {
-        return (*dataStream << data);
+        *dataStream << data;
+        return *this;
     }
+
+    operator QByteArray(void);
 };
 
 typedef enum { DATA_BYTE=0, DATA_WORD } EDataType;

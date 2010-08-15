@@ -52,6 +52,7 @@ class CBaseClient
     virtual void tcpHandleRobotData(ETcpMessage msg, int data) = 0;
     virtual void tcpLuaScripts(const QStringList &) { }
     virtual void tcpRequestedScript(const QByteArray &) { }
+    virtual void tcpScriptRunning(bool) { }
     virtual void tcpHandleLuaMsg(const QString &, const QStringList &) { }
     virtual void updateDriveSpeed(int left, int right) = 0;
 

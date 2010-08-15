@@ -125,8 +125,8 @@ float standardDeviation(const QList<int> &values)
 CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
                          remainingACSScanCycles(0), isTurretScanning(false), turretScanEndRange(0),
                          turretScanResolution(0), turretScanTime(0), turretScanDelay(0),
-                         currentScanPosition(0), previousScriptItem(NULL), simNavUpdatePathGrid(true),
-                         firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
+                         currentScanPosition(0), previousScriptItem(NULL), robotNavEnabled(false),
+                         simNavUpdatePathGrid(true), firstStateUpdate(false), ACSPowerState(ACS_POWER_OFF)
 {
     QTabWidget *mainTab = new QTabWidget;
     mainTab->setTabPosition(QTabWidget::West);
@@ -550,6 +550,7 @@ QWidget *CQtClient::createDriveWidget()
 {
     QWidget *ret = new QWidget;
     connectionDependentWidgets << ret;
+    scriptDisabledWidgets << ret;
     
     QHBoxLayout *hbox = new QHBoxLayout(ret);
     
@@ -599,6 +600,7 @@ QWidget *CQtClient::createScannerWidget()
 {
     QWidget *ret = new QWidget;
     connectionDependentWidgets << ret;
+    scriptDisabledWidgets << ret;
     
     QHBoxLayout *hbox = new QHBoxLayout(ret);
     
@@ -629,6 +631,7 @@ QWidget *CQtClient::createIRTurretWidget()
 {
     QWidget *ret = new QWidget;
     connectionDependentWidgets << ret;
+    scriptDisabledWidgets << ret;
     
     QHBoxLayout *hbox = new QHBoxLayout(ret);
     
@@ -730,10 +733,12 @@ QWidget *CQtClient::createLocalLuaWidget()
     vbox->addWidget(button = new QPushButton("Run"));
     connect(button, SIGNAL(clicked()), this, SLOT(runLocalScriptPressed()));
     connectionDependentWidgets << button;
+    scriptDisabledWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Upload && Run"));
     connect(button, SIGNAL(clicked()), this, SLOT(uploadRunLocalScriptPressed()));
     connectionDependentWidgets << button;
+    scriptDisabledWidgets << button;
     
     return ret;
 }
@@ -753,6 +758,7 @@ QWidget *CQtClient::createServerLuaWidget()
     vbox->addWidget(button);
     connect(button, SIGNAL(clicked()), this, SLOT(runServerScriptPressed()));
     connectionDependentWidgets << button;
+    scriptDisabledWidgets << button;
     
     vbox->addWidget(button = new QPushButton("Remove"));
     connect(button, SIGNAL(clicked()), this, SLOT(removeServerScriptPressed()));
@@ -1139,10 +1145,21 @@ void CQtClient::tcpRequestedScript(const QByteArray &text)
     downloadButton->setEnabled(true);
 }
 
+void CQtClient::tcpScriptRunning(bool r)
+{
+    for (QList<QWidget *>::iterator it=scriptDisabledWidgets.begin();
+         it!=scriptDisabledWidgets.end(); ++it)
+        (*it)->setEnabled(r);
+}
+
 void CQtClient::tcpHandleLuaMsg(const QString &msg, const QStringList &args)
 {
-    // UNDONE: Check if bot is actually navigating
-    if (msg == "robotcell")
+    if (msg == "enablepathclient")
+    {
+        robotNavEnabled = (args[0] == "true");
+        robotNavControlGroup->setEnabled(robotNavEnabled);
+    }
+    else if (robotNavEnabled && (msg == "robotcell"))
     {
         const QPoint cell(args[0].toInt(), args[1].toInt());
         robotNavMap->setRobot(cell);

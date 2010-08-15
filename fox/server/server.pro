@@ -4,7 +4,8 @@ HEADERS += serial.h \
     server.h \
     tcp.h \
     shared.h \
-    lua.h
+    lua.h \
+    ../../shared/tcputil.h
 SOURCES += serial.cpp \
     tcp.cpp \
     server.cpp \
@@ -21,4 +22,5 @@ SOURCES += tcputil.cpp
 INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua
 OTHER_FILES += main.lua \
-    main.lua
+    main.lua \
+    ../scripts/nav.lua
