@@ -39,6 +39,7 @@ CControl::CControl(QObject *parent) : QObject(parent)
             this, SLOT(handleSerialMSG(ESerialMessage, const QByteArray &)));
 
     tcpServer = new CTcpServer(this);
+    connect(tcpServer, SIGNAL(newConnection()), this, SLOT(clientConnected()));
     connect(tcpServer, SIGNAL(clientTcpReceived(QDataStream &)), this,
             SLOT(parseClientTcp(QDataStream &)));
 
@@ -142,6 +143,13 @@ void CControl::initLua()
     luaInterface.exec();
 }
 
+void CControl::runScript(const QByteArray &script)
+{
+    luaInterface.runScript(script);
+    if (tcpServer->hasConnections())
+        luaInterface.scriptInitClient();
+}
+
 CControl::TLuaScriptMap CControl::getLuaScripts()
 {
     QSettings settings;
@@ -228,6 +236,11 @@ void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
     lua_pop(luaInterface, 1); // Pop sensortable
 }
 
+void CControl::clientConnected()
+{
+    luaInterface.scriptInitClient();
+}
+
 void CControl::parseClientTcp(QDataStream &stream)
 {
     uint8_t m;
@@ -250,7 +263,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         QByteArray script;
         stream >> script;
         qDebug() << "Received script:\n" << script;
-        luaInterface.runScript(script.constData());
+        runScript(script.constData());
     }
     else if ((msg == TCP_UPLOADLUA) || (msg == TCP_UPRUNLUA))
     {
@@ -265,7 +278,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         sendLuaScripts();
 
         if (msg == TCP_UPRUNLUA)
-            luaInterface.runScript(script);
+            runScript(script);
     }
     else if (msg == TCP_RUNSERVERLUA)
     {
@@ -274,7 +287,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         
         TLuaScriptMap scripts = getLuaScripts();
         if (scripts.find(name) != scripts.end())
-            luaInterface.runScript(scripts[name].toByteArray());
+            runScript(scripts[name].toByteArray());
     }
     else if (msg == TCP_REMOVESERVERLUA)
     {
@@ -340,12 +353,26 @@ int CControl::luaSendMsg(lua_State *l)
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
     const char *msg = luaL_checkstring(l, 1);
     const int nargs = lua_gettop(l);
-    QStringList args;
+
+    CTcpMsgComposer comp(TCP_LUAMSG);
+
+    comp << QString(msg);
 
     for (int i=2; i<=nargs; ++i)
-        args << lua_tostring(l, i);
+    {
+        switch (lua_type(l, i))
+        {
+        case LUA_TBOOLEAN: comp << static_cast<bool>(lua_toboolean(l, i)); break;
+        case LUA_TNUMBER: comp << static_cast<float>(lua_tonumber(l, i)); break;
+        default:
+            qWarning() << "Unknown type: " << lua_typename(l, i) <<
+                    ". Converting to string...";
+            // Fall through
+        case LUA_TSTRING: comp << QString(lua_tostring(l, i)); break;
+        }
+    }
 
-    control->tcpServer->send(CTcpMsgComposer(TCP_LUAMSG) << QString(msg) << args);
+    control->tcpServer->send(comp);
 
     return 0;
 }

@@ -31,12 +31,14 @@ class CControl: public QObject
 
     void initSerial2TcpMap(void);
     void initLua(void);
+    void runScript(const QByteArray &script);
     TLuaScriptMap getLuaScripts(void);
     void sendLuaScripts(void);
 
 private slots:
     void handleSerialText(const QByteArray &text);
     void handleSerialMSG(ESerialMessage msg, const QByteArray &data);
+    void clientConnected(void);
     void parseClientTcp(QDataStream &stream);
     void enableRP6Slave(void);
     

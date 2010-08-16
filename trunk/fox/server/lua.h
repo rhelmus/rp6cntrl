@@ -36,6 +36,7 @@ public:
     void createClass(void *data, const char *type, lua_CFunction destr = NULL);
     void runScript(const QByteArray &s);
     void execScriptCmd(const QString &cmd, const QStringList &args);
+    void scriptInitClient(void);
 
     operator lua_State*(void) { return luaState; }
 };

@@ -39,6 +39,8 @@ void CTcpServer::clientConnected()
     clientDataMapper->setMapping(socket, socket);
     
     clientInfo[socket] = 0;
+
+    emit newConnection();
 }
 
 void CTcpServer::clientDisconnected(QObject *obj)

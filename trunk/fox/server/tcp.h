@@ -36,7 +36,10 @@ public:
         send(CTcpMsgComposer(msg) << value);
     }
 
+    bool hasConnections(void) const { return !clientInfo.isEmpty(); }
+
 signals:
+    void newConnection(void);
     void clientTcpReceived(QDataStream &stream);
 };
 

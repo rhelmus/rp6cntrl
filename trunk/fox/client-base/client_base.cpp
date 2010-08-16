@@ -190,9 +190,8 @@ void CBaseClient::parseTcp(QDataStream &stream)
     else if (msg == TCP_LUAMSG)
     {
         QString msg;
-        QStringList args;
-        stream >> msg >> args;
-        tcpHandleLuaMsg(msg, args);
+        stream >> msg;
+        tcpHandleLuaMsg(msg, stream);
     }
 }
 

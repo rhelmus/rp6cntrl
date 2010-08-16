@@ -53,7 +53,7 @@ class CBaseClient
     virtual void tcpLuaScripts(const QStringList &) { }
     virtual void tcpRequestedScript(const QByteArray &) { }
     virtual void tcpScriptRunning(bool) { }
-    virtual void tcpHandleLuaMsg(const QString &, const QStringList &) { }
+    virtual void tcpHandleLuaMsg(const QString &, QDataStream &) { }
     virtual void updateDriveSpeed(int left, int right) = 0;
 
     friend class CBaseClientTcpHandler;

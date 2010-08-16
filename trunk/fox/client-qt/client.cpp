@@ -800,9 +800,8 @@ QWidget *CQtClient::createRobotNavWidget()
     
     QHBoxLayout *subhbox = new QHBoxLayout(robotNavControlGroup);
 
-    QPushButton *button = new QPushButton("Start");
-    connect(button, SIGNAL(clicked()), this, SLOT(robotNavStartPressed()));
-    subhbox->addWidget(button);
+    subhbox->addWidget(robotNavStartButton = new QPushButton("Start"));
+    connect(robotNavStartButton, SIGNAL(clicked()), this, SLOT(robotNavStartPressed()));
 
     subhbox->addWidget(robotNavSetStartButton = new QPushButton("Set start"));
     connect(robotNavSetStartButton, SIGNAL(toggled(bool)), this,
@@ -814,8 +813,8 @@ QWidget *CQtClient::createRobotNavWidget()
             SLOT(robotNavSetGoalToggled(bool)));
     robotNavSetGoalButton->setCheckable(true);
 
-    subhbox->addWidget(button = new QPushButton("Grid size..."));
-    connect(button, SIGNAL(clicked()), this, SLOT(robotNavSetGridPressed()));
+    subhbox->addWidget(robotNavSetGridButton = new QPushButton("Grid size..."));
+    connect(robotNavSetGridButton, SIGNAL(clicked()), this, SLOT(robotNavSetGridPressed()));
 
     return split;
 }
@@ -955,6 +954,14 @@ void CQtClient::stopACSScan()
 {
     isACSScanning = false;
     ACSScanButton->setEnabled(true);
+}
+
+void CQtClient::robotNavUpdateNavigating(bool n)
+{
+    robotNavStartButton->setText((n) ? "Abort" : "Start");
+    robotNavSetStartButton->setEnabled(!n);
+    robotNavSetGoalButton->setEnabled(!n);
+    robotNavSetGridButton->setEnabled(!n);
 }
 
 void CQtClient::setServo(int pos)
@@ -1152,17 +1159,24 @@ void CQtClient::tcpScriptRunning(bool r)
         (*it)->setEnabled(r);
 }
 
-void CQtClient::tcpHandleLuaMsg(const QString &msg, const QStringList &args)
+void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
 {
     if (msg == "enablepathclient")
     {
-        robotNavEnabled = (args[0] == "true");
+        args >> robotNavEnabled;
         robotNavControlGroup->setEnabled(robotNavEnabled);
     }
     else if (robotNavEnabled && (msg == "robotcell"))
     {
-        const QPoint cell(args[0].toInt(), args[1].toInt());
-        robotNavMap->setRobot(cell);
+        float x, y;
+        args >> x >> y;
+        robotNavMap->setRobot(QPoint(x, y));
+    }
+    else if (robotNavEnabled && (msg == "navigating"))
+    {
+        bool n;
+        args >> n;
+        robotNavUpdateNavigating(n);
     }
 }
 
@@ -1527,7 +1541,10 @@ void CQtClient::downloadServerScriptPressed()
 
 void CQtClient::robotNavStartPressed()
 {
-    executeScriptCommand("start");
+    if (robotNavStartButton->text() == "Start")
+        executeScriptCommand("start");
+    else
+        executeScriptCommand("abort");
 }
 
 void CQtClient::robotNavSetStartToggled(bool e)

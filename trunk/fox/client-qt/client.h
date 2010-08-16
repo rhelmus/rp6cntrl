@@ -119,7 +119,8 @@ class CQtClient: public QMainWindow, public CBaseClient
     // Navigation
     bool robotNavEnabled;
     QGroupBox *robotNavControlGroup;
-    QPushButton *robotNavSetStartButton, *robotNavSetGoalButton;
+    QPushButton *robotNavStartButton;
+    QPushButton *robotNavSetStartButton, *robotNavSetGoalButton, *robotNavSetGridButton;
     CNavMap *robotNavMap;
     CPathEngine simNavPathEngine;
     bool simNavUpdatePathGrid;
@@ -166,6 +167,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     
     void updateACSScan(const SStateSensors &oldstate, const SStateSensors &newstate);
     void stopACSScan(void);
+    void robotNavUpdateNavigating(bool n);
     void setServo(int pos);
     bool checkScriptSave(void);
     void stopSimNav(void);
@@ -178,7 +180,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     virtual void tcpLuaScripts(const QStringList &list);
     virtual void tcpRequestedScript(const QByteArray &text);
     virtual void tcpScriptRunning(bool r);
-    virtual void tcpHandleLuaMsg(const QString &msg, const QStringList &args);
+    virtual void tcpHandleLuaMsg(const QString &msg, QDataStream &args);
     virtual void updateDriveSpeed(int left, int right);
     
 private slots:

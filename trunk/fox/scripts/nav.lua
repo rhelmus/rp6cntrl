@@ -25,6 +25,8 @@ local function settask(task)
     if not task then
         print("Cleared task")
     end
+    
+    sendmsg("navigating", (task ~= nil))
 end
 
 -- Declare tasks
@@ -132,7 +134,11 @@ function init()
     pathengine:setgrid(10, 10)
     setcell(startcell, 0, 0)
     setcell(goalcell, 0, 0)
+end
+
+function initclient()
     sendmsg("enablepathclient", true)
+    sendmsg("navigating", (currenttask ~= nil))
 end
 
 function handlecmd(cmd, ...)
@@ -144,6 +150,8 @@ function handlecmd(cmd, ...)
         if not currenttask then
             settask(taskInitPath)
         end
+    elseif cmd == "abort" then
+        settask(nil)
     elseif cmd == "setstart" then
         setcell(startcell, args[1], args[2])
     elseif cmd == "setgoal" then

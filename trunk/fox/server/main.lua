@@ -114,6 +114,12 @@ function execcmd(cmd, ...)
     end
 end
 
+function initclient()
+    if curscript and curscript.initclient then
+        curscript.initclient()
+    end
+end
+
 function makescript()
     local ret = { }
     setmetatable(ret, { __index = _G })
