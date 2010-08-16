@@ -208,3 +208,10 @@ void CLuaInterface::execScriptCmd(const QString &cmd, const QStringList &args)
     if (lua_pcall(luaState, 1 + args.size(), 0, 0))
         luaError(luaState);
 }
+
+void CLuaInterface::scriptInitClient()
+{
+    lua_getglobal(luaState, "initclient");
+    if (lua_pcall(luaState, 0, 0, 0))
+        luaError(luaState);
+}
