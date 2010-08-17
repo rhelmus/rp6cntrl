@@ -20,11 +20,13 @@ private:
     struct SCell
     {
         int obstacles;
-        SCell(void) : obstacles(OBSTACLE_NONE) {}
+        bool inPath;
+        SCell(void) : obstacles(OBSTACLE_NONE), inPath(false) {}
     };
 
     QVector<QVector<SCell> > grid;
     QPoint startPos, goalPos, robotPos;
+    int robotRotation;
     EEditMode editMode;
     bool blockEditMode;
     QPoint currentMouseCell;
@@ -48,9 +50,11 @@ public:
     CNavMap(QWidget *parent = 0, Qt::WindowFlags f = 0);
 
     void setGrid(const QSize &size);
+    void setPath(const QList<QPoint> &path);
     void setStart(const QPoint &pos) { startPos = pos; update(); }
     void setGoal(const QPoint &pos) { goalPos = pos; update(); }
-    void setRobot(const QPoint &pos) { robotPos = pos; update(); }
+    void setRobot(const QPoint &pos);
+    void setRobotRotation(int r) { robotRotation = r; update(); }
     void markObstacle(const QPoint &pos, int o);
     QPoint getRobot(void) const { return robotPos; }
     QPoint getStart(void) const { return startPos; }

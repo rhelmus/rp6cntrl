@@ -180,6 +180,7 @@ void CBaseClient::parseTcp(QDataStream &stream)
         bool r;
         stream >> r;
         tcpScriptRunning(r);
+        qDebug() << "script running:" << r;
     }
     else if (msg == TCP_LUATEXT)
     {

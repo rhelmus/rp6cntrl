@@ -1,10 +1,17 @@
 local ret = makescript()
 
 local currenttask = nil
+local gridsize = { }
 local startcell, goalcell = { }, { }
 local pathengine = nil
 local currentpath, currentcell = nil, nil
 local currentangle, targetangle = 0, 0
+
+local function setgrid(w, h)
+    gridsize.w = w
+    gridsize.h = h
+    pathengine:setgrid(w, h)
+end
 
 local function setcell(c, x, y)
     c.x = x
@@ -24,6 +31,7 @@ local function settask(task)
     
     if not task then
         print("Cleared task")
+        currentpath = nil
     end
     
     sendmsg("navigating", (task ~= nil))
@@ -41,6 +49,7 @@ taskInitPath =
         stat, currentpath = pathengine:calc()
         if stat then
             print("Calculated path!")
+            sendmsg("path", currentpath)
             currentcell = table.remove(currentpath, 1) -- Remove first cell (startcell)
             currentangle = 0
             return true, taskMoveToNextNode
@@ -56,10 +65,12 @@ taskMoveToNextNode =
     init = function(self)
         local nextcell = table.remove(currentpath, 1)
         
-        if currentcell.x < nextcell.x then
+        if currentcell.x > nextcell.x then
             targetangle = 270
-        elseif currentcell.x > nextcell.x then
+        elseif currentcell.x < nextcell.x then
             targetangle = 90
+        elseif currentcell.y > nextcell.y then
+            targetangle = 180
         else
             targetangle = 0
         end
@@ -84,16 +95,17 @@ taskMoveToNextNode =
             self.status = "rotating"
             currentangle = targetangle
         elseif self.status == "rotating" then
-            if getstate().movecomplete then
+            if true or getstate().movecomplete then
                 self.status = "startmove"
                 getstate().movecomplete = false
+                sendmsg("rotation", currentangle)
             end
         elseif self.status == "startmove" then
             print("Moving 300 mm")
             move(300) -- UNDONE: Grid size
             self.status = "moving"
         elseif self.status == "moving" then
-            if getstate().movecomplete then
+            if true or getstate().movecomplete then
                 sendmsg("robotcell", currentcell.x, currentcell.y)
                 getstate().movecomplete = false
                 
@@ -113,7 +125,47 @@ taskMoveToNextNode =
 
 taskIRScan =
 {
+    init = function(self)
+        self.status = "setturret"
+        self.targetangle = 0
+        self.scanarray = { }
+    end,
+    
     run = function(self)
+        if self.status == "setturret" then
+            setservo(self.targetangle)
+            -- UNDONE: Verify/tweak
+            if self.targetangle == 0 then -- Wait longer for first
+                self.wait = gettimems() + 500
+            else
+                self.wait = gettimems() + 100
+            end
+            self.status = "wait"
+        elseif self.status == "wait" then
+            if self.wait < gettimems() then
+                self.status = "scan"
+                self.scantime = gettimems() + 150 -- ~3-5 scans (30-50 ms)
+                self.scandelay = 0
+            end
+        elseif self.status == "scan" then
+            if self.scantime < gettimems() then
+                self.targetangle = self.targetangle + 25 -- UNDONE
+                if self.targetangle > 180 then
+                    return true, taskMoveToNextNode
+                end
+                setservo(self.targetangle)
+                self.status = "setturret"
+            elseif self.scandelay < gettimems() then
+                self.scandelay = gettimems() + 50 -- UNDONE
+                self.scanarray[self.targetangle] = self.scanarray[self.targetangle] or { }
+                table.insert(self.scanarray[self.targetangle], getsharpir())
+                print(string.format("scan[%d] = %d", self.targetangle,
+                                    self.scanarray[self.targetangle][#self.scanarray[self.targetangle]]))
+            end
+        end
+
+        return false
+        --[[
     -- UNDONE
         if not timeout then
             timeout = gettimems()
@@ -124,6 +176,7 @@ taskIRScan =
         else
             return false
         end
+        --]]
     end
 }
 
@@ -131,14 +184,21 @@ taskIRScan =
 -- Module functions
 function init()
     pathengine = newpathengine()
-    pathengine:setgrid(10, 10)
+    setgrid(10, 10, false)
     setcell(startcell, 0, 0)
-    setcell(goalcell, 0, 0)
+    setcell(goalcell, 9, 9)
 end
 
 function initclient()
     sendmsg("enablepathclient", true)
+    sendmsg("grid", gridsize.w, gridsize.h)
+    sendmsg("start", startcell.x, startcell.y)
+    sendmsg("goal", goalcell.x, goalcell.y)
     sendmsg("navigating", (currenttask ~= nil))
+    
+    if currentpath then
+        sendmsg("path", currentpath)
+    end
 end
 
 function handlecmd(cmd, ...)
@@ -157,7 +217,7 @@ function handlecmd(cmd, ...)
     elseif cmd == "setgoal" then
         setcell(goalcell, args[1], args[2])
     elseif cmd == "setgrid" then
-        pathengine:setgrid(args[1], args[2], args[3], args[4])
+        setgrid(args[1], args[2])
     end
         
 end

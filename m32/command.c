@@ -38,7 +38,7 @@ static const char setUsageStr[] PROGMEM =
     "beep\t\tSets beeper pitch. Usage: pitch\n"
     "slave\t\tEnables or disables slave mode. Usage: boolean.\n"
     "slavemic\t\tSlave mic update time. Usage: time in msec.\n"
-    "servo\t\tServo position. Usage: 0..255.\n"
+    "servo\t\tServo position. Usage: 0..180.\n"
     "srange\t\tServo touch range. Usage: left, right\n";
 
 static const char dumpUsageStr[] PROGMEM =

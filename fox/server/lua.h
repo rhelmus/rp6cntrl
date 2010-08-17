@@ -1,4 +1,5 @@
 #include <QByteArray>
+#include <QMap>
 #include <QObject>
 #include <QString>
 
@@ -41,8 +42,13 @@ public:
     operator lua_State*(void) { return luaState; }
 };
 
+inline int luaAbsIndex(lua_State *l, int i)
+{ return ((i < 0) && (i > LUA_REGISTRYINDEX)) ? (lua_gettop(l)+1)+i : i; }
+
 template <typename C> C *checkClassData(lua_State *l, int index, const char *type)
 {
     void **p = static_cast<void **>(luaL_checkudata(l, index, type));
     return static_cast <C*>(*p);
 }
+
+QMap<QString, QVariant> convertLuaTable(lua_State *l, int index);

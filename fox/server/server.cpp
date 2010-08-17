@@ -369,6 +369,7 @@ int CControl::luaSendMsg(lua_State *l)
                     ". Converting to string...";
             // Fall through
         case LUA_TSTRING: comp << QString(lua_tostring(l, i)); break;
+        case LUA_TTABLE: comp << convertLuaTable(l, i); break;
         }
     }
 
