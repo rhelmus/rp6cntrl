@@ -773,8 +773,6 @@ QWidget *CQtClient::createServerLuaWidget()
 
 QWidget *CQtClient::createRobotNavWidget()
 {
-    const QSize gridsize(10, 10);
-
     QSplitter *split = new QSplitter(Qt::Vertical);
 
     QGroupBox *group = new QGroupBox("Navigation map");
@@ -787,9 +785,6 @@ QWidget *CQtClient::createRobotNavWidget()
     vbox->addWidget(scroll);
 
     scroll->setWidget(robotNavMap = new CNavMap);
-    robotNavMap->setGrid(gridsize);
-    robotNavMap->setStart(QPoint(0, 0));
-    robotNavMap->setGoal(QPoint(gridsize.width()-1, gridsize.height()-1));
 
     QWidget *w = new QWidget;
     split->addWidget(w);
@@ -797,7 +792,8 @@ QWidget *CQtClient::createRobotNavWidget()
     QHBoxLayout *hbox = new QHBoxLayout(w);
 
     hbox->addWidget(robotNavControlGroup = new QGroupBox("Control"));
-    
+    robotNavControlGroup->setEnabled(false);
+
     QHBoxLayout *subhbox = new QHBoxLayout(robotNavControlGroup);
 
     subhbox->addWidget(robotNavStartButton = new QPushButton("Start"));
@@ -1156,27 +1152,68 @@ void CQtClient::tcpScriptRunning(bool r)
 {
     for (QList<QWidget *>::iterator it=scriptDisabledWidgets.begin();
          it!=scriptDisabledWidgets.end(); ++it)
-        (*it)->setEnabled(r);
+        (*it)->setEnabled(!r);
 }
 
 void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
 {
+    qDebug() << "Received msg:" << msg;
+
     if (msg == "enablepathclient")
     {
         args >> robotNavEnabled;
         robotNavControlGroup->setEnabled(robotNavEnabled);
     }
-    else if (robotNavEnabled && (msg == "robotcell"))
+    // Keep this block at the bottom!
+    else if (robotNavEnabled)
     {
-        float x, y;
-        args >> x >> y;
-        robotNavMap->setRobot(QPoint(x, y));
-    }
-    else if (robotNavEnabled && (msg == "navigating"))
-    {
-        bool n;
-        args >> n;
-        robotNavUpdateNavigating(n);
+        if (msg == "grid")
+        {
+            float w, h;
+            args >> w >> h;
+            robotNavMap->setGrid(QSize(w, h));
+        }
+        else if ((msg == "start") || (msg == "goal"))
+        {
+            float x, y;
+            args >> x >> y;
+            if (msg == "start")
+                robotNavMap->setStart(QPoint(x, y));
+            else
+                robotNavMap->setGoal(QPoint(x, y));
+        }
+        else if (msg == "navigating")
+        {
+            bool n;
+            args >> n;
+            robotNavUpdateNavigating(n);
+        }
+        else if (msg == "path")
+        {
+            QMap<QString, QVariant> p;
+            args >> p;
+            QList<QPoint> path;
+
+            for (QMap<QString, QVariant>::iterator it=p.begin(); it!=p.end(); ++it)
+            {
+                const QMap<QString, QVariant> coord(it.value().toMap());
+                path << QPoint(coord["x"].toInt(), coord["y"].toInt());
+            }
+
+            robotNavMap->setPath(path);
+        }
+        else if (msg == "robotcell")
+        {
+            float x, y;
+            args >> x >> y;
+            robotNavMap->setRobot(QPoint(x, y));
+        }
+        else if (msg == "rotation")
+        {
+            float r;
+            args >> r;
+            robotNavMap->setRobotRotation(r);
+        }
     }
 }
 

@@ -115,14 +115,17 @@ function execcmd(cmd, ...)
 end
 
 function initclient()
+    print("initclient:", tostring(curscript ~= nil))
+    scriptrunning(curscript ~= nil)
+
     if curscript and curscript.initclient then
         curscript.initclient()
-    end
+    end    
 end
 
 function makescript()
     local ret = { }
     setmetatable(ret, { __index = _G })
-    setfenv(0, ret)
+    setfenv(2, ret)
     return ret
 end

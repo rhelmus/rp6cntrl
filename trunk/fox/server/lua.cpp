@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QStringList>
 #include <QTimer>
+#include <QVariant>
 
 #include "lua.h"
 
@@ -214,4 +215,35 @@ void CLuaInterface::scriptInitClient()
     lua_getglobal(luaState, "initclient");
     if (lua_pcall(luaState, 0, 0, 0))
         luaError(luaState);
+}
+
+QMap<QString, QVariant> convertLuaTable(lua_State *l, int index)
+{
+    QMap<QString, QVariant> ret;
+    const int tabind = luaAbsIndex(l, index);
+
+    stackDump(l);
+
+    lua_pushnil(l);
+    while (lua_next(l, tabind))
+    {
+        QVariant v;
+        switch (lua_type(l, -1))
+        {
+        case LUA_TBOOLEAN: v.setValue(static_cast<bool>(lua_toboolean(l, -1))); break;
+        case LUA_TNUMBER: v.setValue(static_cast<float>(lua_tonumber(l, -1))); break;
+        default:
+        case LUA_TSTRING: v.setValue(QString(lua_tostring(l, -1))); break;
+        case LUA_TTABLE: v.setValue(convertLuaTable(l, -1)); break;
+        }
+
+        // According to manual we cannot use tostring directly on keys.
+        // Therefore duplicate the key first
+        lua_pushvalue(l, -2);
+        ret[lua_tostring(l, -1)] = v;
+
+        lua_pop(l, 2); // Remove duplicate key and value, keep original key
+    }
+
+    return ret;
 }

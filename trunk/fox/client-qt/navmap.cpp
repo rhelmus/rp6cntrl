@@ -5,7 +5,7 @@
 #include "navmap.h"
 
 CNavMap::CNavMap(QWidget *parent, Qt::WindowFlags f) : QWidget(parent, f),
-                  startPos(-1, -1), goalPos(-1, -1), robotPos(-1, -1),
+                  startPos(-1, -1), goalPos(-1, -1), robotPos(-1, -1), robotRotation(0),
                   editMode(EDIT_NONE), blockEditMode(false)
 {
 }
@@ -109,7 +109,7 @@ void CNavMap::paintEvent(QPaintEvent *event)
                 {
                     painter.setPen(QPen(Qt::gray, 1));
                     painter.drawRect(rect);
-                    painter.fillRect(rect, Qt::white);
+                    painter.fillRect(rect, (grid[x][y].inPath) ? Qt::green : Qt::white);
 
                     if ((editMode != EDIT_NONE) && (currentMouseCell.x() == x) && (currentMouseCell.y() == y))
                     {
@@ -129,8 +129,20 @@ void CNavMap::paintEvent(QPaintEvent *event)
                     if ((robotPos.x() == x) && (robotPos.y() == y))
                     {
                         painter.setPen(QPen(Qt::black, 3));
-                        painter.drawRect(rect.adjusted(10, 15, -10, -15));
+                        const QRect r(rect.adjusted(12, 8, -12, -8));
+
+                        if (robotRotation)
+                        {
+                            // From http://wiki.forum.nokia.com/index.php/CS001514_-_Rotate_picture_in_Qt
+                            const QPoint c(r.center());
+                            painter.translate(c);
+                            painter.rotate(robotRotation);
+                            painter.translate(-c);
+                        }
+
+                        painter.drawRect(r);
                         painter.drawText(rect, Qt::AlignCenter, "R");
+                        painter.resetTransform();
                     }
 
                     if (grid[x][y].obstacles != OBSTACLE_NONE)
@@ -214,6 +226,32 @@ void CNavMap::setGrid(const QSize &size)
     grid.resize(size.width());
     grid.fill(QVector<SCell>(size.height()));
     adjustSize();
+}
+
+void CNavMap::setPath(const QList<QPoint> &path)
+{
+    const QSize size(getGridSize());
+
+    // First reset all cells
+    for (int x=0; x<size.width(); ++x)
+    {
+        for (int y=0; y<size.height(); ++y)
+            grid[x][y].inPath = false;
+    }
+
+    foreach(QPoint cell, path)
+    {
+        grid[cell.x()][cell.y()].inPath = true;
+    }
+
+    update();
+}
+
+void CNavMap::setRobot(const QPoint &pos)
+{
+    robotPos = pos;
+    grid[pos.x()][pos.y()].inPath = false;
+    update();
 }
 
 void CNavMap::markObstacle(const QPoint &pos, int o)
