@@ -60,6 +60,13 @@ function setservo(angle)
     exec(string.format("set servo %d", angle))
 end
 
+function beep(pitch, time)
+    exec(string.format("beep %d %d", pitch, time))
+end
+
+function sound(pitch, time, delay)
+    exec(string.format("sound %d %d %d", pitch, time, delay))
+end
 
 -- Misc functions
 
@@ -68,13 +75,23 @@ function print(s, ...)
     oldprint(s, ...)
 
     if ... then
-        sendtext(s .. table.concat({...}, "\t"))
+        sendtext(s .. "\t" .. table.concat({...}, "\t") .. "\n")
     else
-        sendtext(s)
+        sendtext(s .. "\n")
     end
 end
 
+-- External script functions
 local curscript = nil
+
+local function calloptscriptfunc(f, ...)
+    -- Use rawget to avoid obtaining data from global environment
+    local func = rawget(curscript, f)
+    if func then
+        func(...)
+    end
+end
+
 function runscript(s)
     local stat, ret = pcall(assert(loadstring(s)))
 
@@ -87,9 +104,7 @@ function runscript(s)
     
     curscript.corun = coroutine.create(curscript.run)
     
-    if curscript.init then
-        curscript.init()
-    end
+    calloptscriptfunc("init")
 
     scriptrunning(true)
 end
@@ -98,9 +113,7 @@ function think()
     if curscript then
         assert(coroutine.resume(curscript.corun))
         if coroutine.status(curscript.corun) == "dead" then
-            if curscript.finish then
-                curscript.finish()
-            end
+            calloptscriptfunc("finish")
             curscript = nil
             scriptrunning(false)
         end
@@ -109,18 +122,24 @@ end
 
 function execcmd(cmd, ...)
     print("Executing script cmd:", cmd)
-    if curscript and curscript.handlecmd then
-        curscript.handlecmd(cmd, ...)
+    
+    if cmd == "abortcurrentscript" then
+        if curscript then
+            calloptscriptfunc("finish")
+            curscript = nil
+            scriptrunning(false)
+        end
+    elseif curscript then
+        calloptscriptfunc("handlecmd", cmd, ...)
     end
 end
 
 function initclient()
     print("initclient:", tostring(curscript ~= nil))
     scriptrunning(curscript ~= nil)
-
-    if curscript and curscript.initclient then
-        curscript.initclient()
-    end    
+    if curscript then
+        calloptscriptfunc("initclient")
+    end
 end
 
 function makescript()

@@ -186,7 +186,7 @@ void CBaseClient::parseTcp(QDataStream &stream)
     {
         QString text;
         stream >> text;
-        appendLogOutput(QString("Lua: %1\n").arg(text));
+        appendLuaOutput(text);
     }
     else if (msg == TCP_LUAMSG)
     {

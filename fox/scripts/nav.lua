@@ -65,9 +65,9 @@ taskMoveToNextNode =
     init = function(self)
         local nextcell = table.remove(currentpath, 1)
         
-        if currentcell.x > nextcell.x then
+        if currentcell.x < nextcell.x then
             targetangle = 270
-        elseif currentcell.x < nextcell.x then
+        elseif currentcell.x > nextcell.x then
             targetangle = 90
         elseif currentcell.y > nextcell.y then
             targetangle = 180
@@ -95,7 +95,7 @@ taskMoveToNextNode =
             self.status = "rotating"
             currentangle = targetangle
         elseif self.status == "rotating" then
-            if true or getstate().movecomplete then
+            if getstate().movecomplete then
                 self.status = "startmove"
                 getstate().movecomplete = false
                 sendmsg("rotation", currentangle)
@@ -105,7 +105,7 @@ taskMoveToNextNode =
             move(300) -- UNDONE: Grid size
             self.status = "moving"
         elseif self.status == "moving" then
-            if true or getstate().movecomplete then
+            if getstate().movecomplete then
                 sendmsg("robotcell", currentcell.x, currentcell.y)
                 getstate().movecomplete = false
                 
@@ -126,13 +126,18 @@ taskMoveToNextNode =
 taskIRScan =
 {
     init = function(self)
-        self.status = "setturret"
-        self.targetangle = 0
+        self.status = "initdelay"
+        self.wait = gettimems() + 2000
         self.scanarray = { }
     end,
     
     run = function(self)
-        if self.status == "setturret" then
+        if self.status == "initdelay" then
+            if self.wait < gettimems() then
+                self.targetangle = 0
+                self.status = "setturret"
+            end
+        elseif self.status == "setturret" then
             setservo(self.targetangle)
             -- UNDONE: Verify/tweak
             if self.targetangle == 0 then -- Wait longer for first
@@ -219,7 +224,6 @@ function handlecmd(cmd, ...)
     elseif cmd == "setgrid" then
         setgrid(args[1], args[2])
     end
-        
 end
 
 function run()

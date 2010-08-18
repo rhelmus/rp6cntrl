@@ -23,4 +23,5 @@ INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua
 OTHER_FILES += main.lua \
     main.lua \
-    ../scripts/nav.lua
+    ../scripts/nav.lua \
+    ../scripts/rotate.lua
