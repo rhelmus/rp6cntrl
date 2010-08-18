@@ -188,28 +188,17 @@ QWidget *CQtClient::createMainTab()
 
 QWidget *CQtClient::createLuaTab()
 {
-    QSplitter *split = new QSplitter(Qt::Vertical);
-    
-    QGroupBox *group = new QGroupBox("Editor");
-    split->addWidget(group);
-    QVBoxLayout *vbox = new QVBoxLayout(group);
-    
-    vbox->addWidget(scriptEditor = new CEditor(this));
-    QAction *a = scriptEditor->getToolBar()->addAction(style()->
-            standardIcon(QStyle::SP_DialogSaveButton),
-                         "Save", scriptEditor->editor(), SLOT(save()));
-    a->setShortcut(tr("Ctrl+S"));
-    
-    QWidget *w = new QWidget;
-    QHBoxLayout *hbox = new QHBoxLayout(w);
-    split->addWidget(w);
-    
-    hbox->addWidget(createLocalLuaWidget());
-    hbox->addWidget(createServerLuaWidget());
-    
-    split->setStretchFactor(0, 66);
-    split->setStretchFactor(1, 33);
-    return split;
+    QWidget *ret = new QWidget;
+
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    QTabWidget *tabwidget = new QTabWidget;
+    vbox->addWidget(tabwidget);
+
+    tabwidget->addTab(createLuaScriptTab(), "Scripts");
+    tabwidget->addTab(createLuaConsoleTab(), "Console");
+
+    return ret;
 }
 
 QWidget *CQtClient::createNavTab()
@@ -694,6 +683,61 @@ QWidget *CQtClient::createIRTurretWidget()
     return ret;
 }
 
+QWidget *CQtClient::createLuaScriptTab()
+{
+    QSplitter *split = new QSplitter(Qt::Vertical);
+
+    QGroupBox *group = new QGroupBox("Editor");
+    split->addWidget(group);
+    QVBoxLayout *vbox = new QVBoxLayout(group);
+
+    vbox->addWidget(scriptEditor = new CEditor(this));
+    QAction *a = scriptEditor->getToolBar()->addAction(style()->
+            standardIcon(QStyle::SP_DialogSaveButton),
+                         "Save", scriptEditor->editor(), SLOT(save()));
+    a->setShortcut(tr("Ctrl+S"));
+
+    QWidget *w = new QWidget;
+    QHBoxLayout *hbox = new QHBoxLayout(w);
+    split->addWidget(w);
+
+    hbox->addWidget(createLocalLuaWidget());
+    hbox->addWidget(createServerLuaWidget());
+
+    split->setStretchFactor(0, 66);
+    split->setStretchFactor(1, 33);
+    return split;
+}
+
+QWidget *CQtClient::createLuaConsoleTab()
+{
+    QWidget *ret = new QWidget;
+
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    vbox->addWidget(luaConsoleOut = new QPlainTextEdit);
+    luaConsoleOut->setReadOnly(true);
+    luaConsoleOut->setCenterOnScroll(true);
+
+    QHBoxLayout *hbox = new QHBoxLayout;
+    vbox->addLayout(hbox);
+
+    hbox->addWidget(luaConsoleIn = new QLineEdit);
+
+    QPushButton *button = new QPushButton("Send");
+    connect(button, SIGNAL(clicked()), this, SLOT(sendLuaConsolePressed()));
+    connect(luaConsoleIn, SIGNAL(returnPressed()), button, SLOT(click()));
+    hbox->addWidget(button);
+
+    hbox->addWidget(button = new QPushButton("Clear console"));
+    connect(button, SIGNAL(clicked()), luaConsoleOut, SLOT(clear()));
+
+    hbox->addWidget(luaAbortScriptButton = new QPushButton("Abort script"));
+    connect(luaAbortScriptButton, SIGNAL(clicked()), this, SLOT(luaAbortScriptPressed()));
+
+    return ret;
+}
+
 QWidget *CQtClient::createLocalLuaWidget()
 {
     QGroupBox *ret = new QGroupBox("Local");
@@ -1153,6 +1197,8 @@ void CQtClient::tcpScriptRunning(bool r)
     for (QList<QWidget *>::iterator it=scriptDisabledWidgets.begin();
          it!=scriptDisabledWidgets.end(); ++it)
         (*it)->setEnabled(!r);
+
+    luaAbortScriptButton->setEnabled(r);
 }
 
 void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
@@ -1576,6 +1622,19 @@ void CQtClient::downloadServerScriptPressed()
     }
 }
 
+void CQtClient::sendLuaConsolePressed()
+{
+    QStringList cmdlist(luaConsoleIn->text().split(" "));
+
+    if (!cmdlist.isEmpty())
+        executeScriptCommand(cmdlist.takeFirst(), cmdlist);
+}
+
+void CQtClient::luaAbortScriptPressed()
+{
+    executeScriptCommand("abortcurrentscript");
+}
+
 void CQtClient::robotNavStartPressed()
 {
     if (robotNavStartButton->text() == "Start")
@@ -1773,6 +1832,16 @@ void CQtClient::appendLogOutput(const QString &text)
 {
     logWidget->appendHtml(QString("<FONT color=#FF0000><strong>[%1]</strong></FONT> %2")
             .arg(QTime::currentTime().toString()).arg(text));
+}
+
+void CQtClient::appendLuaOutput(const QString &text)
+{
+    CBaseClient::appendLuaOutput(text);
+
+    QTextCursor cur = luaConsoleOut->textCursor();
+    cur.movePosition(QTextCursor::End);
+    luaConsoleOut->setTextCursor(cur);
+    luaConsoleOut->insertPlainText(text);
 }
 
 void CQtClient::closeEvent(QCloseEvent *e)

@@ -109,12 +109,17 @@ class CQtClient: public QMainWindow, public CBaseClient
     int currentScanPosition;
     QList<int> turretScanData;
     
-    // Lua editing
+    // Lua scripts
     CEditor *scriptEditor;
     QPushButton *downloadButton;
     QListWidget *localScriptListWidget, *serverScriptListWidget;
     QListWidgetItem *previousScriptItem;
     QString downloadScript;
+
+    // Lua console
+    QPlainTextEdit *luaConsoleOut;
+    QLineEdit *luaConsoleIn;
+    QPushButton *luaAbortScriptButton;
 
     // Navigation
     bool robotNavEnabled;
@@ -159,6 +164,8 @@ class CQtClient: public QMainWindow, public CBaseClient
     QWidget *createScannerWidget(void);
     QWidget *createIRTurretWidget(void);
     
+    QWidget *createLuaScriptTab(void);
+    QWidget *createLuaConsoleTab(void);
     QWidget *createLocalLuaWidget(void);
     QWidget *createServerLuaWidget(void);
     
@@ -204,6 +211,8 @@ private slots:
     void runServerScriptPressed(void);
     void removeServerScriptPressed(void);
     void downloadServerScriptPressed(void);
+    void sendLuaConsolePressed(void);
+    void luaAbortScriptPressed(void);
     void robotNavStartPressed(void);
     void robotNavSetStartToggled(bool e);
     void robotNavSetGoalToggled(bool e);
@@ -218,6 +227,7 @@ private slots:
 protected:
     virtual void appendConsoleOutput(const QString &text);
     virtual void appendLogOutput(const QString &text);
+    virtual void appendLuaOutput(const QString &text);
 
     virtual void closeEvent(QCloseEvent *e);
     

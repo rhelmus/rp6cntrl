@@ -76,7 +76,8 @@ protected:
 
     virtual void appendConsoleOutput(const QString &text) = 0;
     virtual void appendLogOutput(const QString &text) = 0;
-    
+    virtual void appendLuaOutput(const QString &text) { appendLogOutput(QString("[Lua]: %1\n").arg(text)); }
+
 public:
     CBaseClient(void);
     virtual ~CBaseClient(void) {}
