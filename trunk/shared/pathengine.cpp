@@ -11,6 +11,37 @@ CPathEngine::CPathEngine() : startCell(NULL), goalCell(NULL)
 {
 }
 
+void CPathEngine::initCell(int x, int y)
+{
+    const QSize gridsize(getGridSize());
+
+    grid[x][y].xPos = x;
+    grid[x][y].yPos = y;
+
+    if ((x-1) >= 0)
+        grid[x][y].connections[CONNECTION_LEFT].set(x-1, y);
+    if ((x+1) < gridsize.width())
+        grid[x][y].connections[CONNECTION_RIGHT].set(x+1, y);
+    if ((y-1) >= 0)
+        grid[x][y].connections[CONNECTION_UP].set(x, y-1);
+    if ((y+1) < gridsize.height())
+        grid[x][y].connections[CONNECTION_DOWN].set(x, y+1);
+}
+
+void CPathEngine::moveCell(SCell *cell, int dx, int dy)
+{
+    cell->xPos += dx;
+    cell->yPos += dy;
+    for (int i=0; i<MAX_CONNECTIONS; ++i)
+    {
+        if (!cell->connections[i].broken)
+        {
+            cell->connections[i].set(cell->connections[i].xPos + dx,
+                                     cell->connections[i].yPos + dy);
+        }
+    }
+}
+
 QSize CPathEngine::getGridSize() const
 {
     if (grid.isEmpty())
@@ -27,13 +58,13 @@ int CPathEngine::getCellLength(const SCell *c1, const SCell *c2) const
 
 CPathEngine::EConnection CPathEngine::getCellConnection(const SCell *c1, const SCell *c2) const
 {
-    if (c1->connections[CONNECTION_LEFT] == c2)
+    if (c1->connections[CONNECTION_LEFT].connected(c2->xPos, c2->yPos))
         return CONNECTION_LEFT;
-    if (c1->connections[CONNECTION_RIGHT] == c2)
+    if (c1->connections[CONNECTION_RIGHT].connected(c2->xPos, c2->yPos))
         return CONNECTION_RIGHT;
-    if (c1->connections[CONNECTION_UP] == c2)
+    if (c1->connections[CONNECTION_UP].connected(c2->xPos, c2->yPos))
         return CONNECTION_UP;
-    if (c1->connections[CONNECTION_DOWN] == c2)
+    if (c1->connections[CONNECTION_DOWN].connected(c2->xPos, c2->yPos))
         return CONNECTION_DOWN;
 
     assert(false); // This really should not happen
@@ -65,20 +96,159 @@ void CPathEngine::setGrid(const QSize &size)
     for (int x=0; x<size.width(); ++x)
     {
         for (int y=0; y<size.height(); ++y)
-        {
-            grid[x][y].xPos = x;
-            grid[x][y].yPos = y;
+            initCell(x, y);
+    }
+}
 
-            if ((x-1) >= 0)
-                grid[x][y].connections[CONNECTION_LEFT] = &grid[x-1][y];
-            if ((x+1) < size.width())
-                grid[x][y].connections[CONNECTION_RIGHT] = &grid[x+1][y];
-            if ((y-1) >= 0)
-                grid[x][y].connections[CONNECTION_UP] = &grid[x][y-1];
-            if ((y+1) < size.height())
-                grid[x][y].connections[CONNECTION_DOWN] = &grid[x][y+1];
+void CPathEngine::expandGrid(int left, int up, int right, int down)
+{
+    QSize gridsize(getGridSize());
+
+    if (left)
+    {
+        grid.insert(0, left, QVector<SCell>(gridsize.height()));
+        gridsize.rwidth() += left;
+        for (int x=0; x<gridsize.width(); ++x)
+        {
+            for (int y=0; y<gridsize.height(); ++y)
+            {
+                if (x < left) // New cell?
+                    initCell(x, y);
+                else
+                {
+                    moveCell(&grid[x][y], left, 0);
+                    if (x == left) // Connect with new neighbour cell
+                        grid[x][y].connections[CONNECTION_LEFT].set(x-1, y);
+                }
+            }
         }
     }
+
+    if (up)
+    {
+        gridsize.rheight() += up;
+
+        for (int x=0; x<gridsize.width(); ++x)
+        {
+            grid[x].insert(0, up, SCell());
+
+            for (int y=0; y<gridsize.height(); ++y)
+            {
+                if (y < up) // New cell?
+                    initCell(x, y);
+                else
+                {
+                    moveCell(&grid[x][y], 0, up);
+                    grid[x][y].yPos = y; // Update new y
+                    if (y == up) // Connect with new neighbour cell
+                        grid[x][y].connections[CONNECTION_UP].set(x, y-1);
+                }
+            }
+        }
+    }
+
+    if (right)
+    {
+        grid.insert(grid.end(), right, QVector<SCell>(gridsize.height()));
+        gridsize.rwidth() += right;
+
+        // Init new cells
+        for (int x=gridsize.width()-right-1; x<gridsize.width(); ++x)
+        {
+            for (int y=0; y<gridsize.height(); ++y)
+                initCell(x, y);
+        }
+
+        // Connect with new neighbours
+        const int cellx = gridsize.width() - right - 2;
+        for (int y=0; y<gridsize.height(); ++y)
+            grid[cellx][y].connections[CONNECTION_RIGHT].set(cellx+1, y);
+    }
+
+    if (down)
+    {
+        gridsize.rheight() += down;
+
+        for (int x=0; x<gridsize.width(); ++x)
+        {
+            grid[x].insert(grid[x].end(), down, SCell());
+
+            // Init new cells
+            for (int y=gridsize.height()-down-1; y<gridsize.height(); ++y)
+                initCell(x, y);
+
+            // Connect with new neighbour
+            const int celly = gridsize.height() - down - 2;
+            grid[x][celly].connections[CONNECTION_DOWN].set(x, celly+1);
+        }
+    }
+#if 0
+    while (left)
+    {
+        grid.append(QVector<SCell>(gridsize.height())); // Add column
+        ++gridsize.rwidth();
+
+        // Shift cells right
+        for (int x=gridsize.width()-1; x>0; --x)
+        {
+            for (int y=0; y<gridsize.height(); ++y)
+            {
+                if (x == (gridsize.width()-1))
+                    initCell(x, y); // Init new cells
+
+                QPoint &cell1 = grid[x][y], &cell2 = grid[x-1][y];
+                qSwap(grid[x][y], grid[x-1][y]);
+                --cell1.rx();
+                ++cell2.rx();
+            }
+        }
+        --left;
+    }
+
+    while (up)
+    {
+        // Shift cells to down
+        for (int x=0; x<gridsize.width(); ++x)
+        {
+            grid[x] << SCell(); // Add row
+            ++gridsize.rheight();
+            initCell(x, gridsize.height()-1);
+
+            for (int y=gridsize.height()-1; y>0; ++y)
+            {
+                QPoint &cell1 = grid[x][y], &cell2 = grid[x][y-1];
+                qSwap(grid[x][y], grid[x-1][y]);
+                --cell1.ry();
+                ++cell2.ry();
+            }
+        }
+        --up;
+    }
+
+    while (right)
+    {
+        grid.append(QVector<SCell>(gridsize.height())); // Add column
+        ++gridsize.rwidth();
+
+        // Init new cells
+        for (int y=0; y<gridsize.height(); ++y)
+            initCell(gridsize.width()-1, y);
+
+        --right;
+    }
+
+    while (down)
+    {
+        for (int x=0; x<gridsize.width(); ++x)
+        {
+            grid[x] << SCell(); // Add row
+            ++gridsize.rheight();
+            initCell(x, gridsize.height()-1);
+        }
+
+        --down;
+    }
+#endif
 }
 
 void CPathEngine::initPath(const QPoint &start, const QPoint &goal)
@@ -159,10 +329,14 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
 
         for (int i=0; i<MAX_CONNECTIONS; ++i)
         {
-            if (!cell->connections[i] || cell->connections[i]->closed)
+            if (cell->connections[i].broken)
                 continue;
 
-            SCell *child = cell->connections[i];
+            SCell *child = &grid[cell->connections[i].xPos][cell->connections[i].yPos];
+
+            if (child->closed)
+                continue;
+
             int newscore = cell->score + pathScore(cell, child);
 
             if (child->open)
@@ -226,5 +400,11 @@ bool CPathEngine::calcPath(QList<QPoint> &output)
 
 void CPathEngine::breakConnection(const QPoint &cell, EConnection connection)
 {
-    grid[cell.x()][cell.y()].connections[connection] = NULL;
+    grid[cell.x()][cell.y()].connections[connection].breakCon();
+}
+
+void CPathEngine::breakAllConnections(const QPoint &cell)
+{
+    for (int i=0; i<MAX_CONNECTIONS; ++i)
+        grid[cell.x()][cell.y()].connections[i].breakCon();
 }

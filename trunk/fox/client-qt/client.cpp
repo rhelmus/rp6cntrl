@@ -1054,7 +1054,12 @@ void CQtClient::updateConnection(bool connected)
 
 void CQtClient::tcpError(const QString &error)
 {
-    QMessageBox::critical(this, "Socket error", error);
+    if (QMessageBox::critical(this, "Socket error", error,
+                              QMessageBox::Retry | QMessageBox::Cancel) == QMessageBox::Retry)
+    {
+        disconnectFromServer();
+        connectToHost(serverEdit->text());
+    }
 }
 
 void CQtClient::tcpRobotStateUpdate(const SStateSensors &oldstate,
@@ -1218,6 +1223,18 @@ void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
             float w, h;
             args >> w >> h;
             robotNavMap->setGrid(QSize(w, h));
+        }
+        else if (msg == "gridexpanded")
+        {
+            float exl, exu, exr, exd;
+            args >> exl >> exu >> exr >> exd;
+            robotNavMap->expandGrid(exl, exu, exr, exd);
+        }
+        else if (msg == "obstacle")
+        {
+            float x, y;
+            args >> x >> y;
+            robotNavMap->markObstacle(QPoint(x, y));
         }
         else if ((msg == "start") || (msg == "goal"))
         {

@@ -19,17 +19,27 @@ public:
 
 private:
 
+    struct SConnection
+    {
+        int xPos, yPos;
+        bool broken;
+        void set(int x, int y) { xPos = x; yPos = y; broken = false; }
+        void breakCon(void) { broken = true; }
+        bool connected(int x, int y) const { return (!broken && (x == xPos) && (y == yPos)); }
+        SConnection(void) : broken(true) { }
+    };
+
     struct SCell
     {
-        SCell *connections[MAX_CONNECTIONS];
+        SConnection connections[MAX_CONNECTIONS];
         int xPos, yPos;
         uint16_t score;
         int distCost;
         bool open, closed;
         SCell *parent;
 
-        SCell(void) : xPos(0), yPos(0), score(0), distCost(0), open(false), closed(false), parent(NULL)
-        { for (int i=0; i<MAX_CONNECTIONS; ++i) connections[i] = NULL;  }
+        SCell(void) : xPos(0), yPos(0), score(0), distCost(0), open(false), closed(false),
+                      parent(NULL) { }
     };
 
     struct SCellCostCompare // To compare pointers
@@ -47,6 +57,8 @@ private:
     SCell *startCell, *goalCell;
     TOpenList openList;
 
+    void initCell(int x, int y);
+    void moveCell(SCell *cell, int dx, int dy);
     QSize getGridSize(void) const;
     int getCellLength(const SCell *c1, const SCell *c2) const;
     EConnection getCellConnection(const SCell *c1, const SCell *c2) const;
@@ -56,9 +68,11 @@ public:
     CPathEngine(void);
 
     void setGrid(const QSize &size);
+    void expandGrid(int left, int up, int right, int down);
     void initPath(const QPoint &start, const QPoint &goal);
     bool calcPath(QList<QPoint> &output);
     void breakConnection(const QPoint &cell, EConnection connection);
+    void breakAllConnections(const QPoint &cell);
 };
 
 #endif // PATHENGINE_H

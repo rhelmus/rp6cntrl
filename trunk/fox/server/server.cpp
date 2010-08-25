@@ -108,6 +108,8 @@ void CControl::initLua()
     luaInterface.registerFunction(luaNewPE, "newpathengine", this);
 
     luaInterface.registerClassFunction(luaPESetGrid, "setgrid", "pathengine");
+    luaInterface.registerClassFunction(luaPEExpandGrid, "expandgrid", "pathengine");
+    luaInterface.registerClassFunction(luaPESetObstacle, "setobstacle", "pathengine");
     luaInterface.registerClassFunction(luaPEInitPath, "init", "pathengine");
     luaInterface.registerClassFunction(luaPECalcPath, "calc", "pathengine");
 
@@ -425,6 +427,25 @@ int CControl::luaPESetGrid(lua_State *l)
     CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
     const int w = luaL_checkint(l, 2), h = luaL_checkint(l, 3);
     pe->setGrid(QSize(w, h));
+    return 0;
+}
+
+int CControl::luaPEExpandGrid(lua_State *l)
+{
+    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
+    const int left = luaL_checkint(l, 2);
+    const int up = luaL_checkint(l, 3);
+    const int right = luaL_checkint(l, 4);
+    const int down = luaL_checkint(l, 5);
+    pe->expandGrid(left, up, right, down);
+    return 0;
+}
+
+int CControl::luaPESetObstacle(lua_State *l)
+{
+    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
+    const int x = luaL_checkint(l, 2), y = luaL_checkint(l, 3);
+    pe->breakAllConnections(QPoint(x, y));
     return 0;
 }
 
