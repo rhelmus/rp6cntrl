@@ -57,6 +57,8 @@ public:
     static int luaNewPE(lua_State *l);
     static int luaDelPE(lua_State *l);
     static int luaPESetGrid(lua_State *l);
+    static int luaPEExpandGrid(lua_State *l);
+    static int luaPESetObstacle(lua_State *l);
     static int luaPEInitPath(lua_State *l);
     static int luaPECalcPath(lua_State *l);
 

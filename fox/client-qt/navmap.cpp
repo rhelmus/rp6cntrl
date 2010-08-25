@@ -228,6 +228,48 @@ void CNavMap::setGrid(const QSize &size)
     adjustSize();
 }
 
+void CNavMap::expandGrid(int left, int up, int right, int down)
+{
+    QSize gridsize(getGridSize());
+
+    if (left)
+    {
+        grid.insert(0, left, QVector<SCell>(gridsize.height()));
+        gridsize.rwidth() += left;
+        startPos.rx() += left;
+        goalPos.rx() += left;
+        robotPos.rx() += left;
+    }
+
+    if (up)
+    {
+        gridsize.rheight() += up;
+
+        for (int x=0; x<gridsize.width(); ++x)
+            grid[x].insert(0, up, SCell());
+
+        startPos.ry() += up;
+        goalPos.ry() += up;
+        robotPos.ry() += up;
+    }
+
+    if (right)
+    {
+        grid.insert(grid.end(), right, QVector<SCell>(gridsize.height()));
+        gridsize.rwidth() += right;
+    }
+
+    if (down)
+    {
+        gridsize.rheight() += down;
+
+        for (int x=0; x<gridsize.width(); ++x)
+            grid[x].insert(grid[x].end(), down, SCell());
+    }
+
+    adjustSize();
+}
+
 void CNavMap::setPath(const QList<QPoint> &path)
 {
     const QSize size(getGridSize());
@@ -257,6 +299,7 @@ void CNavMap::setRobot(const QPoint &pos)
 void CNavMap::markObstacle(const QPoint &pos, int o)
 {
     grid[pos.x()][pos.y()].obstacles |= o;
+    update();
 }
 
 QSize CNavMap::getGridSize() const

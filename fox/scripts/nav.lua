@@ -1,11 +1,33 @@
 local ret = makescript()
 
 local currenttask = nil
+local cellsize = 25 -- in cm. Bot is about 20 cm long
 local gridsize = { }
 local startcell, goalcell = { }, { }
 local pathengine = nil
 local currentpath, currentcell = nil, nil
 local currentangle, targetangle = 0, 0
+
+local function average(set)
+    local sum = 0
+    local n = #set
+    
+    for i=1, n do
+        sum = sum + set[i]
+    end
+    
+    return sum / n
+end
+
+local function setcell(c, x, y)
+    c.x = x
+    c.y = y
+end
+
+local function movecell(c, dx, dy)
+    c.x = c.x + dx
+    c.y = c.y + dy
+end
 
 local function setgrid(w, h)
     gridsize.w = w
@@ -13,9 +35,46 @@ local function setgrid(w, h)
     pathengine:setgrid(w, h)
 end
 
-local function setcell(c, x, y)
-    c.x = x
-    c.y = y
+local function expandgrid(left, up, right, down)
+    gridsize.w = gridsize.w + left + right
+    gridsize.h = gridsize.h + up + down
+    
+    if left > 0 then
+        movecell(startcell, left, 0)
+        movecell(goalcell, left, 0)
+        movecell(currentcell, left, 0)
+    end
+
+    if up > 0 then
+        movecell(startcell, 0, up)
+        movecell(goalcell, 0, up)
+        movecell(currentcell, 0, up)
+    end
+
+    pathengine:expandgrid(left, up, right, down)
+    sendmsg("gridexpanded", left, up, right, down)
+end
+
+local function disttocells(dist)
+    return math.floor(dist / cellsize + 0.5) -- Round
+end
+
+local function wrapangle(a)
+    while a < 0 do
+        a = a + 360
+    end
+    
+    while a >= 360 do
+        a = a - 360
+    end
+    
+    return a
+end
+
+local function servopostoangle(pos)
+    -- Servo ranges from 0 (270 deg) to 180 (90 deg)
+    -- Angles are converted to clockwise
+    return wrapangle(270 + pos)
 end
 
 local function settask(task)
@@ -49,10 +108,9 @@ taskInitPath =
         stat, currentpath = pathengine:calc()
         if stat then
             print("Calculated path!")
-            sendmsg("path", currentpath)
             currentcell = table.remove(currentpath, 1) -- Remove first cell (startcell)
-            currentangle = 0
-            return true, taskMoveToNextNode
+            sendmsg("path", currentpath)
+            return true, taskIRScan
         else
             print("WARNING: Failed to calculate path!")
             return true, nil
@@ -65,14 +123,14 @@ taskMoveToNextNode =
     init = function(self)
         local nextcell = table.remove(currentpath, 1)
         
-        if currentcell.x < nextcell.x then
+        if currentcell.x > nextcell.x then
             targetangle = 270
-        elseif currentcell.x > nextcell.x then
+        elseif currentcell.x < nextcell.x then
             targetangle = 90
         elseif currentcell.y > nextcell.y then
-            targetangle = 180
-        else
             targetangle = 0
+        else
+            targetangle = 180
         end
         
         currentcell = nextcell
@@ -86,10 +144,7 @@ taskMoveToNextNode =
     
     run = function(self)
         if self.status == "startrotate" then
-            local a = targetangle - currentangle
-            if a < 0 then
-                a = a + 360
-            end
+            local a = wrapangle(targetangle - currentangle)
             print(string.format("Rotating %d degrees (%d->%d)", a, currentangle, targetangle))
             shortrotate(a)
             self.status = "rotating"
@@ -101,8 +156,8 @@ taskMoveToNextNode =
                 sendmsg("rotation", currentangle)
             end
         elseif self.status == "startmove" then
-            print("Moving 300 mm")
-            move(300) -- UNDONE: Grid size
+            print("Moving to next cell")
+            move(cellsize * 10) -- *10: to mm
             self.status = "moving"
         elseif self.status == "moving" then
             if getstate().movecomplete then
@@ -127,61 +182,156 @@ taskIRScan =
 {
     init = function(self)
         self.status = "initdelay"
-        self.wait = gettimems() + 2000
+        self.wait = gettimems() + 500 -- cool down a bit from movement (UNDONE)
         self.scanarray = { }
     end,
     
     run = function(self)
         if self.status == "initdelay" then
             if self.wait < gettimems() then
-                self.targetangle = 0
+                self.servopos = 0
                 self.status = "setturret"
             end
         elseif self.status == "setturret" then
-            setservo(self.targetangle)
+            setservo(self.servopos)
             -- UNDONE: Verify/tweak
-            if self.targetangle == 0 then -- Wait longer for first
-                self.wait = gettimems() + 500
+            if self.servopos == 0 then -- Wait longer for first
+                self.wait = gettimems() + 1000
             else
-                self.wait = gettimems() + 100
+                self.wait = gettimems() + 300
             end
             self.status = "wait"
         elseif self.status == "wait" then
             if self.wait < gettimems() then
                 self.status = "scan"
-                self.scantime = gettimems() + 150 -- ~3-5 scans (30-50 ms)
+                self.scantime = gettimems() + 550 -- ~3-5 scans (30-50 ms) UNDONE
                 self.scandelay = 0
             end
         elseif self.status == "scan" then
             if self.scantime < gettimems() then
-                self.targetangle = self.targetangle + 25 -- UNDONE
-                if self.targetangle > 180 then
-                    return true, taskMoveToNextNode
+                self.servopos = self.servopos + 25 -- UNDONE
+                if self.servopos > 180 then
+                    self.status = "procresults"
+                else
+                    setservo(self.servopos)
+                    self.status = "setturret"
                 end
-                setservo(self.targetangle)
-                self.status = "setturret"
             elseif self.scandelay < gettimems() then
+                local angle = servopostoangle(self.servopos)
                 self.scandelay = gettimems() + 50 -- UNDONE
-                self.scanarray[self.targetangle] = self.scanarray[self.targetangle] or { }
-                table.insert(self.scanarray[self.targetangle], getsharpir())
-                print(string.format("scan[%d] = %d", self.targetangle,
-                                    self.scanarray[self.targetangle][#self.scanarray[self.targetangle]]))
+                self.scanarray[angle] = self.scanarray[angle] or { }
+                table.insert(self.scanarray[angle], getsharpir())
+                print(string.format("scan[%d] = %d", angle,
+                                    self.scanarray[angle][#self.scanarray[angle]]))
+            end
+        elseif self.status == "procresults" then
+            local refreshpath = false
+            
+            -- NOTE: not ipairs because scanarray indices have 'gaps' or equal 0 and are
+            -- therefore not real lua arrays
+            for sangle, disttab in pairs(self.scanarray) do
+                local sdist = average(disttab) -- UNDONE: More statistics?
+                print(string.format("av scan[%d] = %d", sangle, sdist))
+                
+                -- Distance in valid range?
+                if sdist >= 20 and sdist >= cellsize and sdist <= 150 then
+                    local x, y
+                    local realangle = wrapangle(currentangle + sangle)
+                    if realangle == 0 then -- Straight up
+                        x = currentcell.x
+                        y = currentcell.y - disttocells(sdist)
+                    elseif realangle == 90 then -- Straight right
+                        x = currentcell.x + disttocells(sdist)
+                        y = currentcell.y
+                    elseif realangle == 180 then -- Straight down
+                        x = currentcell.x
+                        y = currentcell.y + disttocells(sdist)
+                    elseif realangle == 270 then -- Straight left
+                        x = currentcell.x - disttocells(sdist)
+                        y = currentcell.y
+                    else
+                        local function getcells(angle)
+                            local rad = math.rad(angle)
+                            local adj = math.cos(rad) * sdist
+                            local opp = math.sin(rad) * sdist
+                            print("getcells:", adj, opp)
+                            return disttocells(adj), disttocells(opp)
+                        end
+                        
+                        if realangle < 90 then
+                            local adjcells, oppcells = getcells(realangle)
+                            x = currentcell.x + oppcells
+                            y = currentcell.y - adjcells
+                        elseif realangle < 180 then
+                            local adjcells, oppcells = getcells(realangle - 90)
+                            x = currentcell.x + adjcells
+                            y = currentcell.y + oppcells
+                        elseif realangle < 270 then
+                            local adjcells, oppcells = getcells(realangle - 180)
+                            x = currentcell.x - oppcells
+                            y = currentcell.y + adjcells
+                        elseif realangle < 360 then
+                            local adjcells, oppcells = getcells(realangle - 270)
+                            x = currentcell.x - adjcells
+                            y = currentcell.y - oppcells
+                        end                       
+                    end
+                    
+                    print("av cell:", x, y)
+                    print("realangle:", realangle)
+                    
+                    local exl, exu, exr, exd = 0, 0, 0, 0
+                    if x < 0 then
+                        exl = math.abs(x)
+                    elseif x > gridsize.w then
+                        exr = x - gridsize.w
+                    end
+                    
+                    if y < 0 then
+                        exu = math.abs(y)
+                    elseif y > gridsize.h then
+                        exd = y - gridsize.h
+                    end
+                                        
+                    if exl > 0 or exu > 0 or exr > 0 or exd > 0 then
+                        print("expand:", exl, exu, exr, exd)
+
+                        expandgrid(exl, exu, exr, exd)
+                        refreshpath = true
+                        
+                        if x < 0 then
+                            x = 0
+                        end
+                        if y < 0 then
+                            y = 0
+                        end
+                    end
+                    
+                    pathengine:setobstacle(x, y)
+                    sendmsg("obstacle", x, y)
+                    print("obstacle:", x, y)
+                    
+                    if not refreshpath then
+                        -- Check if cell is in current path list
+                        for _, v in ipairs(currentpath) do
+                            if v.x == x and v.y == y then
+                                refreshpath = true
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if refreshpath then
+            	startcell = currentcell
+                return true, taskInitPath
+            else
+                return true, taskMoveToNextNode
             end
         end
 
         return false
-        --[[
-    -- UNDONE
-        if not timeout then
-            timeout = gettimems()
-            return false
-        elseif (gettimems() - timeout) >= 400 then
-            timeout = nil
-            return true, taskMoveToNextNode
-        else
-            return false
-        end
-        --]]
     end
 }
 
@@ -213,16 +363,17 @@ function handlecmd(cmd, ...)
     
     if cmd == "start" then
         if not currenttask then
+            currentangle = 180 -- By default bot is facing downwards
             settask(taskInitPath)
         end
     elseif cmd == "abort" then
         settask(nil)
     elseif cmd == "setstart" then
-        setcell(startcell, args[1], args[2])
+        setcell(startcell, tonumber(args[1]), tonumber(args[2]))
     elseif cmd == "setgoal" then
-        setcell(goalcell, args[1], args[2])
+        setcell(goalcell, tonumber(args[1]), tonumber(args[2]))
     elseif cmd == "setgrid" then
-        setgrid(args[1], args[2])
+        setgrid(tonumber(args[1]), tonumber(args[2]))
     end
 end
 

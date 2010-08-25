@@ -50,12 +50,14 @@ public:
     CNavMap(QWidget *parent = 0, Qt::WindowFlags f = 0);
 
     void setGrid(const QSize &size);
+    void expandGrid(int left, int up, int right, int down);
     void setPath(const QList<QPoint> &path);
     void setStart(const QPoint &pos) { startPos = pos; update(); }
     void setGoal(const QPoint &pos) { goalPos = pos; update(); }
     void setRobot(const QPoint &pos);
     void setRobotRotation(int r) { robotRotation = r; update(); }
-    void markObstacle(const QPoint &pos, int o);
+    void markObstacle(const QPoint &pos,
+                      int o=OBSTACLE_LEFT | OBSTACLE_RIGHT | OBSTACLE_UP | OBSTACLE_DOWN);
     QPoint getRobot(void) const { return robotPos; }
     QPoint getStart(void) const { return startPos; }
     QPoint getGoal(void) const { return goalPos; }
