@@ -856,6 +856,9 @@ QWidget *CQtClient::createRobotNavWidget()
     subhbox->addWidget(robotNavSetGridButton = new QPushButton("Grid size..."));
     connect(robotNavSetGridButton, SIGNAL(clicked()), this, SLOT(robotNavSetGridPressed()));
 
+    subhbox->addWidget(robotNavMoveCheckBox = new QCheckBox("Move"));
+    robotNavMoveCheckBox->setChecked(true);
+
     return split;
 }
 
@@ -1056,10 +1059,7 @@ void CQtClient::tcpError(const QString &error)
 {
     if (QMessageBox::critical(this, "Socket error", error,
                               QMessageBox::Retry | QMessageBox::Cancel) == QMessageBox::Retry)
-    {
-        disconnectFromServer();
-        connectToHost(serverEdit->text());
-    }
+        QTimer::singleShot(100, connectButton, SLOT(click()));
 }
 
 void CQtClient::tcpRobotStateUpdate(const SStateSensors &oldstate,
@@ -1234,7 +1234,7 @@ void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
         {
             float x, y;
             args >> x >> y;
-            robotNavMap->markObstacle(QPoint(x, y));
+            robotNavMap->markBlockObstacle(QPoint(x, y));
         }
         else if ((msg == "start") || (msg == "goal"))
         {
@@ -1654,6 +1654,11 @@ void CQtClient::luaAbortScriptPressed()
 
 void CQtClient::robotNavStartPressed()
 {
+    if (robotNavMoveCheckBox->isChecked())
+        executeScriptCommand("simmove", QStringList() << "0");
+    else
+        executeScriptCommand("simmove", QStringList() << "1");
+
     if (robotNavStartButton->text() == "Start")
         executeScriptCommand("start");
     else

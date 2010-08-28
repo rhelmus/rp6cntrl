@@ -186,25 +186,7 @@ void CNavMap::mouseReleaseEvent(QMouseEvent *event)
         if (editMode == EDIT_OBSTACLE)
         {
             if (blockEditMode)
-            {
-                // Mark neighboring cells
-                const QSize gridsize(getGridSize());
-                QPoint cell(currentMouseCell.x()-1, currentMouseCell.y()); // Left
-                if (cell.x() >= 0)
-                    markObstacle(cell, OBSTACLE_RIGHT);
-
-                cell = QPoint(currentMouseCell.x()+1, currentMouseCell.y()); // Right
-                if (cell.x() < gridsize.width())
-                    markObstacle(cell, OBSTACLE_LEFT);
-
-                cell = QPoint(currentMouseCell.x(), currentMouseCell.y()-1); // Up
-                if (cell.y() >= 0)
-                    markObstacle(cell, OBSTACLE_DOWN);
-
-                cell = QPoint(currentMouseCell.x(), currentMouseCell.y()+1); // Down
-                if (cell.y() < gridsize.height())
-                    markObstacle(cell, OBSTACLE_UP);
-            }
+                markBlockObstacle(currentMouseCell);
             else
                 markObstacle(currentMouseCell, currentMouseObstacle);
 
@@ -300,6 +282,30 @@ void CNavMap::markObstacle(const QPoint &pos, int o)
 {
     grid[pos.x()][pos.y()].obstacles |= o;
     update();
+}
+
+void CNavMap::markBlockObstacle(const QPoint &pos)
+{
+    grid[pos.x()][pos.y()].obstacles = OBSTACLE_LEFT | OBSTACLE_RIGHT |
+                                       OBSTACLE_UP | OBSTACLE_DOWN;
+
+    // Mark neighboring cells
+    const QSize gridsize(getGridSize());
+    QPoint neighbour(pos.x()-1, pos.y()); // Left
+    if (neighbour.x() >= 0)
+        markObstacle(neighbour, OBSTACLE_RIGHT);
+
+    neighbour = QPoint(pos.x()+1, pos.y()); // Right
+    if (neighbour.x() < gridsize.width())
+        markObstacle(neighbour, OBSTACLE_LEFT);
+
+    neighbour = QPoint(pos.x(), pos.y()-1); // Up
+    if (neighbour.y() >= 0)
+        markObstacle(neighbour, OBSTACLE_DOWN);
+
+    neighbour = QPoint(pos.x(), pos.y()+1); // Down
+    if (neighbour.y() < gridsize.height())
+        markObstacle(neighbour, OBSTACLE_UP);
 }
 
 QSize CNavMap::getGridSize() const

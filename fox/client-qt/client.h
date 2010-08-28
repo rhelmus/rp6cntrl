@@ -126,6 +126,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     QGroupBox *robotNavControlGroup;
     QPushButton *robotNavStartButton;
     QPushButton *robotNavSetStartButton, *robotNavSetGoalButton, *robotNavSetGridButton;
+    QCheckBox *robotNavMoveCheckBox;
     CNavMap *robotNavMap;
     CPathEngine simNavPathEngine;
     bool simNavUpdatePathGrid;
