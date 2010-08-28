@@ -3,11 +3,30 @@
 
 #include <QtCore>
 
+#include <luanav.h>
 #include "pathengine.h"
 #include "serial.h"
 #include "server.h"
 #include "shared.h"
 #include "tcp.h"
+
+namespace {
+
+const char *moveDirToLuaStr(int dir)
+{
+    switch (dir)
+    {
+    case FWD: return "fwd";
+    case BWD: return "bwd";
+    case LEFT: return "left";
+    case RIGHT: return "right";
+    }
+
+    assert(false);
+    return NULL;
+}
+
+}
 
 CControl::CControl(QObject *parent) : QObject(parent)
 {
@@ -43,6 +62,7 @@ CControl::CControl(QObject *parent) : QObject(parent)
     connect(tcpServer, SIGNAL(clientTcpReceived(QDataStream &)), this,
             SLOT(parseClientTcp(QDataStream &)));
 
+    // important: Keep these 3 in order
     initTcpDataTypes();
     initSerial2TcpMap();
     initLua();
@@ -99,57 +119,134 @@ void CControl::initSerial2TcpMap()
 
 void CControl::initLua()
 {
-    luaInterface.registerFunction(luaScriptRunning, "scriptrunning", this);
-    luaInterface.registerFunction(luaExecCmd, "exec", this);
-    luaInterface.registerFunction(luaSendText, "sendtext", this);
-    luaInterface.registerFunction(luaSendMsg, "sendmsg", this);
-    luaInterface.registerFunction(luaUpdate, "update");
-    luaInterface.registerFunction(luaGetTimeMS, "gettimems");
-    luaInterface.registerFunction(luaNewPE, "newpathengine", this);
+    NLuaNav::registerBindings();
 
-    luaInterface.registerClassFunction(luaPESetGrid, "setgrid", "pathengine");
-    luaInterface.registerClassFunction(luaPEExpandGrid, "expandgrid", "pathengine");
-    luaInterface.registerClassFunction(luaPESetObstacle, "setobstacle", "pathengine");
-    luaInterface.registerClassFunction(luaPEInitPath, "init", "pathengine");
-    luaInterface.registerClassFunction(luaPECalcPath, "calc", "pathengine");
+    NLua::registerFunction(luaScriptRunning, "scriptrunning", this);
+    NLua::registerFunction(luaExecCmd, "exec", this);
+    NLua::registerFunction(luaSendText, "sendtext", this);
+    NLua::registerFunction(luaSendMsg, "sendmsg", this);
+    NLua::registerFunction(luaUpdate, "update");
+    NLua::registerFunction(luaGetTimeMS, "gettimems");
 
-    lua_newtable(luaInterface);
+    registerLuaRobotModule();
+
+#if 0
+    lua_newtable(NLua::luaInterface); // Table for "robot" module
+    for(TSerial2TcpMap::iterator it=serial2TcpMap.begin(); it!=serial2TcpMap.end(); ++it)
+    {
+        lua_pushlightuserdata(NLua::luaInterface, this);
+        lua_pushinteger(NLua::luaInterface, it.key());
+        lua_pushcclosure(NLua::luaInterface, luaGetData, 2);
+        lua_setfield(NLua::luaInterface, -2, it.value().luaFunc);
+    }
+
+    lua_setglobal(NLua::luaInterface, "robot");
+#endif
+
+#if 0
+    lua_newtable(NLua::luaInterface);
     for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
          it!=serial2TcpMap.end(); ++it)
     {
         if (it.key() == SERIAL_STATE_SENSORS)
         {
             // Save state sensors in subtable
-            lua_newtable(luaInterface);
+            lua_newtable(NLua::luaInterface);
 
-            lua_pushboolean(luaInterface, false);
-            lua_setfield(luaInterface, -2, "bumperleft");           
-            lua_pushboolean(luaInterface, false);
-            lua_setfield(luaInterface, -2, "bumperright");
-            lua_pushboolean(luaInterface, false);
-            lua_setfield(luaInterface, -2, "acsleft");
-            lua_pushboolean(luaInterface, false);
-            lua_setfield(luaInterface, -2, "acsright");
-            lua_pushboolean(luaInterface, false);
-            lua_setfield(luaInterface, -2, "movecomplete");
-            lua_pushstring(luaInterface, "idle");
-            lua_setfield(luaInterface, -2, "acsstate");
+            lua_pushboolean(NLua::luaInterface, false);
+            lua_setfield(NLua::luaInterface, -2, "bumperleft");
+            lua_pushboolean(NLua::luaInterface, false);
+            lua_setfield(NLua::luaInterface, -2, "bumperright");
+            lua_pushboolean(NLua::luaInterface, false);
+            lua_setfield(NLua::luaInterface, -2, "acsleft");
+            lua_pushboolean(NLua::luaInterface, false);
+            lua_setfield(NLua::luaInterface, -2, "acsright");
+            lua_pushboolean(NLua::luaInterface, false);
+            lua_setfield(NLua::luaInterface, -2, "movecomplete");
+            lua_pushstring(NLua::luaInterface, "idle");
+            lua_setfield(NLua::luaInterface, -2, "acsstate");
         }
         else
-            lua_pushinteger(luaInterface, 0);
-        lua_setfield(luaInterface, -2, it.value().luaKey);
+            lua_pushinteger(NLua::luaInterface, 0);
+        lua_setfield(NLua::luaInterface, -2, it.value().luaKey);
     }
 
-    lua_setglobal(luaInterface, "sensortable");
-    
-    luaInterface.exec();
+    lua_setglobal(NLua::luaInterface, "sensortable");
+#endif
+
+    NLua::luaInterface.exec();
+}
+
+void CControl::registerLuaDataFunc(const char *name, ESerialMessage msg,
+                                   const char *submod, lua_CFunction func)
+{
+    lua_getglobal(NLua::luaInterface, "robot");
+
+    if (lua_isnil(NLua::luaInterface, -1))
+    {
+        lua_pop(NLua::luaInterface, 1);
+        lua_newtable(NLua::luaInterface);
+    }
+
+    if (submod)
+    {
+        lua_getfield(NLua::luaInterface, -1, submod);
+
+        if (lua_isnil(NLua::luaInterface, -1))
+        {
+            lua_pop(NLua::luaInterface, 1);
+            lua_newtable(NLua::luaInterface);
+        }
+    }
+
+    lua_pushlightuserdata(NLua::luaInterface, this);
+    lua_pushinteger(NLua::luaInterface, msg);
+    lua_pushcclosure(NLua::luaInterface, func, 2);
+    lua_setfield(NLua::luaInterface, -2, name);
+
+    if (submod)
+        lua_setfield(NLua::luaInterface, -2, submod);
+
+    lua_setglobal(NLua::luaInterface, "robot");
+}
+
+void CControl::registerLuaRobotModule()
+{
+    registerLuaDataFunc("bumperleft", SERIAL_STATE_SENSORS, "sensors", luaGetBumperLeft);
+    registerLuaDataFunc("bumperright", SERIAL_STATE_SENSORS, "sensors", luaGetBumperRight);
+    registerLuaDataFunc("acsleft", SERIAL_STATE_SENSORS, "sensors", luaGetACSLeft);
+    registerLuaDataFunc("acsright", SERIAL_STATE_SENSORS, "sensors", luaGetACSRight);
+    registerLuaDataFunc("movecomplete", SERIAL_STATE_SENSORS, "motor", luaGetMoveComplete);
+    registerLuaDataFunc("base", SERIAL_BASE_LEDS, "leds");
+    registerLuaDataFunc("m32", SERIAL_M32_LEDS, "leds");
+    registerLuaDataFunc("lightleft", SERIAL_LIGHT_LEFT, "sensors");
+    registerLuaDataFunc("lightright", SERIAL_LIGHT_RIGHT, "sensors");
+    registerLuaDataFunc("speedleft", SERIAL_MOTOR_SPEED_LEFT, "motor");
+    registerLuaDataFunc("speedright", SERIAL_MOTOR_SPEED_RIGHT, "motor");
+    registerLuaDataFunc("destspeedleft", SERIAL_MOTOR_DESTSPEED_LEFT, "motor");
+    registerLuaDataFunc("destspeedright", SERIAL_MOTOR_DESTSPEED_RIGHT, "motor");
+    registerLuaDataFunc("distleft", SERIAL_MOTOR_DIST_LEFT, "motor");
+    registerLuaDataFunc("distright", SERIAL_MOTOR_DIST_RIGHT, "motor");
+    registerLuaDataFunc("destdistleft", SERIAL_MOTOR_DESTDIST_LEFT, "motor");
+    registerLuaDataFunc("destdistright", SERIAL_MOTOR_DESTDIST_RIGHT, "motor");
+    registerLuaDataFunc("motorcurrentleft", SERIAL_MOTOR_CURRENT_LEFT, "motor");
+    registerLuaDataFunc("motorcurrentright", SERIAL_MOTOR_CURRENT_RIGHT, "motor");
+    registerLuaDataFunc("motordirleft", SERIAL_MOTOR_DIRECTIONS, "motor", luaGetMotorDirLeft);
+    registerLuaDataFunc("motordirright", SERIAL_MOTOR_DIRECTIONS, "motor", luaGetMotorDirRight);
+    registerLuaDataFunc("battery", SERIAL_BATTERY, "sensors");
+    registerLuaDataFunc("acspower", SERIAL_ACS_POWER, "sensors", luaGetACSPower);
+    registerLuaDataFunc("mic", SERIAL_MIC, "sensors");
+    registerLuaDataFunc("key", SERIAL_LASTRC5, "rc5", luaGetRC5Key);
+    registerLuaDataFunc("device", SERIAL_LASTRC5, "rc5", luaGetRC5Device);
+    registerLuaDataFunc("toggle", SERIAL_LASTRC5, "rc5", luaGetRC5Toggle);
+    registerLuaDataFunc("sharpir", SERIAL_SHARPIR, "sensors");
 }
 
 void CControl::runScript(const QByteArray &script)
 {
-    luaInterface.runScript(script);
+    NLua::runScript(script);
     if (tcpServer->hasConnections())
-        luaInterface.scriptInitClient();
+        NLua::scriptInitClient();
 }
 
 CControl::TLuaScriptMap CControl::getLuaScripts()
@@ -200,47 +297,51 @@ void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
         }
     }
 
-    lua_getglobal(luaInterface, "sensortable");
+    serialDataMap[msg] = luaval;
+
+#if 0
+    lua_getglobal(NLua::luaInterface, "sensortable");
 
     if (msg == SERIAL_STATE_SENSORS)
     {
         SStateSensors state;
         state.byte = luaval;
 
-        lua_getfield(luaInterface, -1, serial2TcpMap[msg].luaKey);
+        lua_getfield(NLua::luaInterface, -1, serial2TcpMap[msg].luaKey);
 
-        lua_pushboolean(luaInterface, state.bumperLeft);
-        lua_setfield(luaInterface, -2, "bumperleft");
-        lua_pushboolean(luaInterface, state.bumperRight);
-        lua_setfield(luaInterface, -2, "bumperright");
-        lua_pushboolean(luaInterface, state.ACSLeft);
-        lua_setfield(luaInterface, -2, "acsleft");
-        lua_pushboolean(luaInterface, state.ACSRight);
-        lua_setfield(luaInterface, -2, "acsright");
-        lua_pushboolean(luaInterface, state.movementComplete);
-        lua_setfield(luaInterface, -2, "movecomplete");
+        lua_pushboolean(NLua::luaInterface, state.bumperLeft);
+        lua_setfield(NLua::luaInterface, -2, "bumperleft");
+        lua_pushboolean(NLua::luaInterface, state.bumperRight);
+        lua_setfield(NLua::luaInterface, -2, "bumperright");
+        lua_pushboolean(NLua::luaInterface, state.ACSLeft);
+        lua_setfield(NLua::luaInterface, -2, "acsleft");
+        lua_pushboolean(NLua::luaInterface, state.ACSRight);
+        lua_setfield(NLua::luaInterface, -2, "acsright");
+        lua_pushboolean(NLua::luaInterface, state.movementComplete);
+        lua_setfield(NLua::luaInterface, -2, "movecomplete");
 
         switch (state.ACSState)
         {
-        case ACS_STATE_IDLE: lua_pushstring(luaInterface, "idle"); break;
-        case ACS_STATE_IRCOMM_DELAY: lua_pushstring(luaInterface, "ircomm"); break;
-        case ACS_STATE_SEND_LEFT: lua_pushstring(luaInterface, "sendleft"); break;
-        case ACS_STATE_WAIT_LEFT: lua_pushstring(luaInterface, "waitleft"); break;
-        case ACS_STATE_SEND_RIGHT: lua_pushstring(luaInterface, "sendright"); break;
-        case ACS_STATE_WAIT_RIGHT: lua_pushstring(luaInterface, "waitright"); break;
+        case ACS_STATE_IDLE: lua_pushstring(NLua::luaInterface, "idle"); break;
+        case ACS_STATE_IRCOMM_DELAY: lua_pushstring(NLua::luaInterface, "ircomm"); break;
+        case ACS_STATE_SEND_LEFT: lua_pushstring(NLua::luaInterface, "sendleft"); break;
+        case ACS_STATE_WAIT_LEFT: lua_pushstring(NLua::luaInterface, "waitleft"); break;
+        case ACS_STATE_SEND_RIGHT: lua_pushstring(NLua::luaInterface, "sendright"); break;
+        case ACS_STATE_WAIT_RIGHT: lua_pushstring(NLua::luaInterface, "waitright"); break;
         }
-        lua_setfield(luaInterface, -2, "acsstate");
+        lua_setfield(NLua::luaInterface, -2, "acsstate");
     }
     else
-        lua_pushinteger(luaInterface, luaval);
+        lua_pushinteger(NLua::luaInterface, luaval);
 
-    lua_setfield(luaInterface, -2, serial2TcpMap[msg].luaKey);
-    lua_pop(luaInterface, 1); // Pop sensortable
+    lua_setfield(NLua::luaInterface, -2, serial2TcpMap[msg].luaKey);
+    lua_pop(NLua::luaInterface, 1); // Pop sensortable
+#endif
 }
 
 void CControl::clientConnected()
 {
-    luaInterface.scriptInitClient();
+    NLua::scriptInitClient();
 }
 
 void CControl::parseClientTcp(QDataStream &stream)
@@ -316,7 +417,7 @@ void CControl::parseClientTcp(QDataStream &stream)
         QString cmd;
         QStringList args;
         stream >> cmd >> args;
-        luaInterface.execScriptCmd(cmd, args);
+        NLua::execScriptCmd(cmd, args);
     }
 }
 
@@ -371,7 +472,7 @@ int CControl::luaSendMsg(lua_State *l)
                     ". Converting to string...";
             // Fall through
         case LUA_TSTRING: comp << QString(lua_tostring(l, i)); break;
-        case LUA_TTABLE: comp << convertLuaTable(l, i); break;
+        case LUA_TTABLE: comp << NLua::convertLuaTable(l, i); break;
         }
     }
 
@@ -406,94 +507,129 @@ int CControl::luaGetTimeMS(lua_State *l)
     return 1;
 }
 
-int CControl::luaNewPE(lua_State *l)
+int CControl::luaGetGenericData(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    control->luaInterface.createClass(new CPathEngine, "pathengine", luaDelPE);
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    lua_pushinteger(l, control->serialDataMap[msg]);
     return 1;
 }
 
-int CControl::luaDelPE(lua_State *l)
+int CControl::luaGetBumperLeft(lua_State *l)
 {
-    qDebug() << "Removing pathengine";
-    void **p = static_cast<void **>(lua_touserdata(l, 1));
-    delete static_cast<CPathEngine *>(*p);
-    *p = NULL;
-    return 0;
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SStateSensors state;
+    state.byte = control->serialDataMap[msg];
+    lua_pushboolean(l, state.bumperLeft);
+    return 1;
 }
 
-int CControl::luaPESetGrid(lua_State *l)
+int CControl::luaGetBumperRight(lua_State *l)
 {
-    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
-    const int w = luaL_checkint(l, 2), h = luaL_checkint(l, 3);
-    pe->setGrid(QSize(w, h));
-    return 0;
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SStateSensors state;
+    state.byte = control->serialDataMap[msg];
+    lua_pushboolean(l, state.bumperRight);
+    return 1;
 }
 
-int CControl::luaPEExpandGrid(lua_State *l)
+int CControl::luaGetACSLeft(lua_State *l)
 {
-    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
-    const int left = luaL_checkint(l, 2);
-    const int up = luaL_checkint(l, 3);
-    const int right = luaL_checkint(l, 4);
-    const int down = luaL_checkint(l, 5);
-    pe->expandGrid(left, up, right, down);
-    return 0;
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SStateSensors state;
+    state.byte = control->serialDataMap[msg];
+    lua_pushboolean(l, state.ACSLeft);
+    return 1;
 }
 
-int CControl::luaPESetObstacle(lua_State *l)
+int CControl::luaGetACSRight(lua_State *l)
 {
-    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
-    const int x = luaL_checkint(l, 2), y = luaL_checkint(l, 3);
-    pe->breakAllConnections(QPoint(x, y));
-    return 0;
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SStateSensors state;
+    state.byte = control->serialDataMap[msg];
+    lua_pushboolean(l, state.ACSRight);
+    return 1;
 }
 
-int CControl::luaPEInitPath(lua_State *l)
+int CControl::luaGetMoveComplete(lua_State *l)
 {
-    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
-    const QPoint start(luaL_checkint(l, 2), luaL_checkint(l, 3));
-    const QPoint goal(luaL_checkint(l, 4), luaL_checkint(l, 5));
-    pe->initPath(start, goal);
-    return 0;
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SStateSensors state;
+    state.byte = control->serialDataMap[msg];
+    lua_pushboolean(l, state.movementComplete);
+    return 1;
 }
 
-int CControl::luaPECalcPath(lua_State *l)
+int CControl::luaGetMotorDirLeft(lua_State *l)
 {
-    CPathEngine *pe = checkClassData<CPathEngine>(l, 1, "pathengine");
-    QList<QPoint> path;
-    if (pe->calcPath(path))
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SMotorDirections dir;
+    dir.byte = control->serialDataMap[msg];
+    lua_pushstring(l, moveDirToLuaStr(dir.left));
+    return 1;
+}
+
+int CControl::luaGetMotorDirRight(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    SMotorDirections dir;
+    dir.byte = control->serialDataMap[msg];
+    lua_pushstring(l, moveDirToLuaStr(dir.right));
+    return 1;
+}
+
+int CControl::luaGetACSPower(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    EACSPowerState state = static_cast<EACSPowerState>(control->serialDataMap[msg]);
+
+    switch (state)
     {
-        lua_pushboolean(l, true); // Success
-
-        const int size = path.size();
-
-        lua_newtable(l); // Returning path array
-        const int tab = lua_gettop(l);
-
-        for (int i=1; i<=size; ++i)
-        {
-            lua_newtable(l); // X&Y pair
-
-            lua_pushinteger(l, path[i-1].x());
-            lua_setfield(l, -2, "x");
-
-            lua_pushinteger(l, path[i-1].y());
-            lua_setfield(l, -2, "y");
-
-            lua_rawseti(l, tab, i);
-        }
-
-        qDebug() << "Returning lua vars: " << luaL_typename(l, lua_gettop(l)-1) << ", " <<
-                luaL_typename(l, lua_gettop(l));
-
-        return 2;
+    case ACS_POWER_OFF: lua_pushstring(l, "off"); break;
+    case ACS_POWER_LOW: lua_pushstring(l, "low"); break;
+    case ACS_POWER_MED: lua_pushstring(l, "med"); break;
+    case ACS_POWER_HIGH: lua_pushstring(l, "high"); break;
     }
-    else
-    {
-        lua_pushboolean(l, false); // Failed to calc path
-        return 1;
-    }
+
+    return 1;
+}
+
+int CControl::luaGetRC5Key(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    RC5data_t rc5;
+    rc5.data = control->serialDataMap[msg];
+    lua_pushnumber(l, rc5.key_code);
+    return 1;
+}
+
+int CControl::luaGetRC5Device(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    RC5data_t rc5;
+    rc5.data = control->serialDataMap[msg];
+    lua_pushnumber(l, rc5.device);
+    return 1;
+}
+
+int CControl::luaGetRC5Toggle(lua_State *l)
+{
+    CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
+    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    RC5data_t rc5;
+    rc5.data = control->serialDataMap[msg];
+    lua_pushboolean(l, rc5.toggle_bit);
+    return 1;
 }
 
 void CControl::daemonMsgHandler(QtMsgType type, const char *msg)

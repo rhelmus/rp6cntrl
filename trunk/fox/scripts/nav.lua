@@ -1,7 +1,8 @@
 local ret = makescript()
 
+local simmove = false
 local currenttask = nil
-local cellsize = 25 -- in cm. Bot is about 20 cm long
+local cellsize = 30 -- in cm. Bot is about 20 cm long
 local gridsize = { }
 local startcell, goalcell = { }, { }
 local pathengine = nil
@@ -17,6 +18,27 @@ local function average(set)
     end
     
     return sum / n
+end
+
+local function median(set)
+    local ret
+    
+    table.sort(set)
+    
+    if math.fmod(#set, 2) > 0 then
+        local i = math.floor(#set / 2)
+        ret = (set[i] + set[i+1]) / 2
+    else
+        ret = set[#set / 2]
+    end
+    
+    io.write("median: ")
+    for _, v in ipairs(set) do
+        io.write(string.format("%d, ", v))
+    end
+    print("\n== ", ret)
+    
+    return ret
 end
 
 local function setcell(c, x, y)
@@ -146,21 +168,27 @@ taskMoveToNextNode =
         if self.status == "startrotate" then
             local a = wrapangle(targetangle - currentangle)
             print(string.format("Rotating %d degrees (%d->%d)", a, currentangle, targetangle))
-            shortrotate(a)
+            
+            if not simmove then
+                shortrotate(a)
+            end
+            
             self.status = "rotating"
             currentangle = targetangle
         elseif self.status == "rotating" then
-            if getstate().movecomplete then
+            if getstate().movecomplete or simmove then
                 self.status = "startmove"
                 getstate().movecomplete = false
                 sendmsg("rotation", currentangle)
             end
         elseif self.status == "startmove" then
             print("Moving to next cell")
-            move(cellsize * 10) -- *10: to mm
+            if not simmove then
+                move(cellsize * 10) -- *10: to mm
+            end
             self.status = "moving"
         elseif self.status == "moving" then
-            if getstate().movecomplete then
+            if getstate().movecomplete or simmove then
                 sendmsg("robotcell", currentcell.x, currentcell.y)
                 getstate().movecomplete = false
                 
@@ -180,12 +208,27 @@ taskMoveToNextNode =
 
 taskIRScan =
 {
+    isvalidscandata = function(self, scanset)
+        local maxerr = 2
+        local errfound = 0
+        for _, v in ipairs(scanset) do
+            if v < 20 or v < cellsize or v > 150 then
+                errfound = errfound + 1
+                if errfound > maxerr then
+                    return false
+                end
+            end
+        end
+        
+        return true
+    end,
+    
     init = function(self)
         self.status = "initdelay"
         self.wait = gettimems() + 500 -- cool down a bit from movement (UNDONE)
         self.scanarray = { }
     end,
-    
+        
     run = function(self)
         if self.status == "initdelay" then
             if self.wait < gettimems() then
@@ -229,12 +272,12 @@ taskIRScan =
             
             -- NOTE: not ipairs because scanarray indices have 'gaps' or equal 0 and are
             -- therefore not real lua arrays
-            for sangle, disttab in pairs(self.scanarray) do
-                local sdist = average(disttab) -- UNDONE: More statistics?
-                print(string.format("av scan[%d] = %d", sangle, sdist))
-                
+            for sangle, disttab in pairs(self.scanarray) do               
                 -- Distance in valid range?
-                if sdist >= 20 and sdist >= cellsize and sdist <= 150 then
+                if self:isvalidscandata(disttab) then
+                    local sdist = median(disttab) -- UNDONE: More statistics?
+                    print(string.format("av scan[%d] = %d", sangle, sdist))
+
                     local x, y
                     local realangle = wrapangle(currentangle + sangle)
                     if realangle == 0 then -- Straight up
@@ -374,6 +417,8 @@ function handlecmd(cmd, ...)
         setcell(goalcell, tonumber(args[1]), tonumber(args[2]))
     elseif cmd == "setgrid" then
         setgrid(tonumber(args[1]), tonumber(args[2]))
+    elseif cmd == "simmove" then
+        simmove = (args[1] == "1")
     end
 end
 

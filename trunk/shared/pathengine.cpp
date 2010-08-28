@@ -406,5 +406,20 @@ void CPathEngine::breakConnection(const QPoint &cell, EConnection connection)
 void CPathEngine::breakAllConnections(const QPoint &cell)
 {
     for (int i=0; i<MAX_CONNECTIONS; ++i)
-        grid[cell.x()][cell.y()].connections[i].breakCon();
+    {
+        if (!grid[cell.x()][cell.y()].connections[i].broken)
+        {
+            // Break neighbour --> me
+            if (i == CONNECTION_LEFT)
+                grid[cell.x()-1][cell.y()].connections[CONNECTION_RIGHT].breakCon();
+            else if (i == CONNECTION_RIGHT)
+                grid[cell.x()+1][cell.y()].connections[CONNECTION_LEFT].breakCon();
+            else if (i == CONNECTION_UP)
+                grid[cell.x()][cell.y()-1].connections[CONNECTION_DOWN].breakCon();
+            else if (i == CONNECTION_DOWN)
+                grid[cell.x()][cell.y()+1].connections[CONNECTION_UP].breakCon();
+
+            grid[cell.x()][cell.y()].connections[i].breakCon(); // Break me --> neighbour
+        }
+    }
 }
