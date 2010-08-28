@@ -130,50 +130,6 @@ void CControl::initLua()
 
     registerLuaRobotModule();
 
-#if 0
-    lua_newtable(NLua::luaInterface); // Table for "robot" module
-    for(TSerial2TcpMap::iterator it=serial2TcpMap.begin(); it!=serial2TcpMap.end(); ++it)
-    {
-        lua_pushlightuserdata(NLua::luaInterface, this);
-        lua_pushinteger(NLua::luaInterface, it.key());
-        lua_pushcclosure(NLua::luaInterface, luaGetData, 2);
-        lua_setfield(NLua::luaInterface, -2, it.value().luaFunc);
-    }
-
-    lua_setglobal(NLua::luaInterface, "robot");
-#endif
-
-#if 0
-    lua_newtable(NLua::luaInterface);
-    for (QMap<ESerialMessage, SSerial2TcpInfo>::iterator it=serial2TcpMap.begin();
-         it!=serial2TcpMap.end(); ++it)
-    {
-        if (it.key() == SERIAL_STATE_SENSORS)
-        {
-            // Save state sensors in subtable
-            lua_newtable(NLua::luaInterface);
-
-            lua_pushboolean(NLua::luaInterface, false);
-            lua_setfield(NLua::luaInterface, -2, "bumperleft");
-            lua_pushboolean(NLua::luaInterface, false);
-            lua_setfield(NLua::luaInterface, -2, "bumperright");
-            lua_pushboolean(NLua::luaInterface, false);
-            lua_setfield(NLua::luaInterface, -2, "acsleft");
-            lua_pushboolean(NLua::luaInterface, false);
-            lua_setfield(NLua::luaInterface, -2, "acsright");
-            lua_pushboolean(NLua::luaInterface, false);
-            lua_setfield(NLua::luaInterface, -2, "movecomplete");
-            lua_pushstring(NLua::luaInterface, "idle");
-            lua_setfield(NLua::luaInterface, -2, "acsstate");
-        }
-        else
-            lua_pushinteger(NLua::luaInterface, 0);
-        lua_setfield(NLua::luaInterface, -2, it.value().luaKey);
-    }
-
-    lua_setglobal(NLua::luaInterface, "sensortable");
-#endif
-
     NLua::luaInterface.exec();
 }
 
@@ -273,11 +229,6 @@ void CControl::handleSerialText(const QByteArray &text)
 
 void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
 {
-/*    qDebug() << "Serial data: " << msg << " type: " <<
-        tcpDataTypes[serial2TcpMap[msg].tcpMessage] << " name: " <<
-        serial2TcpMap[msg].luaKey << " TCP type: " <<
-        serial2TcpMap[msg].tcpMessage;*/
-
     int luaval;
 
     switch (tcpDataTypes[serial2TcpMap[msg].tcpMessage])
@@ -298,45 +249,6 @@ void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
     }
 
     serialDataMap[msg] = luaval;
-
-#if 0
-    lua_getglobal(NLua::luaInterface, "sensortable");
-
-    if (msg == SERIAL_STATE_SENSORS)
-    {
-        SStateSensors state;
-        state.byte = luaval;
-
-        lua_getfield(NLua::luaInterface, -1, serial2TcpMap[msg].luaKey);
-
-        lua_pushboolean(NLua::luaInterface, state.bumperLeft);
-        lua_setfield(NLua::luaInterface, -2, "bumperleft");
-        lua_pushboolean(NLua::luaInterface, state.bumperRight);
-        lua_setfield(NLua::luaInterface, -2, "bumperright");
-        lua_pushboolean(NLua::luaInterface, state.ACSLeft);
-        lua_setfield(NLua::luaInterface, -2, "acsleft");
-        lua_pushboolean(NLua::luaInterface, state.ACSRight);
-        lua_setfield(NLua::luaInterface, -2, "acsright");
-        lua_pushboolean(NLua::luaInterface, state.movementComplete);
-        lua_setfield(NLua::luaInterface, -2, "movecomplete");
-
-        switch (state.ACSState)
-        {
-        case ACS_STATE_IDLE: lua_pushstring(NLua::luaInterface, "idle"); break;
-        case ACS_STATE_IRCOMM_DELAY: lua_pushstring(NLua::luaInterface, "ircomm"); break;
-        case ACS_STATE_SEND_LEFT: lua_pushstring(NLua::luaInterface, "sendleft"); break;
-        case ACS_STATE_WAIT_LEFT: lua_pushstring(NLua::luaInterface, "waitleft"); break;
-        case ACS_STATE_SEND_RIGHT: lua_pushstring(NLua::luaInterface, "sendright"); break;
-        case ACS_STATE_WAIT_RIGHT: lua_pushstring(NLua::luaInterface, "waitright"); break;
-        }
-        lua_setfield(NLua::luaInterface, -2, "acsstate");
-    }
-    else
-        lua_pushinteger(NLua::luaInterface, luaval);
-
-    lua_setfield(NLua::luaInterface, -2, serial2TcpMap[msg].luaKey);
-    lua_pop(NLua::luaInterface, 1); // Pop sensortable
-#endif
 }
 
 void CControl::clientConnected()

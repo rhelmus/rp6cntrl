@@ -1,38 +1,4 @@
---[[
--- Generate access functions
-for k, v in pairs(sensortable) do
-    _G[string.format("get%s", k)] = function()
-        return sensortable[k]
-    end
-end
---]]
-
--- Misc functions
-
-local oldprint = print
-function print(s, ...)
-    oldprint(s, ...)
-    
-    for i=1, select("#", ...) do
-        s = s .. "\t" .. tostring(select(i, ...))
-    end
-
-    sendtext(s .. "\n")
-end
-
--- Similar to regular module function, but may extend existing module,
--- does no registration and always inherits environment
-function extmodule(name)
-    local M = _G[name]
-    if not M then
-        M = { }
-        _G[name] = M
-    end
-    if not getmetatable(M) then
-        setmetatable(M, { __index = _G })
-    end
-    setfenv(2, M)
-end
+dofile "utils.lua"
 
 require "robot"
 require "nav"
