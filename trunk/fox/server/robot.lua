@@ -63,3 +63,8 @@ function sound(pitch, time, delay)
     exec(string.format("sound %d %d %d", pitch, time, delay))
 end
 
+function servoangle(pos)
+    -- Servo ranges from 0 (270 deg) to 180 (90 deg)
+    -- Angles are converted clockwise
+    return math.wrapangle(270 + pos)
+end
