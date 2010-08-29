@@ -170,23 +170,14 @@ end
 function gridMT:getvec(cell)
     -- Returns coords of cell center
     local x, y = cell.x * self.cellsize, cell.y * self.cellsize
-    x = x + (self.cellsize / 2)
-    y = y + (self.cellsize / 2)
+    x = x + ((self.cellsize-1) / 2)
+    y = y + ((self.cellsize-1) / 2)
     return newvector(x, y)
 end
 
 function gridMT:getcell(vec)
-    local x, fx = math.modf(vec:x() / cellsize)
-    local y, fy = math.modf(vec:y() / cellsize)
-    
-    -- Round up when past center
-    if fx > 0.5 then
-        x = x + 1
-    end
-    if fy > 0.5 then
-        y = y + 1
-    end
-    
+    local x = math.floor(vec:x() / self.cellsize + 0.5)
+    local y = math.floor(vec:y() / self.cellsize + 0.5)   
     return newcell(x, y)
 end
 
