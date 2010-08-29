@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "math.h"
 
 #include <QtGui/QVector2D>
 #include <QDebug>
@@ -11,6 +12,8 @@ namespace NLuaNav
 
 // Lua vector
 
+int vecDel(lua_State *l);
+
 int vecNew(lua_State *l)
 {
     QVector2D *vec = NULL;
@@ -18,7 +21,7 @@ int vecNew(lua_State *l)
     if (lua_isuserdata(l, 1)) // Construct with another vector
         vec = new QVector2D(*NLua::checkClassData<QVector2D>(l, 1, "vector"));
     else // Construct with given x&y
-        vec = new QVector2D(luaL_optint(l, 1, 0), luaL_optint(l, 2, 0));
+        vec = new QVector2D(luaL_optnumber(l, 1, 0), luaL_optnumber(l, 2, 0));
 
     assert(vec);
     NLua::createClass(l, vec, "vector", vecDel);
@@ -135,6 +138,20 @@ int vecNormalize(lua_State *l)
     return 0;
 }
 
+int vecRotate(lua_State *l)
+{
+    QVector2D *vec = NLua::checkClassData<QVector2D>(l, 1, "vector");
+    float angle = -(luaL_checknumber(l, 2)); // Negate: clockwise
+    const float rad = angle * M_PI / 180.0;
+    const float x = vec->x(), y = vec->y();
+    qDebug() << "X:" << x << "Y:" << y;
+    qDebug() << "rad:" << rad << "x:" << (x * cosf(rad) - y * sinf(rad)) << "y:" <<
+            (x * sinf(rad) + y * cosf(rad));
+    vec->setX(x * cosf(rad) - y * sinf(rad));
+    vec->setY(x * sinf(rad) + y * cosf(rad));
+    return 0;
+}
+
 int vecToString(lua_State *l)
 {
     QVector2D *vec = NLua::checkClassData<QVector2D>(l, 1, "vector");
@@ -143,6 +160,8 @@ int vecToString(lua_State *l)
 }
 
 // Lua path engine
+
+int pathEDel(lua_State *l);
 
 int pathENew(lua_State *l)
 {
@@ -248,6 +267,7 @@ void registerBindings()
     NLua::registerClassFunction(vecEqual, "__eq", "vector");
     NLua::registerClassFunction(vecLength, "__len", "vector");
     NLua::registerClassFunction(vecNormalize, "normalize", "vector");
+    NLua::registerClassFunction(vecRotate, "rotate", "vector");
     NLua::registerClassFunction(vecToString, "__tostring", "vector");
 
     // Path engine

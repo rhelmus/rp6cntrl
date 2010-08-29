@@ -5,6 +5,8 @@ local oldprint = print
 function print(s, ...)
     oldprint(s, ...)
     
+    s = tostring(s)
+    
     for i=1, select("#", ...) do
         s = s .. "\t" .. tostring(select(i, ...))
     end
