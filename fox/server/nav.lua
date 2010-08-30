@@ -12,10 +12,22 @@ function cellMT:init(x, y)
 end
 
 function cellMT:move(dx, dy)
-    self.x = self.x + x
-    self.y = self.y + y
+    self.x = self.x + dx
+    self.y = self.y + dy
 end
 
+function cellMT:set(x, y)
+    self.x = x
+    self.y = y
+end
+
+function cellMT:setx(x)
+    self.x = x
+end
+
+function cellMT:sety(y)
+    self.y = y
+end
 
 function cellMT.__add(c1, c2)
     return newcell(c1.x + c2.x, c1.y + c2.y)
@@ -44,11 +56,11 @@ function gridMT:__index(key)
 end
 
 function gridMT:init(cellsize)
-    self.grid = { }
-    self.size = { w = 0, h = 0 }
     self.cellsize = cellsize or 30
     self.pathengine = newpathengine()
-    self.pathstart, self.pathgoal, self.robot = newcell(), newcell(), newcell()
+    self:setsize(1, 1)
+    self.pathstart, self.pathgoal, self.robot = self.grid[0][0], self.grid[0][0],
+                                                self.grid[0][0]
     self.robotangle = 0
 end
 
@@ -62,13 +74,11 @@ end
 
 function gridMT:handlecmd(cmd, ...)  
     if cmd == "setstart" then
-        self.pathstart.x, self.pathstart.y = tonumber(selectone(1, ...)),
-                                             tonumber(selectone(2, ...))
+        self.pathstart = self.grid[tonumber(selectone(1, ...))][tonumber(selectone(2, ...))]
     elseif cmd == "setgoal" then
-        self.pathgoal.x, self.pathgoal.y = tonumber(selectone(1, ...)),
-                                           tonumber(selectone(2, ...))
+        self.pathgoal = self.grid[tonumber(selectone(1, ...))][tonumber(selectone(2, ...))]
     elseif cmd == "setgrid" then
-        setsize(tonumber(selectone(1, ...)), tonumber(selectone(2, ...)))
+        self:setsize(tonumber(selectone(1, ...)), tonumber(selectone(2, ...)))
     else
         return false
     end
@@ -85,26 +95,82 @@ function gridMT:setsize(w, h)
         end
     end
     
+    self.size = self.size or { }
     self.size.w = w
     self.size.h = h
     
     self.pathengine:setgrid(w, h)
-    sendmsg("grid", self.size.w, self.size.h)
+    sendmsg("grid", w, h)
 end
 
 function gridMT:getsize()
     return self.size
 end
 
-function gridMT:expand(left, up, right, down)
-    self.size.w = self.size.w + left + right
-    self.size.h = self.size.h + up + down
+function gridMT:getcellsize()
+    return self.cellsize
+end
 
-    if left > 0 or up > 0 then -- Move cell
+function gridMT:expand(left, up, right, down)
+    if left > 0 then
+        for n=1, left do
+            table.insert(self.grid, 0, { }) -- Insert new col
+        end
+        
+        self.size.w = self.size.w + left
+        
+        for x=0, self.size.w-1 do
+            self.grid[x] = self.grid[x] or { } -- Add row
+            for y=0, self.size.h-1 do
+                if x < left then -- New cell?
+                    self.grid[x][y] = newcell(x, y)
+                else
+                    self.grid[x][y]:move(left, 0)
+                end
+            end
+        end
+    end
+    
+    if up > 0 then
+        self.size.h = self.size.h + up
+        
+        for x=0, self.size.w-1 do
+            for y=0, self.size.h-1 do
+                if y < up then -- New row?
+                    table.insert(self.grid[x], 0, nav.newcell(x, y)) -- Insert row
+                else
+                    print(self.grid[x][y])
+                    self.grid[x][y]:move(0, up)
+                end
+            end
+        end
+    end
+    
+    if right > 0 then
+        for n=1, right do
+            local col = { }
+            table.insert(self.grid, col)
+            self.size.w = self.size.w + 1
+            for y=0, self.size.h-1 do
+                col[y] = nav.newcell(self.size.w-1, y)
+            end
+        end
+    end
+    
+    if down > 0 then
+        self.size.h = self.size.h + down
+        local y = self.size.h - 1
+        for x=0, self.size.w-1 do
+            self.grid[x][y] = nav.newcell(x, y)
+        end
+    end
+
+-- UNDONE: Need this?
+--[[    if left > 0 or up > 0 then -- Move cell
         self.pathstart.move(left, up)
         self.pathgoal.move(left, up)
         self.robot.move(left, up)
-    end
+    end]]
     
     self.pathengine:expandgrid(left, up, right, down)
     sendmsg("gridexpanded", left, up, right, down)
@@ -127,9 +193,6 @@ function gridMT:getpathgoal()
 end
 
 function gridMT:setrobot(r)
-    if not r then
-        print(debug.traceback())
-    end
     self.robot = r
     sendmsg("robotcell", r.x, r.y)
 end
@@ -155,7 +218,14 @@ function gridMT:calcpath()
     if stat then
         print("Calculated path!")
         sendmsg("path", path)
-        return true, path
+        
+        -- Convert to cells
+        local cellpath = { }
+        for _, v in ipairs(path) do
+            table.insert(cellpath, self.grid[v.x][v.y])
+        end
+        
+        return true, cellpath
     else
         print("WARNING: Failed to calculate path!")
         return false
@@ -163,8 +233,8 @@ function gridMT:calcpath()
 end
 
 function gridMT:addobstacle(cell)
-    pathengine:setobstacle(x, y)
-    sendmsg("obstacle", x, y)
+    self.pathengine:setobstacle(cell.x, cell.y)
+    sendmsg("obstacle", cell.x, cell.y)
 end
 
 function gridMT:getvec(cell)
@@ -178,7 +248,43 @@ end
 function gridMT:getcell(vec)
     local x = math.floor(vec:x() / self.cellsize + 0.5)
     local y = math.floor(vec:y() / self.cellsize + 0.5)   
-    return newcell(x, y)
+    return self.grid[x][y]
+end
+
+-- Expands grid if necessary
+function gridMT:safegetcell(vec)
+    local x = math.floor(vec:x() / self.cellsize + 0.5)
+    local y = math.floor(vec:y() / self.cellsize + 0.5)
+    
+    local exl, exu, exr, exd = 0, 0, 0, 0
+    if x < 0 then
+        exl = math.abs(x)
+    elseif x > self.size.w then
+        exr = x - self.size.w
+    end
+    
+    if y < 0 then
+        exu = math.abs(y)
+    elseif y > self.size.h then
+        exd = y - self.size.h
+    end
+
+    local expand = (exl > 0 or exu > 0 or exr > 0 or exd > 0)
+    if expand then
+        print("expand:", exl, exu, exr, exd)
+        
+        self:expand(exl, exu, exr, exd)
+       
+        if x < 0 then
+            x = 0
+        end
+        if y < 0 then
+            y = 0
+        end
+        
+    end
+
+    return self.grid[x][y], expand
 end
 
 function gridMT:__tostring()

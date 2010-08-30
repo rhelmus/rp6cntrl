@@ -68,3 +68,7 @@ function servoangle(pos)
     -- Angles are converted clockwise
     return math.wrapangle(270 + pos)
 end
+
+function sensoroffset()
+    return nav.newvector(0, 3)
+end

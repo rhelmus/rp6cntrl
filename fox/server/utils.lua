@@ -55,7 +55,7 @@ function math.median(set)
     
     if math.fmod(#set, 2) > 0 then
         local i = math.floor(#set / 2)
-        ret = math.average(set[i], set[i+1])
+        ret = math.average{set[i], set[i+1]}
     else
         ret = set[#set / 2]
     end
