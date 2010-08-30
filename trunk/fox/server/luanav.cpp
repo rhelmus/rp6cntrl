@@ -143,12 +143,9 @@ int vecRotate(lua_State *l)
     QVector2D *vec = NLua::checkClassData<QVector2D>(l, 1, "vector");
     float angle = -(luaL_checknumber(l, 2)); // Negate: clockwise
     const float rad = angle * M_PI / 180.0;
-    const float x = vec->x(), y = vec->y();
-    qDebug() << "X:" << x << "Y:" << y;
-    qDebug() << "rad:" << rad << "x:" << (x * cosf(rad) - y * sinf(rad)) << "y:" <<
-            (x * sinf(rad) + y * cosf(rad));
+    const float x = vec->x(), y = -vec->y(); // Negate: y downwards is positive
     vec->setX(x * cosf(rad) - y * sinf(rad));
-    vec->setY(x * sinf(rad) + y * cosf(rad));
+    vec->setY(-(x * sinf(rad) + y * cosf(rad))); // Negate: y downwards is positive
     return 0;
 }
 

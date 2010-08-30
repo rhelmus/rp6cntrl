@@ -123,7 +123,7 @@ taskIRScan =
         local maxerr = 2
         local errfound = 0
         for _, v in ipairs(scanset) do
-            if v < 20 or v < cellsize or v > 150 then
+            if v < 20 or v < grid:getcellsize() or v > 150 then
                 errfound = errfound + 1
                 if errfound > maxerr then
                     return false
@@ -179,7 +179,57 @@ taskIRScan =
                                     self.scanarray[angle][#self.scanarray[angle]]))
             end
         elseif self.status == "procresults" then
-            return true, taskMoveToNextNode -- UNDONE
+            local refreshpath = false
+            
+            -- NOTE: not ipairs because scanarray indices have 'gaps' or equal 0 and are
+            -- therefore not real lua arrays
+            for sangle, disttab in pairs(self.scanarray) do               
+                -- Distance in valid range?
+                if self:isvalidscandata(disttab) then
+                    local sdist = math.median(disttab)
+                    print(string.format("av scan[%d] = %d", sangle, sdist))
+                    
+                    local robotpos = grid:getvec(grid:getrobot())
+                    local scanpos = robot.sensoroffset()
+                    scanpos:rotate(math.wrapangle(-grid:getrobotangle()))
+                    scanpos = scanpos + robotpos
+                    
+                    local hit = nav.newvector(0, -sdist)
+                    hit:rotate(math.wrapangle(sangle + grid:getrobotangle()))
+                    hit = hit + scanpos
+                    
+                    print("botpos:", robotpos, grid:getrobotangle())
+                    print("scanpos:", scanpos)
+                    print("hit:", hit)
+                    
+                    local hitcell, expanded = grid:safegetcell(hit)
+                    
+                    print("hitcell:", hitcell)
+                    
+                    refreshpath = refreshpath or expanded
+                    grid:addobstacle(hitcell)
+                    
+                    if not refreshpath then
+                        -- Check if cell is in current path list
+                        for _, v in ipairs(currentpath) do
+                            if v == hitcell then
+                                refreshpath = true
+                                print("hitcell found")
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if refreshpath then
+                grid:setpathstart(grid:getrobot())
+                print("new start path:", grid:getrobot(), grid:getpathgoal())
+                return true, taskInitPath
+            else
+                return true, taskMoveToNextNode
+            end
+            
             --[[
             local refreshpath = false
             

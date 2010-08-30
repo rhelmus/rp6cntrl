@@ -139,7 +139,6 @@ void CPathEngine::expandGrid(int left, int up, int right, int down)
                 else
                 {
                     moveCell(&grid[x][y], 0, up);
-                    grid[x][y].yPos = y; // Update new y
                     if (y == up) // Connect with new neighbour cell
                         grid[x][y].connections[CONNECTION_UP].set(x, y-1);
                 }
