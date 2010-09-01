@@ -31,6 +31,13 @@ QPoint CNavMap::getCellFromPos(const QPoint &pos) const
     return QPoint(pos.x() / size, pos.y() / size);
 }
 
+QPoint CNavMap::getPosFromRealVec(const QPoint &vec)
+{
+    // Convert real vector to 'screen vector'
+    const int scrcellsize = getCellSize();
+    return vec * scrcellsize / realCellSize;
+}
+
 CNavMap::EObstacle CNavMap::getObstacleFromPos(const QPoint &pos, const QPoint &cell)
 {
     const QRect rect(getCellRect(cell));
@@ -147,8 +154,26 @@ void CNavMap::paintEvent(QPaintEvent *event)
 
                     if (grid[x][y].obstacles != OBSTACLE_NONE)
                         drawObstacle(rect, painter, grid[x][y].obstacles);
+
                 }
             }
+        }
+
+        painter.setPen(QPen(Qt::red, 1));
+        foreach(SScanPoint point, scanPoints)
+        {
+            const QPoint from(getCellRect(point.from).center());
+            const QPoint to(getPosFromRealVec(point.to));
+
+            painter.drawLine(from, to);
+
+            const int rsize = 6;
+            const int halfrsize = rsize / 2;
+            QRect r(from.x()-halfrsize, from.y()-halfrsize, rsize, rsize);
+            painter.fillRect(r, Qt::blue);
+
+            r.setRect(to.x()-halfrsize, to.y()-halfrsize, rsize, rsize);
+            painter.fillRect(r, Qt::red);
         }
     }
 
@@ -207,6 +232,7 @@ void CNavMap::setGrid(const QSize &size)
     grid.clear();
     grid.resize(size.width());
     grid.fill(QVector<SCell>(size.height()));
+    scanPoints.clear();
     adjustSize();
 }
 
@@ -249,6 +275,17 @@ void CNavMap::expandGrid(int left, int up, int right, int down)
             grid[x].insert(grid[x].end(), down, SCell());
     }
 
+    if (left || up)
+    {
+        for (QList<SScanPoint>::iterator it=scanPoints.begin(); it!=scanPoints.end(); ++it)
+        {
+            it->from.rx() += left;
+            it->from.ry() += up;
+            it->to.rx() += (realCellSize * left);
+            it->to.ry() += (realCellSize * up);
+        }
+    }
+
     adjustSize();
 }
 
@@ -275,6 +312,13 @@ void CNavMap::setRobot(const QPoint &pos)
 {
     robotPos = pos;
     grid[pos.x()][pos.y()].inPath = false;
+    update();
+}
+
+void CNavMap::addScanPoint(const QPoint &pos)
+{
+    qDebug() << "Add scan point:" << pos;
+    scanPoints << SScanPoint(getRobot(), pos);
     update();
 }
 

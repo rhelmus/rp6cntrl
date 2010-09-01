@@ -1224,6 +1224,12 @@ void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
             args >> w >> h;
             robotNavMap->setGrid(QSize(w, h));
         }
+        else if (msg == "cellsize")
+        {
+            float s;
+            args >> s;
+            robotNavMap->setRealCellSize(s);
+        }
         else if (msg == "gridexpanded")
         {
             float exl, exu, exr, exd;
@@ -1236,14 +1242,16 @@ void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
             args >> x >> y;
             robotNavMap->markBlockObstacle(QPoint(x, y));
         }
-        else if ((msg == "start") || (msg == "goal"))
+        else if ((msg == "start") || (msg == "goal") || (msg == "robot"))
         {
             float x, y;
             args >> x >> y;
             if (msg == "start")
                 robotNavMap->setStart(QPoint(x, y));
-            else
+            else if (msg == "goal")
                 robotNavMap->setGoal(QPoint(x, y));
+            else // robot
+                robotNavMap->setRobot(QPoint(x, y));
         }
         else if (msg == "navigating")
         {
@@ -1265,17 +1273,17 @@ void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
 
             robotNavMap->setPath(path);
         }
-        else if (msg == "robotcell")
-        {
-            float x, y;
-            args >> x >> y;
-            robotNavMap->setRobot(QPoint(x, y));
-        }
         else if (msg == "rotation")
         {
             float r;
             args >> r;
             robotNavMap->setRobotRotation(r);
+        }
+        else if (msg == "hit")
+        {
+            float x, y;
+            args >> x >> y;
+            robotNavMap->addScanPoint(QPoint(x, y));
         }
     }
 }

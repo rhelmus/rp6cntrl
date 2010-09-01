@@ -70,6 +70,7 @@ function gridMT:initclient()
     sendmsg("start", self.pathstart.x, self.pathstart.y)
     sendmsg("goal", self.pathgoal.x, self.pathgoal.y)
     sendmsg("robot", self.robot.x, self.robot.y)
+    sendmsg("cellsize", self.cellsize)
 end
 
 function gridMT:handlecmd(cmd, ...)  
@@ -178,6 +179,7 @@ end
 
 function gridMT:setpathstart(s)
     self.pathstart = s
+    sendmsg("start", s.x, s.y)
 end
 
 function gridMT:getpathstart()
@@ -186,6 +188,7 @@ end
 
 function gridMT:setpathgoal(g)
     self.pathgoal = g
+    sendmsg("goal", g.x, g.y)
 end
 
 function gridMT:getpathgoal()
@@ -194,7 +197,7 @@ end
 
 function gridMT:setrobot(r)
     self.robot = r
-    sendmsg("robotcell", r.x, r.y)
+    sendmsg("robot", r.x, r.y)
 end
 
 function gridMT:getrobot()
@@ -246,15 +249,15 @@ function gridMT:getvec(cell)
 end
 
 function gridMT:getcell(vec)
-    local x = math.floor(vec:x() / self.cellsize + 0.5)
-    local y = math.floor(vec:y() / self.cellsize + 0.5)   
+    local x = math.floor(vec:x() / self.cellsize)
+    local y = math.floor(vec:y() / self.cellsize)
     return self.grid[x][y]
 end
 
 -- Expands grid if necessary
 function gridMT:safegetcell(vec)
-    local x = math.floor(vec:x() / self.cellsize + 0.5)
-    local y = math.floor(vec:y() / self.cellsize + 0.5)
+    local x = math.floor(vec:x() / self.cellsize)
+    local y = math.floor(vec:y() / self.cellsize)
     
     local exl, exu, exr, exd = 0, 0, 0, 0
     if x < 0 then

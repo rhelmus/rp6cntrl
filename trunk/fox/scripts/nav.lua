@@ -64,7 +64,7 @@ taskMoveToNextNode =
         
         grid:setrobot(nextcell)
         
-        if targetangle ~= currentangle then
+        if targetangle ~= grid:getrobotangle() then
             self.status = "startrotate"
         else
             self.status = "startmove"
@@ -95,9 +95,10 @@ taskMoveToNextNode =
         elseif self.status == "startmove" then
             print("Moving to next cell")
             if not simmove then
-                robot.move(cellsize * 10) -- *10: to mm
+                robot.move(grid:getcellsize() * 10) -- *10: to mm
             end
             self.status = "moving"
+            self.wait = gettimems() + 500
         elseif self.status == "moving" then
             if self.wait < gettimems() and (robot.motor.movecomplete() or simmove) then
                 -- UNDONE: Need this?
@@ -197,25 +198,37 @@ taskIRScan =
                     local hit = nav.newvector(0, -sdist)
                     hit:rotate(math.wrapangle(sangle + grid:getrobotangle()))
                     hit = hit + scanpos
-                    
+                                      
                     print("botpos:", robotpos, grid:getrobotangle())
                     print("scanpos:", scanpos)
                     print("hit:", hit)
-                    
+                                       
                     local hitcell, expanded = grid:safegetcell(hit)
-                    
                     print("hitcell:", hitcell)
                     
-                    refreshpath = refreshpath or expanded
-                    grid:addobstacle(hitcell)
+                    local hx, hy = hit:x(), hit:y()
+                    if hx < 0 then
+                        hx = math.fmod(-hx, grid:getcellsize())
+                    end
+                    if hy < 0 then
+                        hy = math.fmod(-hy, grid:getcellsize())
+                    end
                     
-                    if not refreshpath then
-                        -- Check if cell is in current path list
-                        for _, v in ipairs(currentpath) do
-                            if v == hitcell then
-                                refreshpath = true
-                                print("hitcell found")
-                                break
+                    sendmsg("hit", hx, hy)
+                    
+                    -- For now discard results from current cell
+                    if hitcell ~= grid:getrobot() then
+                        refreshpath = refreshpath or expanded
+                        grid:addobstacle(hitcell)
+                        
+                        if not refreshpath then
+                            -- Check if cell is in current path list
+                            for _, v in ipairs(currentpath) do
+                                if v == hitcell then
+                                    refreshpath = true
+                                    print("hitcell found")
+                                    break
+                                end
                             end
                         end
                     end
