@@ -24,7 +24,17 @@ private:
         SCell(void) : obstacles(OBSTACLE_NONE), inPath(false) {}
     };
 
+    struct SScanPoint
+    {
+        // from: grid cell
+        // to: 'real vector'
+        QPoint from, to;
+        SScanPoint(const QPoint &f, const QPoint &t) : from(f), to(t) { }
+    };
+
     QVector<QVector<SCell> > grid;
+    QList<SScanPoint> scanPoints;
+    int realCellSize;
     QPoint startPos, goalPos, robotPos;
     int robotRotation;
     EEditMode editMode;
@@ -35,6 +45,7 @@ private:
     int getCellSize(void) const;
     QRect getCellRect(const QPoint &cell) const;
     QPoint getCellFromPos(const QPoint &pos) const;
+    QPoint getPosFromRealVec(const QPoint &vec);
     EObstacle getObstacleFromPos(const QPoint &pos, const QPoint &cell);
     void drawObstacle(QRect rect, QPainter &painter, int obstacles);
     void drawStart(const QRect &rect, QPainter &painter);
@@ -50,12 +61,14 @@ public:
     CNavMap(QWidget *parent = 0, Qt::WindowFlags f = 0);
 
     void setGrid(const QSize &size);
+    void setRealCellSize(int size) { realCellSize = size; }
     void expandGrid(int left, int up, int right, int down);
     void setPath(const QList<QPoint> &path);
     void setStart(const QPoint &pos) { startPos = pos; update(); }
     void setGoal(const QPoint &pos) { goalPos = pos; update(); }
     void setRobot(const QPoint &pos);
     void setRobotRotation(int r) { robotRotation = r; update(); }
+    void addScanPoint(const QPoint &pos);
     void markObstacle(const QPoint &pos, int o);
     void markBlockObstacle(const QPoint &pos);
     QPoint getRobot(void) const { return robotPos; }
