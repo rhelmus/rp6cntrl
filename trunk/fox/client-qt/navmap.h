@@ -32,8 +32,16 @@ private:
         SScanPoint(const QPoint &f, const QPoint &t) : from(f), to(t) { }
     };
 
+    struct SScanConnection
+    {
+        // From and to are 'real vectors'
+        QPoint from, to;
+        SScanConnection(const QPoint &f, const QPoint &t) : from(f), to(t) { }
+    };
+
     QVector<QVector<SCell> > grid;
     QList<SScanPoint> scanPoints;
+    QList<SScanConnection> scanConnections;
     int realCellSize;
     QPoint startPos, goalPos, robotPos;
     int robotRotation;
@@ -69,6 +77,7 @@ public:
     void setRobot(const QPoint &pos);
     void setRobotRotation(int r) { robotRotation = r; update(); }
     void addScanPoint(const QPoint &pos);
+    void addScanConnection(const QPoint &start, const QPoint &end);
     void markObstacle(const QPoint &pos, int o);
     void markBlockObstacle(const QPoint &pos);
     QPoint getRobot(void) const { return robotPos; }

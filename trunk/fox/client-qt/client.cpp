@@ -1285,6 +1285,12 @@ void CQtClient::tcpHandleLuaMsg(const QString &msg, QDataStream &args)
             args >> x >> y;
             robotNavMap->addScanPoint(QPoint(x, y));
         }
+        else if (msg == "connecthit")
+        {
+            float fx, fy, tx, ty;
+            args >> fx >> fy >> tx >> ty;
+            robotNavMap->addScanConnection(QPoint(fx, fy), QPoint(tx, ty));
+        }
     }
 }
 
