@@ -159,7 +159,7 @@ void CNavMap::paintEvent(QPaintEvent *event)
             }
         }
 
-        painter.setPen(QPen(Qt::red, 1));
+        painter.setPen(QPen(Qt::red, 0.5));
         foreach(SScanPoint point, scanPoints)
         {
             const QPoint from(getCellRect(point.from).center());
@@ -174,6 +174,12 @@ void CNavMap::paintEvent(QPaintEvent *event)
 
             r.setRect(to.x()-halfrsize, to.y()-halfrsize, rsize, rsize);
             painter.fillRect(r, Qt::red);
+        }
+
+        painter.setPen(QPen(Qt::magenta, 0.5));
+        foreach(SScanConnection con, scanConnections)
+        {
+            painter.drawLine(getPosFromRealVec(con.from), getPosFromRealVec(con.to));
         }
     }
 
@@ -233,6 +239,7 @@ void CNavMap::setGrid(const QSize &size)
     grid.resize(size.width());
     grid.fill(QVector<SCell>(size.height()));
     scanPoints.clear();
+    scanConnections.clear();
     adjustSize();
 }
 
@@ -277,12 +284,23 @@ void CNavMap::expandGrid(int left, int up, int right, int down)
 
     if (left || up)
     {
+        const int rdx = (realCellSize * left), rdy = (realCellSize * up);
+
         for (QList<SScanPoint>::iterator it=scanPoints.begin(); it!=scanPoints.end(); ++it)
         {
             it->from.rx() += left;
             it->from.ry() += up;
-            it->to.rx() += (realCellSize * left);
-            it->to.ry() += (realCellSize * up);
+            it->to.rx() += rdx;
+            it->to.ry() += rdy;
+        }
+
+        for (QList<SScanConnection>::iterator it=scanConnections.begin();
+             it!=scanConnections.end(); ++it)
+        {
+            it->from.rx() += rdx;
+            it->from.ry() += rdy;
+            it->to.rx() += rdx;
+            it->to.ry() += rdy;
         }
     }
 
@@ -319,6 +337,13 @@ void CNavMap::addScanPoint(const QPoint &pos)
 {
     qDebug() << "Add scan point:" << pos;
     scanPoints << SScanPoint(getRobot(), pos);
+    update();
+}
+
+void CNavMap::addScanConnection(const QPoint &start, const QPoint &end)
+{
+    qDebug() << "Add scan connection:" << start << end;
+    scanConnections << SScanConnection(start, end);
     update();
 }
 

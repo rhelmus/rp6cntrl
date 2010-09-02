@@ -287,7 +287,7 @@ function gridMT:safegetcell(vec)
         
     end
 
-    return self.grid[x][y], expand
+    return self.grid[x][y], expand, exl, exu, exr, exd
 end
 
 function gridMT:__tostring()
