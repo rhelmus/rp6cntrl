@@ -94,6 +94,7 @@ inline RC5data_t getLastRC5(void) { return lastRC5Data; }
 inline void resetLastRC5(void) { lastRC5Data.data = 0; }
 
 void setServoRange(uint8_t left, uint8_t right);
+void setServoTimer1(uint32_t timer);
 uint8_t getSharpIRDistance(void); 
 
 void updateInterface(void);

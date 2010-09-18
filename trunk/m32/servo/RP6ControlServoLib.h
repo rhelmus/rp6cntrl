@@ -81,11 +81,12 @@
 
 // Moved externally
 extern uint8_t servoLeftTouch, servoRightTouch;
+extern uint32_t servoTimer1;
 #define LEFT_TOUCH         servoLeftTouch         // Left servo touch      (~0.7ms)
 #define RIGHT_TOUCH         servoRightTouch         // Right servo touch     (~2.3ms)
 #define MIDDLE_POSITION      (RIGHT_TOUCH / 2) // Middle position (~1.5ms)
 #define PULSE_REPETITION   17         // Pulse repetition freq. (~50Hz)
-#define F_TIMER1         100000      // Timer 1 frequency     (100kHz)
+#define F_TIMER1         servoTimer1      // Timer 1 frequency     (100kHz)
 
 // Servo ports: 
 #define SERVO1_PULSE_ON      (PORTC |= IO_PC2)   // PC2 
@@ -96,8 +97,10 @@ extern uint8_t servoLeftTouch, servoRightTouch;
 #define SERVO3_PULSE_OFF   (PORTC &= ~IO_PC4) 
 #define SERVO4_PULSE_ON      (PORTC |= IO_PC5)   // PC5 
 #define SERVO4_PULSE_OFF   (PORTC &= ~IO_PC5) 
-#define SERVO5_PULSE_ON      (PORTC |= IO_PC6)   // PC6 
-#define SERVO5_PULSE_OFF   (PORTC &= ~IO_PC6) 
+#define SERVO5_PULSE_ON      (PORTC |= IO_PC6)   // PC6
+#define SERVO5_PULSE_OFF   (PORTC &= ~IO_PC6)
+/*#define SERVO5_PULSE_ON      (PORTA |= ADC3)      // PA3
+#define SERVO5_PULSE_OFF   (PORTA &= ~ADC3)*/
 #define SERVO6_PULSE_ON      (PORTC |= IO_PC7)   // PC7 
 #define SERVO6_PULSE_OFF   (PORTC &= ~IO_PC7) 
 #define SERVO7_PULSE_ON      (PORTD |= IO_PD5)   // PD5 

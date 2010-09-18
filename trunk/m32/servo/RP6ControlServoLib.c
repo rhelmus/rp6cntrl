@@ -85,7 +85,8 @@ void initSERVO(uint8_t servos)
    if (servos & SERVO2) {DDRC |= IO_PC3; PORTC &= ~IO_PC3;} 
    if (servos & SERVO3) {DDRC |= IO_PC4; PORTC &= ~IO_PC4;} 
    if (servos & SERVO4) {DDRC |= IO_PC5; PORTC &= ~IO_PC5;} 
-   if (servos & SERVO5) {DDRC |= IO_PC6; PORTC &= ~IO_PC6;} 
+   if (servos & SERVO5) {DDRC |= IO_PC6; PORTC &= ~IO_PC6;}
+   //if (servos & SERVO5) {DDRA |= ADC3; PORTA &= ~ADC3;}
    if (servos & SERVO6) {DDRC |= IO_PC7; PORTC &= ~IO_PC7;} 
    if (servos & SERVO7) {DDRD |= IO_PD5; PORTD &= ~IO_PD5;} 
    if (servos & SERVO8) {DDRD |= IO_PD6; PORTD &= ~IO_PD6;} 
@@ -107,7 +108,7 @@ void initSERVO(uint8_t servos)
    TCCR1B =  (0 << ICNC1) 
          | (0 << ICES1) 
          | (0 << WGM13) 
-         | (1 << WGM12) 
+         | (1 << WGM12)
          | (0 << CS12) 
          | (1 << CS11) 
          | (0 << CS10); 

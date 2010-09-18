@@ -45,6 +45,7 @@ int main(void)
     setServo(MIDDLE_POSITION); // Place servo at middle
     DDRA &= ~ADC2; // Enable sharp IR for readout
 
+#if 1
     for (;;)
     {
         updateInterface();
@@ -55,6 +56,33 @@ int main(void)
         task_I2CTWI();
         task_SERVO();
     }
-    
+#else
+
+    startStopwatch4();
+
+    uint16_t pos = 0;
+    for (;;)
+    {
+        if (getStopwatch4() > 1500) {
+            setServo(pos);
+            writeString_P("Servopos: ");
+            writeInteger(pos, DEC);
+            writeChar('\n');
+
+            pos += 8;
+            if (pos > RIGHT_TOUCH) {pos = 0;}
+            setStopwatch4(0);
+        }
+
+        updateInterface();
+
+        checkCommands();
+        pluginThink();
+
+        task_I2CTWI();
+        task_SERVO();
+    }
+#endif
+
     return 0;
 }

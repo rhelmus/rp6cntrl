@@ -1,7 +1,10 @@
+#include <stdint.h>
+
 #include "RP6ControlLib.h"
 #include "RP6I2CmasterTWI.h"
 #include "../shared/shared.h"
 #include "interface.h"
+#include "servo.h"
 
 enum { REQUEST_DUMP_BASE_DATA = 0 };
 
@@ -13,23 +16,37 @@ uint16_t slaveMicUpdateTime;
 
 // Replaced macros from servolib to these
 uint8_t servoLeftTouch = 46;
-uint8_t servoRightTouch = 196;
+uint8_t servoRightTouch = 188;
+uint32_t servoTimer1 = 100000;
+
+void sendSerialByte(uint8_t data)
+{
+    // Adepted from RP6 uart lib
+    while (!(UCSRA & (1<<UDRE)))
+    {
+        // Keep running mandatory tasks
+        task_I2CTWI();
+        task_SERVO();
+    }
+
+    UDR = data;
+}
 
 void sendSerialMSGByte(ESerialMessage msg, uint8_t data)
 {
-    writeChar(SERIAL_MSG_START);
-    writeChar(2); // Size
-    writeChar(msg);
-    writeChar(data);
+    sendSerialByte(SERIAL_MSG_START);
+    sendSerialByte(2); // Size
+    sendSerialByte(msg);
+    sendSerialByte(data);
 }
 
 void sendSerialMSGWord(ESerialMessage msg, uint16_t data)
 {
-    writeChar(SERIAL_MSG_START);
-    writeChar(3); // Size
-    writeChar(msg);
-    writeChar(data); // Low
-    writeChar(data >> 8); // High
+    sendSerialByte(SERIAL_MSG_START);
+    sendSerialByte(3); // Size
+    sendSerialByte(msg);
+    sendSerialByte(data); // Low
+    sendSerialByte(data >> 8); // High
 }
 
 void I2CError(uint8_t error)
@@ -209,6 +226,13 @@ void setServoRange(uint8_t left, uint8_t right)
 {
     servoLeftTouch = left;
     servoRightTouch = right;
+}
+
+void setServoTimer1(uint32_t timer)
+{
+    servoTimer1 = timer;
+    // From initSERVO()
+    OCR1A = ((F_CPU/8/timer)-1);   // 19 at 100kHz
 }
 
 uint8_t getSharpIRDistance(void)
