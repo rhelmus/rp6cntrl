@@ -39,7 +39,8 @@ static const char setUsageStr[] PROGMEM =
     "slave\t\tEnables or disables slave mode. Usage: boolean.\n"
     "slavemic\t\tSlave mic update time. Usage: time in msec.\n"
     "servo\t\tServo position. Usage: 0..180.\n"
-    "srange\t\tServo touch range. Usage: left, right\n";
+    "srange\t\tServo touch range. Usage: left, right\n"
+    "stimer\t\tServo timer1. Usage: timer\n";
 
 static const char dumpUsageStr[] PROGMEM =
     "dump usage:\n\n"
@@ -202,6 +203,10 @@ void handleSetCommand(const char **cmd, uint8_t count)
             writeString_P("Error: need atleast 3 arguments\n");
         else
             setServoRange(atoi(cmd[1]), atoi(cmd[2]));
+    }
+    else if (!strcmp_P(cmd[0], PSTR("stimer")))
+    {
+        setServoTimer1(atol(cmd[1]));
     }
 }
 

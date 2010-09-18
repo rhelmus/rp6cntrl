@@ -8,7 +8,7 @@ RC5data_t lastRC5Data;
 SMotorDirections motorDirections;
 
 // Modified lib source so that ROTATION_FACTOR points to this var
-uint16_t rotationFactor = 750; // Originally 688
+uint16_t rotationFactor = 800; // Originally 688
 
 // ACS Settings. Modified lib header to use following variables.
 uint8_t ACSUpdateInterval = 2;

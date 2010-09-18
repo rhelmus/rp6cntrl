@@ -159,7 +159,7 @@ void CNavMap::paintEvent(QPaintEvent *event)
             }
         }
 
-        painter.setPen(QPen(Qt::red, 0.5));
+        painter.setPen(QPen(Qt::red, 0.2));
         foreach(SScanPoint point, scanPoints)
         {
             const QPoint from(getCellRect(point.from).center());
@@ -176,7 +176,7 @@ void CNavMap::paintEvent(QPaintEvent *event)
             painter.fillRect(r, Qt::red);
         }
 
-        painter.setPen(QPen(Qt::magenta, 0.5));
+        painter.setPen(QPen(Qt::magenta, 0.7));
         foreach(SScanConnection con, scanConnections)
         {
             painter.drawLine(getPosFromRealVec(con.from), getPosFromRealVec(con.to));
