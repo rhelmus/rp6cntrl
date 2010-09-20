@@ -15,8 +15,6 @@ SOURCES += serial.cpp \
     ../../shared/pathengine.cpp \
     luanav.cpp
 
-# GUI is requiered as server provides lua bindings for QVector2D
-QT += gui
 QT += network
 INCLUDEPATH += ../qextserialport/include
 LIBS += -lqextserialport
