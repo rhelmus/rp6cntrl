@@ -16,6 +16,7 @@ SOURCES += serial.cpp \
     luanav.cpp
 
 QT += network
+QT -= gui
 INCLUDEPATH += ../qextserialport/include
 LIBS += -lqextserialport
 INCLUDEPATH += ../../shared
