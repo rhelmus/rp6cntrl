@@ -182,11 +182,11 @@ void handleSetCommand(const char **cmd, uint8_t count)
     {
         extern uint16_t slaveMicUpdateTime;
         slaveMicUpdateTime = atoi(cmd[1]);
-        setStopwatch3(0);
+        setStopwatch4(0);
         if (slaveMicUpdateTime)
-            startStopwatch3();
+            startStopwatch4();
         else
-            stopStopwatch3();
+            stopStopwatch4();
     }
     else if (!strcmp_P(cmd[0], PSTR("servo")))
     {
