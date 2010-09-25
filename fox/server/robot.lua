@@ -35,7 +35,15 @@ function shortrotate(angle, speed)
     end
 end
 
-function stop()
+function motor.setspeed(left, right)
+    exec(string.format("set movespeed %d %d", left, right))
+end
+
+function motor.setdir(dir)
+    exec("set dir " .. dir)
+end
+
+function motor.stop()
     exec("stop")
 end
 

@@ -105,10 +105,10 @@ void I2CRequestReady(uint8_t id)
 
             sendSerialMSGByte(SERIAL_ACS_POWER, getACSPowerState());
 
-            if (slaveMicUpdateTime && (getStopwatch3() >= slaveMicUpdateTime))
+            if (slaveMicUpdateTime && (getStopwatch4() >= slaveMicUpdateTime))
             {
                 sendSerialMSGWord(SERIAL_MIC, getMicrophonePeak());
-                setStopwatch3(0);
+                setStopwatch4(0);
             }
 
             sendSerialMSGWord(SERIAL_LASTRC5, getLastRC5().data);
