@@ -201,6 +201,7 @@ void setMoveDirection(uint8_t dir)
 void stopMovement(void)
 {
     I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_STOP);
+    beep(120, 80);
 }
 
 void move(uint8_t speed, uint8_t dir, uint16_t dist)
