@@ -198,7 +198,7 @@ void CNCursClient::tcpRobotStateUpdate(const SStateSensors &,
 void CNCursClient::tcpHandleRobotData(ETcpMessage msg, int data)
 {
     averagedSensorDataMap[msg].count++;
-    averagedSensorDataMap[msg].total = data;
+    averagedSensorDataMap[msg].total += data;
 }
 
 void CNCursClient::appendConsoleOutput(const QString &text)
