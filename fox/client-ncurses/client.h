@@ -1,5 +1,6 @@
 #include <QObject>
 #include <QTcpSocket>
+#include <QTime>
 
 #include "client_base.h"
 #include "shared.h"
@@ -15,11 +16,14 @@ class CTextField;
 }
 
 class CDisplayWidget;
+class CNCursClient;
 
 class CNCursManager: public QObject
 {
     Q_OBJECT
     
+    CNCursClient *NCursClient;
+
 private slots:
     void updateNCurs(void);
     void stopNCurs(void);
@@ -59,10 +63,20 @@ class CNCursClient: public CBaseClient, public NNCurses::CWindow
     TScreen *mainScreen, *consoleScreen, *logScreen;
     bool drivingEnabled;
 
+    struct SSensorData
+    {
+        uint32_t total, count;
+        SSensorData(void) : total(0), count(0) {}
+    };
+
+    std::map<ETcpMessage, SSensorData> averagedSensorDataMap;
+
     CDisplayWidget *movementDisplay, *sensorDisplay, *otherDisplay;
     NNCurses::CButton *connectButton;
 
     NNCurses::CTextField *consoleOutput, *logWidget;
+
+    QTime updateTime;
     
     TScreen *createMainScreen(void);
     TScreen *createConsoleScreen(void);
@@ -90,4 +104,6 @@ protected:
     
 public:
     CNCursClient(void);
+
+    void update(void);
 };
