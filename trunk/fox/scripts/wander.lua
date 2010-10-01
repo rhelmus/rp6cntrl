@@ -28,6 +28,7 @@ driveTask =
         robot.motor.stop()
         self.delay = gettimems() + 750
         self.initmotor = true
+        self.acsfreetime = 0
         print("Started drive task")
     end,
     
@@ -37,6 +38,10 @@ driveTask =
         end
        
         self.delay = gettimems() + 100
+        
+        if not robot.sensors.acsleft() and not robot.sensors.acsright() then
+            self.acsfreetime = gettimems()
+        end
 
         if self.initmotor then
             robot.motor.setspeed(80, 80)
@@ -44,11 +49,11 @@ driveTask =
             self.initmotor = false
         elseif robot.sensors.bumperleft() or robot.sensors.bumperright() then
             return true, collisionTask
-        elseif robot.sensors.acsleft() or robot.sensors.acsright() then
+        elseif self.acsfreetime < (gettimems() - 300) then
             return true, scanTask
         else
             local dist = robot.sensors.sharpir()
-            if dist > 20 and dist < 50 then
+            if dist > 20 and dist < 40 then
                 return true, scanTask
             end
         end
@@ -188,7 +193,7 @@ scanTask =
 }
 
 function init()
-    robot.setacs("med")
+    robot.setacs("low")
     settask(driveTask)
     math.randomseed(os.time())
 end

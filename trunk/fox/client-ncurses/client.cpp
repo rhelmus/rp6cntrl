@@ -45,12 +45,12 @@ CNCursManager::CNCursManager(QObject *parent) : QObject(parent)
     // Setup ncurses
     NNCurses::TUI.InitNCurses();
 
-    CNCursClient *w = new CNCursClient;
-    w->SetFColors(COLOR_GREEN, COLOR_BLUE);
-    w->SetDFColors(COLOR_WHITE, COLOR_BLUE);
-    w->SetMinWidth(60);
-    w->SetMinHeight(15);
-    NNCurses::TUI.AddGroup(w, true);
+    NCursClient = new CNCursClient;
+    NCursClient->SetFColors(COLOR_GREEN, COLOR_BLUE);
+    NCursClient->SetDFColors(COLOR_WHITE, COLOR_BLUE);
+    NCursClient->SetMinWidth(60);
+    NCursClient->SetMinHeight(15);
+    NNCurses::TUI.AddGroup(NCursClient, true);
 
     // Updates ncurses TUI
     QTimer *timer = new QTimer(this);
@@ -65,6 +65,8 @@ void CNCursManager::updateNCurs()
 {
     if (!NNCurses::TUI.Run())
         QCoreApplication::quit();
+
+    NCursClient->update();
 }
 
 void CNCursManager::stopNCurs()
@@ -195,50 +197,8 @@ void CNCursClient::tcpRobotStateUpdate(const SStateSensors &,
 
 void CNCursClient::tcpHandleRobotData(ETcpMessage msg, int data)
 {
-    if (msg == TCP_BASE_LEDS)
-        otherDisplay->setDisplayValue(DISPLAY_MAIN_LEDS, 0,
-                                        binaryToStdString(data));
-    else if (msg == TCP_M32_LEDS)
-        otherDisplay->setDisplayValue(DISPLAY_M32_LEDS, 0,
-                                        binaryToStdString(data));
-    else if (msg == TCP_LIGHT_LEFT)
-        sensorDisplay->setDisplayValue(DISPLAY_LIGHT, 0, intToStdString(data));
-    else if (msg == TCP_LIGHT_RIGHT)
-        sensorDisplay->setDisplayValue(DISPLAY_LIGHT, 1, intToStdString(data));
-    else if (msg == TCP_MOTOR_SPEED_LEFT)
-        movementDisplay->setDisplayValue(DISPLAY_SPEED, 0, intToStdString(data));
-    else if (msg == TCP_MOTOR_SPEED_RIGHT)
-        movementDisplay->setDisplayValue(DISPLAY_SPEED, 1, intToStdString(data));
-    else if (msg == TCP_MOTOR_DIST_LEFT)
-        movementDisplay->setDisplayValue(DISPLAY_DISTANCE, 0, intToStdString(data));
-    else if (msg == TCP_MOTOR_DIST_RIGHT)
-        movementDisplay->setDisplayValue(DISPLAY_DISTANCE, 1, intToStdString(data));
-    else if (msg == TCP_MOTOR_CURRENT_LEFT)
-        movementDisplay->setDisplayValue(DISPLAY_CURRENT, 0, intToStdString(data));
-    else if (msg == TCP_MOTOR_CURRENT_RIGHT)
-        movementDisplay->setDisplayValue(DISPLAY_CURRENT, 1, intToStdString(data));
-    else if (msg == TCP_MOTOR_DIRECTIONS)
-    {
-        SMotorDirections dir;
-        dir.byte = data;
-        movementDisplay->setDisplayValue(DISPLAY_DIRECTION, 0,
-                                            directionToStdString(dir.left));
-        movementDisplay->setDisplayValue(DISPLAY_DIRECTION, 1,
-                                            directionToStdString(dir.right));
-    }
-    else if (msg == TCP_BATTERY)
-        otherDisplay->setDisplayValue(DISPLAY_BATTERY, 0, intToStdString(data));
-    else if (msg == TCP_LASTRC5)
-    {
-        RC5data_t rc5;
-        rc5.data = data;
-        otherDisplay->setDisplayValue(DISPLAY_RC5, 0,
-                                            intToStdString(rc5.device));
-        otherDisplay->setDisplayValue(DISPLAY_RC5, 1,
-                                            intToStdString(rc5.toggle_bit));
-        otherDisplay->setDisplayValue(DISPLAY_RC5, 2,
-                                            intToStdString(rc5.key_code));
-    }
+    averagedSensorDataMap[msg].count++;
+    averagedSensorDataMap[msg].total = data;
 }
 
 void CNCursClient::appendConsoleOutput(const QString &text)
@@ -321,4 +281,70 @@ void CNCursClient::CoreGetButtonDescs(NNCurses::TButtonDescList &list)
     list.push_back(NNCurses::TButtonDescPair("F4", "Log"));
     list.push_back(NNCurses::TButtonDescPair("F5", "Toggle drive"));
     CWindow::CoreGetButtonDescs(list);
+}
+
+void CNCursClient::update()
+{
+    if (updateTime.isNull() || (updateTime.elapsed() >= 1000))
+    {
+        for (std::map<ETcpMessage, SSensorData>::iterator it=averagedSensorDataMap.begin();
+             it!= averagedSensorDataMap.end(); ++it)
+        {
+            if (!it->second.count)
+                continue;
+
+            const ETcpMessage msg = it->first;
+            const uint32_t data = it->second.total / it->second.count;
+
+            it->second.total = 0;
+            it->second.count = 0;
+
+            if (msg == TCP_BASE_LEDS)
+                otherDisplay->setDisplayValue(DISPLAY_MAIN_LEDS, 0,
+                                              binaryToStdString(data));
+            else if (msg == TCP_M32_LEDS)
+                otherDisplay->setDisplayValue(DISPLAY_M32_LEDS, 0,
+                                              binaryToStdString(data));
+            else if (msg == TCP_LIGHT_LEFT)
+                sensorDisplay->setDisplayValue(DISPLAY_LIGHT, 0, intToStdString(data));
+            else if (msg == TCP_LIGHT_RIGHT)
+                sensorDisplay->setDisplayValue(DISPLAY_LIGHT, 1, intToStdString(data));
+            else if (msg == TCP_MOTOR_SPEED_LEFT)
+                movementDisplay->setDisplayValue(DISPLAY_SPEED, 0, intToStdString(data));
+            else if (msg == TCP_MOTOR_SPEED_RIGHT)
+                movementDisplay->setDisplayValue(DISPLAY_SPEED, 1, intToStdString(data));
+            else if (msg == TCP_MOTOR_DIST_LEFT)
+                movementDisplay->setDisplayValue(DISPLAY_DISTANCE, 0, intToStdString(data));
+            else if (msg == TCP_MOTOR_DIST_RIGHT)
+                movementDisplay->setDisplayValue(DISPLAY_DISTANCE, 1, intToStdString(data));
+            else if (msg == TCP_MOTOR_CURRENT_LEFT)
+                movementDisplay->setDisplayValue(DISPLAY_CURRENT, 0, intToStdString(data));
+            else if (msg == TCP_MOTOR_CURRENT_RIGHT)
+                movementDisplay->setDisplayValue(DISPLAY_CURRENT, 1, intToStdString(data));
+            else if (msg == TCP_MOTOR_DIRECTIONS)
+            {
+                SMotorDirections dir;
+                dir.byte = data;
+                movementDisplay->setDisplayValue(DISPLAY_DIRECTION, 0,
+                                                 directionToStdString(dir.left));
+                movementDisplay->setDisplayValue(DISPLAY_DIRECTION, 1,
+                                                 directionToStdString(dir.right));
+            }
+            else if (msg == TCP_BATTERY)
+                otherDisplay->setDisplayValue(DISPLAY_BATTERY, 0, intToStdString(data));
+            else if (msg == TCP_LASTRC5)
+            {
+                RC5data_t rc5;
+                rc5.data = data;
+                otherDisplay->setDisplayValue(DISPLAY_RC5, 0,
+                                              intToStdString(rc5.device));
+                otherDisplay->setDisplayValue(DISPLAY_RC5, 1,
+                                              intToStdString(rc5.toggle_bit));
+                otherDisplay->setDisplayValue(DISPLAY_RC5, 2,
+                                              intToStdString(rc5.key_code));
+            }
+        }
+
+        updateTime.start();
+    }
 }
