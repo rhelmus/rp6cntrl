@@ -224,6 +224,7 @@ typedef enum
     TCP_LUAMSG,
 
     // Client
+    TCP_UPDATEDELAY,
     TCP_COMMAND,
     TCP_GETSCRIPTS,
     TCP_RUNLUA,

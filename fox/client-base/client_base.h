@@ -5,6 +5,7 @@
 #include "shared.h"
 
 class QDataStream;
+class QTimer;
 
 class CBaseClient;
 
@@ -14,14 +15,16 @@ class CBaseClientTcpHandler: public QObject
     Q_OBJECT
     
     CBaseClient *baseClient;
-    quint32 tcpReadBlockSize;
+    quint32 tcpReadBlockSize, bytesReceivedLastSecond, bytesReceivedThisSecond;
     QTcpSocket *clientSocket;
+    QTimer *bytesReceivedTimer;
    
 private slots:
     void connectedToServer(void);
     void disconnectedFromServer(void);
     void serverHasData(void);
     void socketError(QAbstractSocket::SocketError);
+    void updateBytesReceived(void);
     
 public:
     CBaseClientTcpHandler(CBaseClient *b);
@@ -31,6 +34,7 @@ public:
     void disconnectFromServer(void) { clientSocket->abort(); }
     bool connected(void) const
     { return (clientSocket->state() == QAbstractSocket::ConnectedState); }
+    quint32 bytesReceivedSecond(void) const { return bytesReceivedLastSecond; }
 };
 
 class CBaseClient
@@ -62,6 +66,7 @@ protected:
     void connectToHost(const QString &host) { tcpHandler.connectToHost(host); }
     void disconnectFromServer(void) { tcpHandler.disconnectFromServer(); }
     bool connected(void) const { return tcpHandler.connected(); }
+    quint32 bytesReceivedSecond(void) const { return tcpHandler.bytesReceivedSecond(); }
     void executeCommand(const QString &cmd);
     void updateDriving(int dir);
     void stopDrive(void);

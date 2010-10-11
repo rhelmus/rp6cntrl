@@ -53,6 +53,8 @@ class CQtClient: public QMainWindow, public CBaseClient
     
     QMap<ETcpMessage, SSensorData> averagedSensorDataMap;
     QMap<ETcpMessage, int> delayedSensorDataMap;
+    QTimer *bytesReceivedTimer;
+    QLabel *bytesReceivedLabel;
     
     // Overview widget
     QLCDNumber *motorSpeedLCD[2];
@@ -193,6 +195,7 @@ class CQtClient: public QMainWindow, public CBaseClient
     
 private slots:
     void updateSensors(void);
+    void updateBytesReceivedSecond(void);
     void toggleServerConnection(void);
     void setMicUpdateTime(int value);
     void micPlotToggled(bool checked);

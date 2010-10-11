@@ -1,3 +1,21 @@
+--[[
+IDEAS:
+    * Scan while drive (if possible)
+        - Quick 4 scans (2 on both sides)
+        - 90 and -90: Adjust speed ratio
+        - Other: Randomly turn left/right if looks favourable
+        - Maybe: wall following (needs close 90 degree scan --> only
+          if not planning to change direction)
+    * Light sensors: avoid darkness
+    * ACS
+        - Alternate power
+        - Act differently on left/right if power is not low
+    * LEDs, bleeps...
+        - Bleeping while going backwards
+    * Change speed depending on scans
+    * Button: suspend movement
+--]]
+
 local ret = makescript()
 
 local currenttask = nil
@@ -29,6 +47,11 @@ driveTask =
         self.delay = gettimems() + 750
         self.initmotor = true
         self.acsfreetime = 0
+        self.sharpirclosetime = 0
+        self.scanstate = "idle"
+        self.scantime = 0
+        self.scandelay = 0
+        self.prevservopos = -1
         print("Started drive task")
     end,
     
@@ -51,10 +74,37 @@ driveTask =
             return true, collisionTask
         elseif self.acsfreetime < (gettimems() - 300) then
             return true, scanTask
-        else
+        elseif self.scanstate == "idle" then
             local dist = robot.sensors.sharpir()
             if dist > 20 and dist < 40 then
                 return true, scanTask
+            end
+            
+            if dist < 100 and dist > 20 then
+                self.sharpirclosetime = gettimems()
+            end
+            
+            if self.scandelay < gettimems() and
+               self.sharpirclosetime < (gettimems() - 500) then
+                self.scandelay = gettimems() + 1000
+                self.scantime = self.scandelay + 500
+                self.scanstate = "scan"
+                self.scanarray = { }
+                -- UNDONE
+                self.scanangle = 270
+                robot.setservo(0)
+            end
+        elseif self.scanstate == "scan" then
+            if self.scandelay < gettimems() then
+                table.insert(self.scanarray, robot.sensors.sharpir())
+                if self.scantime < gettimems() then
+                    -- ...
+                    self.scanstate = "idle"
+                    robot.setservo(90)
+                    self.scandelay = gettimems() + math.random(2000, 10000)
+                else
+                    self.scandelay = gettimems() + 50
+                end
             end
         end
         

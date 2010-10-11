@@ -66,6 +66,10 @@ CControl::CControl(QObject *parent) : QObject(parent)
     initTcpDataTypes();
     initSerial2TcpMap();
     initLua();
+
+    sendTcpTimer = new QTimer(this);
+    connect(sendTcpTimer, SIGNAL(timeout()), this, SLOT(sendTcpData()));
+    sendTcpTimer->start(500);
 }
 
 void CControl::initSerial2TcpMap()
@@ -133,7 +137,7 @@ void CControl::initLua()
     NLua::luaInterface.exec();
 }
 
-void CControl::registerLuaDataFunc(const char *name, ESerialMessage msg,
+void CControl::registerLuaDataFunc(const char *name, ETcpMessage msg,
                                    const char *submod, lua_CFunction func)
 {
     lua_getglobal(NLua::luaInterface, "robot");
@@ -168,34 +172,34 @@ void CControl::registerLuaDataFunc(const char *name, ESerialMessage msg,
 
 void CControl::registerLuaRobotModule()
 {
-    registerLuaDataFunc("bumperleft", SERIAL_STATE_SENSORS, "sensors", luaGetBumperLeft);
-    registerLuaDataFunc("bumperright", SERIAL_STATE_SENSORS, "sensors", luaGetBumperRight);
-    registerLuaDataFunc("acsleft", SERIAL_STATE_SENSORS, "sensors", luaGetACSLeft);
-    registerLuaDataFunc("acsright", SERIAL_STATE_SENSORS, "sensors", luaGetACSRight);
-    registerLuaDataFunc("movecomplete", SERIAL_STATE_SENSORS, "motor", luaGetMoveComplete);
-    registerLuaDataFunc("base", SERIAL_BASE_LEDS, "leds");
-    registerLuaDataFunc("m32", SERIAL_M32_LEDS, "leds");
-    registerLuaDataFunc("lightleft", SERIAL_LIGHT_LEFT, "sensors");
-    registerLuaDataFunc("lightright", SERIAL_LIGHT_RIGHT, "sensors");
-    registerLuaDataFunc("speedleft", SERIAL_MOTOR_SPEED_LEFT, "motor");
-    registerLuaDataFunc("speedright", SERIAL_MOTOR_SPEED_RIGHT, "motor");
-    registerLuaDataFunc("destspeedleft", SERIAL_MOTOR_DESTSPEED_LEFT, "motor");
-    registerLuaDataFunc("destspeedright", SERIAL_MOTOR_DESTSPEED_RIGHT, "motor");
-    registerLuaDataFunc("distleft", SERIAL_MOTOR_DIST_LEFT, "motor");
-    registerLuaDataFunc("distright", SERIAL_MOTOR_DIST_RIGHT, "motor");
-    registerLuaDataFunc("destdistleft", SERIAL_MOTOR_DESTDIST_LEFT, "motor");
-    registerLuaDataFunc("destdistright", SERIAL_MOTOR_DESTDIST_RIGHT, "motor");
-    registerLuaDataFunc("motorcurrentleft", SERIAL_MOTOR_CURRENT_LEFT, "motor");
-    registerLuaDataFunc("motorcurrentright", SERIAL_MOTOR_CURRENT_RIGHT, "motor");
-    registerLuaDataFunc("motordirleft", SERIAL_MOTOR_DIRECTIONS, "motor", luaGetMotorDirLeft);
-    registerLuaDataFunc("motordirright", SERIAL_MOTOR_DIRECTIONS, "motor", luaGetMotorDirRight);
-    registerLuaDataFunc("battery", SERIAL_BATTERY, "sensors");
-    registerLuaDataFunc("acspower", SERIAL_ACS_POWER, "sensors", luaGetACSPower);
-    registerLuaDataFunc("mic", SERIAL_MIC, "sensors");
-    registerLuaDataFunc("key", SERIAL_LASTRC5, "rc5", luaGetRC5Key);
-    registerLuaDataFunc("device", SERIAL_LASTRC5, "rc5", luaGetRC5Device);
-    registerLuaDataFunc("toggle", SERIAL_LASTRC5, "rc5", luaGetRC5Toggle);
-    registerLuaDataFunc("sharpir", SERIAL_SHARPIR, "sensors");
+    registerLuaDataFunc("bumperleft", TCP_STATE_SENSORS, "sensors", luaGetBumperLeft);
+    registerLuaDataFunc("bumperright", TCP_STATE_SENSORS, "sensors", luaGetBumperRight);
+    registerLuaDataFunc("acsleft", TCP_STATE_SENSORS, "sensors", luaGetACSLeft);
+    registerLuaDataFunc("acsright", TCP_STATE_SENSORS, "sensors", luaGetACSRight);
+    registerLuaDataFunc("movecomplete", TCP_STATE_SENSORS, "motor", luaGetMoveComplete);
+    registerLuaDataFunc("base", TCP_BASE_LEDS, "leds");
+    registerLuaDataFunc("m32", TCP_M32_LEDS, "leds");
+    registerLuaDataFunc("lightleft", TCP_LIGHT_LEFT, "sensors");
+    registerLuaDataFunc("lightright", TCP_LIGHT_RIGHT, "sensors");
+    registerLuaDataFunc("speedleft", TCP_MOTOR_SPEED_LEFT, "motor");
+    registerLuaDataFunc("speedright", TCP_MOTOR_SPEED_RIGHT, "motor");
+    registerLuaDataFunc("destspeedleft", TCP_MOTOR_DESTSPEED_LEFT, "motor");
+    registerLuaDataFunc("destspeedright", TCP_MOTOR_DESTSPEED_RIGHT, "motor");
+    registerLuaDataFunc("distleft", TCP_MOTOR_DIST_LEFT, "motor");
+    registerLuaDataFunc("distright", TCP_MOTOR_DIST_RIGHT, "motor");
+    registerLuaDataFunc("destdistleft", TCP_MOTOR_DESTDIST_LEFT, "motor");
+    registerLuaDataFunc("destdistright", TCP_MOTOR_DESTDIST_RIGHT, "motor");
+    registerLuaDataFunc("motorcurrentleft", TCP_MOTOR_CURRENT_LEFT, "motor");
+    registerLuaDataFunc("motorcurrentright", TCP_MOTOR_CURRENT_RIGHT, "motor");
+    registerLuaDataFunc("motordirleft", TCP_MOTOR_DIRECTIONS, "motor", luaGetMotorDirLeft);
+    registerLuaDataFunc("motordirright", TCP_MOTOR_DIRECTIONS, "motor", luaGetMotorDirRight);
+    registerLuaDataFunc("battery", TCP_BATTERY, "sensors");
+    registerLuaDataFunc("acspower", TCP_ACS_POWER, "sensors", luaGetACSPower);
+    registerLuaDataFunc("mic", TCP_MIC, "sensors");
+    registerLuaDataFunc("key", TCP_LASTRC5, "rc5", luaGetRC5Key);
+    registerLuaDataFunc("device", TCP_LASTRC5, "rc5", luaGetRC5Device);
+    registerLuaDataFunc("toggle", TCP_LASTRC5, "rc5", luaGetRC5Toggle);
+    registerLuaDataFunc("sharpir", TCP_SHARPIR, "sensors");
 }
 
 void CControl::runScript(const QByteArray &script)
@@ -229,26 +233,54 @@ void CControl::handleSerialText(const QByteArray &text)
 
 void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
 {
-    int luaval;
+    const ETcpMessage tcpmsg = serial2TcpMap[msg].tcpMessage;
+    int tcpdata;
 
-    switch (tcpDataTypes[serial2TcpMap[msg].tcpMessage])
+    switch (tcpDataTypes[tcpmsg])
     {
         case DATA_BYTE:
-            tcpServer->send(serial2TcpMap[msg].tcpMessage,
-                            static_cast<uint8_t>(data[0]));
-            luaval = static_cast<uint8_t>(data[0]);
+            tcpdata = static_cast<uint8_t>(data[0]);
             break;
         case DATA_WORD:
         {
             const uint16_t d = static_cast<uint8_t>(data[0]) +
                 (static_cast<uint8_t>(data[1]) << 8);
-            luaval = d;
-            tcpServer->send(serial2TcpMap[msg].tcpMessage, d);
+            tcpdata = d;
             break;
         }
     }
 
-    serialDataMap[msg] = luaval;
+    // Store data and sum if we want it averaged
+    switch (tcpmsg)
+    {
+    case TCP_STATE_SENSORS:
+    case TCP_BASE_LEDS:
+    case TCP_M32_LEDS:
+    case TCP_MOTOR_DESTSPEED_LEFT:
+    case TCP_MOTOR_DESTSPEED_RIGHT:
+    case TCP_MOTOR_DIST_LEFT:
+    case TCP_MOTOR_DIST_RIGHT:
+    case TCP_MOTOR_DESTDIST_LEFT:
+    case TCP_MOTOR_DESTDIST_RIGHT:
+    case TCP_MOTOR_DIRECTIONS:
+    case TCP_ACS_POWER:
+    case TCP_LASTRC5:
+        tcpDataMap[tcpmsg].setData(tcpdata);
+        break;
+    case TCP_LIGHT_LEFT:
+    case TCP_LIGHT_RIGHT:
+    case TCP_MOTOR_SPEED_LEFT:
+    case TCP_MOTOR_SPEED_RIGHT:
+    case TCP_MOTOR_CURRENT_LEFT:
+    case TCP_MOTOR_CURRENT_RIGHT:
+    case TCP_BATTERY:
+    case TCP_MIC:
+    case TCP_SHARPIR:
+        tcpDataMap[tcpmsg].addData(tcpdata);
+        break;
+    default:
+        break;
+    }
 }
 
 void CControl::clientConnected()
@@ -264,7 +296,13 @@ void CControl::parseClientTcp(QDataStream &stream)
 
     qDebug() << "msg: " << m;
     
-    if (msg == TCP_COMMAND)
+    if (msg == TCP_UPDATEDELAY)
+    {
+        uint16_t delay;
+        stream >> delay;
+        sendTcpTimer->setInterval(delay);
+    }
+    else if (msg == TCP_COMMAND)
     {
         QString cmd;
         stream >> cmd;
@@ -337,6 +375,26 @@ void CControl::enableRP6Slave()
 {
     serialPort->sendCommand("set power 1");
     serialPort->sendCommand("set slave 1");
+}
+
+void CControl::sendTcpData()
+{
+    for (TTcpMap::iterator it=tcpDataMap.begin(); it!=tcpDataMap.end(); ++it)
+    {
+        switch (tcpDataTypes[it.key()])
+        {
+            case DATA_BYTE:
+                tcpServer->send(it.key(), static_cast<uint8_t>(it.value().data()));
+                break;
+            case DATA_WORD:
+            {
+                tcpServer->send(it.key(), static_cast<uint16_t>(it.value().data()));
+                break;
+            }
+        }
+
+        it.value().clearAverage();
+    }
 }
 
 int CControl::luaScriptRunning(lua_State *l)
@@ -422,17 +480,17 @@ int CControl::luaGetTimeMS(lua_State *l)
 int CControl::luaGetGenericData(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
-    lua_pushinteger(l, control->serialDataMap[msg]);
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    lua_pushinteger(l, control->tcpDataMap[msg].latestData());
     return 1;
 }
 
 int CControl::luaGetBumperLeft(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SStateSensors state;
-    state.byte = control->serialDataMap[msg];
+    state.byte = control->tcpDataMap[msg].latestData();
     lua_pushboolean(l, state.bumperLeft);
     return 1;
 }
@@ -440,9 +498,9 @@ int CControl::luaGetBumperLeft(lua_State *l)
 int CControl::luaGetBumperRight(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SStateSensors state;
-    state.byte = control->serialDataMap[msg];
+    state.byte = control->tcpDataMap[msg].latestData();
     lua_pushboolean(l, state.bumperRight);
     return 1;
 }
@@ -450,9 +508,9 @@ int CControl::luaGetBumperRight(lua_State *l)
 int CControl::luaGetACSLeft(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SStateSensors state;
-    state.byte = control->serialDataMap[msg];
+    state.byte = control->tcpDataMap[msg].latestData();
     lua_pushboolean(l, state.ACSLeft);
     return 1;
 }
@@ -460,9 +518,9 @@ int CControl::luaGetACSLeft(lua_State *l)
 int CControl::luaGetACSRight(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SStateSensors state;
-    state.byte = control->serialDataMap[msg];
+    state.byte = control->tcpDataMap[msg].latestData();
     lua_pushboolean(l, state.ACSRight);
     return 1;
 }
@@ -470,9 +528,9 @@ int CControl::luaGetACSRight(lua_State *l)
 int CControl::luaGetMoveComplete(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SStateSensors state;
-    state.byte = control->serialDataMap[msg];
+    state.byte = control->tcpDataMap[msg].latestData();
     lua_pushboolean(l, state.movementComplete);
     return 1;
 }
@@ -480,9 +538,9 @@ int CControl::luaGetMoveComplete(lua_State *l)
 int CControl::luaGetMotorDirLeft(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SMotorDirections dir;
-    dir.byte = control->serialDataMap[msg];
+    dir.byte = control->tcpDataMap[msg].latestData();
     lua_pushstring(l, moveDirToLuaStr(dir.left));
     return 1;
 }
@@ -490,9 +548,9 @@ int CControl::luaGetMotorDirLeft(lua_State *l)
 int CControl::luaGetMotorDirRight(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     SMotorDirections dir;
-    dir.byte = control->serialDataMap[msg];
+    dir.byte = control->tcpDataMap[msg].latestData();
     lua_pushstring(l, moveDirToLuaStr(dir.right));
     return 1;
 }
@@ -500,8 +558,8 @@ int CControl::luaGetMotorDirRight(lua_State *l)
 int CControl::luaGetACSPower(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
-    EACSPowerState state = static_cast<EACSPowerState>(control->serialDataMap[msg]);
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    EACSPowerState state = static_cast<EACSPowerState>(control->tcpDataMap[msg].latestData());
 
     switch (state)
     {
@@ -517,9 +575,9 @@ int CControl::luaGetACSPower(lua_State *l)
 int CControl::luaGetRC5Key(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     RC5data_t rc5;
-    rc5.data = control->serialDataMap[msg];
+    rc5.data = control->tcpDataMap[msg].latestData();
     lua_pushnumber(l, rc5.key_code);
     return 1;
 }
@@ -527,9 +585,9 @@ int CControl::luaGetRC5Key(lua_State *l)
 int CControl::luaGetRC5Device(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     RC5data_t rc5;
-    rc5.data = control->serialDataMap[msg];
+    rc5.data = control->tcpDataMap[msg].latestData();
     lua_pushnumber(l, rc5.device);
     return 1;
 }
@@ -537,9 +595,9 @@ int CControl::luaGetRC5Device(lua_State *l)
 int CControl::luaGetRC5Toggle(lua_State *l)
 {
     CControl *control = static_cast<CControl *>(lua_touserdata(l, lua_upvalueindex(1)));
-    ESerialMessage msg = static_cast<ESerialMessage>(lua_tointeger(l, lua_upvalueindex(2)));
+    ETcpMessage msg = static_cast<ETcpMessage>(lua_tointeger(l, lua_upvalueindex(2)));
     RC5data_t rc5;
-    rc5.data = control->serialDataMap[msg];
+    rc5.data = control->tcpDataMap[msg].latestData();
     lua_pushboolean(l, rc5.toggle_bit);
     return 1;
 }

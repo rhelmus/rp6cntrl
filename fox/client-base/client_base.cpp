@@ -1,5 +1,6 @@
 #include <QHostAddress>
 #include <QStringList>
+#include <QTimer>
 
 #include "client_base.h"
 #include "tcputil.h"
@@ -22,7 +23,9 @@ QString directionString(uint8_t dir)
 }
 
 CBaseClientTcpHandler::CBaseClientTcpHandler(CBaseClient *b) : baseClient(b),
-                                                               tcpReadBlockSize(0)
+                                                               tcpReadBlockSize(0),
+                                                               bytesReceivedLastSecond(0),
+                                                               bytesReceivedThisSecond(0)
 {
     clientSocket = new QTcpSocket(this);
     connect(clientSocket, SIGNAL(connected()), this, SLOT(connectedToServer()));
@@ -32,10 +35,14 @@ CBaseClientTcpHandler::CBaseClientTcpHandler(CBaseClient *b) : baseClient(b),
             this, SLOT(socketError(QAbstractSocket::SocketError)));
 
     initTcpDataTypes();
+
+    bytesReceivedTimer = new QTimer(this);
+    connect(bytesReceivedTimer, SIGNAL(timeout()), this, SLOT(updateBytesReceived()));
 }
 
 void CBaseClientTcpHandler::connectedToServer(void)
 {
+    bytesReceivedTimer->start(1000);
     clientSocket->write(CTcpMsgComposer(TCP_GETSCRIPTS));
     
     baseClient->updateConnection(true);
@@ -46,6 +53,7 @@ void CBaseClientTcpHandler::connectedToServer(void)
 
 void CBaseClientTcpHandler::disconnectedFromServer(void)
 {
+    bytesReceivedTimer->stop();
     baseClient->updateConnection(false);
     baseClient->appendLogOutput("Disconnected from server.\n");
 }
@@ -63,6 +71,7 @@ void CBaseClientTcpHandler::serverHasData()
                 return;
             
             in >> tcpReadBlockSize;
+            bytesReceivedThisSecond += sizeof(quint32);
         }
         
         quint32 bytesbefore = clientSocket->bytesAvailable();
@@ -81,6 +90,7 @@ void CBaseClientTcpHandler::serverHasData()
             clientSocket->read(bytesremaining);
         }
         
+        bytesReceivedThisSecond += tcpReadBlockSize;
         tcpReadBlockSize = 0;
     }
 }
@@ -91,6 +101,12 @@ void CBaseClientTcpHandler::socketError(QAbstractSocket::SocketError)
     baseClient->updateConnection(false);
     baseClient->appendLogOutput(QString("Socket error: %1\n").
         arg(clientSocket->errorString()));
+}
+
+void CBaseClientTcpHandler::updateBytesReceived()
+{
+    bytesReceivedLastSecond = bytesReceivedThisSecond;
+    bytesReceivedThisSecond = 0;
 }
 
 void CBaseClientTcpHandler::connectToHost(const QString &host)
