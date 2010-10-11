@@ -9,6 +9,7 @@
 
 class CSerialPort;
 class CTcpServer;
+class QTimer;
 
 class CControl: public QObject
 {
@@ -25,14 +26,50 @@ class CControl: public QObject
     typedef QMap<QString, QVariant> TLuaScriptMap;
     typedef QMap<ESerialMessage, SSerial2TcpInfo> TSerial2TcpMap;
 
+    class CTcpInfo
+    {
+        int32_t total, count, latest;
+
+    public:
+        CTcpInfo(void) : total(0), count(0), latest(0) { }
+
+        int32_t data(void) const
+        {
+            if (count > 0)
+                return total / count;
+            return latest;
+        }
+
+        int32_t latestData(void) const { return latest; }
+
+        void addData(int32_t data)
+        {
+            total += data;
+            ++count;
+            latest = data;
+        }
+
+        void setData(int32_t data)
+        {
+            latest = data;
+            total = data;
+            count = 1;
+        }
+
+        void clearAverage(void) { total = count = 0; }
+    };
+
+    typedef QMap<ETcpMessage, CTcpInfo> TTcpMap;
+
     CSerialPort *serialPort;
     CTcpServer *tcpServer;
     TSerial2TcpMap serial2TcpMap;
-    QMap<ESerialMessage, int> serialDataMap;
+    TTcpMap tcpDataMap;
+    QTimer *sendTcpTimer;
 
     void initSerial2TcpMap(void);
     void initLua(void);
-    void registerLuaDataFunc(const char *name, ESerialMessage msg,
+    void registerLuaDataFunc(const char *name, ETcpMessage msg,
                              const char *submod=NULL,
                              lua_CFunction func=luaGetGenericData);
     void registerLuaRobotModule(void);
@@ -46,6 +83,7 @@ private slots:
     void clientConnected(void);
     void parseClientTcp(QDataStream &stream);
     void enableRP6Slave(void);
+    void sendTcpData(void);
     
 public:
     CControl(QObject *parent);

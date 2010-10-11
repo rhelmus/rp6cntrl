@@ -138,6 +138,11 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
     mainTab->addTab(createConsoleTab(), "Console");
     mainTab->addTab(createLogTab(), "Log");
     
+    bytesReceivedLabel = new QLabel;
+    bytesReceivedLabel->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    bytesReceivedLabel->setText("D: 0 B/s");
+    statusBar()->addPermanentWidget(bytesReceivedLabel);
+
     QTimer *uptimer = new QTimer(this);
     connect(uptimer, SIGNAL(timeout()), this, SLOT(updateSensors()));
     uptimer->start(500);
@@ -150,6 +155,9 @@ CQtClient::CQtClient() : isACSScanning(false), alternatingACSScan(false),
 
     simNavTimer = new QTimer(this);
     connect(simNavTimer, SIGNAL(timeout()), this, SLOT(simNavTimeout()));
+
+    bytesReceivedTimer = new QTimer(this);
+    connect(bytesReceivedTimer, SIGNAL(timeout()), this, SLOT(updateBytesReceivedSecond()));
 
     updateConnection(false);
 
@@ -1046,9 +1054,13 @@ void CQtClient::updateConnection(bool connected)
     {
         firstStateUpdate = true;
         connectButton->setText("Disconnect");
+        bytesReceivedTimer->start(1000);
     }
     else
+    {
         connectButton->setText("Connect");
+        bytesReceivedTimer->stop();
+    }
     
     for (QList<QWidget *>::iterator it=connectionDependentWidgets.begin();
          it!=connectionDependentWidgets.end(); ++it)
@@ -1370,6 +1382,12 @@ void CQtClient::updateSensors()
     
     motorDistanceLCD[1]->display(delayedSensorDataMap[TCP_MOTOR_DIST_RIGHT]);
     motorDistancePlot->addData("Right", delayedSensorDataMap[TCP_MOTOR_DIST_RIGHT]);
+}
+
+void CQtClient::updateBytesReceivedSecond()
+{
+    const quint32 bytes = bytesReceivedSecond();
+    bytesReceivedLabel->setText(QString("D: %1 B/s").arg(bytes));
 }
 
 void CQtClient::toggleServerConnection()
