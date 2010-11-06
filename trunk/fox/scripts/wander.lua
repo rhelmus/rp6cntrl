@@ -49,9 +49,6 @@ driveTask =
         self.acsfreetime = 0
         self.sharpirclosetime = 0
         self.scanstate = "idle"
-        self.scantime = 0
-        self.scandelay = 0
-        self.prevservopos = -1
         print("Started drive task")
     end,
     
@@ -91,17 +88,26 @@ driveTask =
                 self.scanstate = "scan"
                 self.scanarray = { }
                 -- UNDONE
-                self.scanangle = 270
+                self.scanservopos = 0
                 robot.setservo(0)
             end
         elseif self.scanstate == "scan" then
             if self.scandelay < gettimems() then
-                table.insert(self.scanarray, robot.sensors.sharpir())
+                local curscanangle = robot.servoangle(self.scanservopos)
+                self.scanarray[curscanangle] = self.scanarray[curscanangle] or { }
+                table.insert(self.scanarray[curscanangle], robot.sensors.sharpir())
+                
                 if self.scantime < gettimems() then
                     -- ...
-                    self.scanstate = "idle"
-                    robot.setservo(90)
-                    self.scandelay = gettimems() + math.random(2000, 10000)
+                    self.scanservopos = self.scanservopos + 20
+                    if self.scanservopos > 180 then
+                        self.scanstate = "idle"
+                        robot.setservo(90)
+                        self.scandelay = gettimems() + math.random(2000, 10000)
+                    else
+                        robot.setservo(self.scanservopos)
+                        self.scandelay = gettimems() + 1000
+                    end
                 else
                     self.scandelay = gettimems() + 50
                 end
@@ -109,6 +115,12 @@ driveTask =
         end
         
         return false
+    end,
+
+    finish = function(self)
+        if self.scanstate ~= "idle" then
+            robot.setservo(90)
+        end
     end
 }
 
