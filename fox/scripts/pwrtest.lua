@@ -3,7 +3,7 @@ local ret = makescript()
 function run()
 	local spos, wait, state = 0, 0, "servo"
 --	exec("set slave 0")
-    exec("set speed 65 65")
+    exec("set speed 80 80")
 	while true do
 		if wait < gettimems() then
 			if state == "servo" then
@@ -21,7 +21,7 @@ function run()
        		    wait = gettimems() + 3000
        		    state = "startservo"
    		    elseif state == "startservo" then
-   		        robot.stop()
+   		        robot.motor.stop()
    		        wait = gettimems() + 500
    		        state = "servo"
         	end
@@ -31,7 +31,7 @@ function run()
 end
 
 function finish()
-	robot.stop()
+    robot.motor.stop()
 end
 
 return ret
