@@ -9,7 +9,7 @@ local function cleanscandata(scan)
     local i = 1
     while i < #scan.set do
         if scan.set[i] < 20 or scan.set[i] > 150 or
-           math.abs(scan.set[i] - median) > 30 then
+           math.abs(scan.set[i] - median) > 15 then
             table.remove(scan.set, i)
             table.remove(scan.settimes, i)
             errfound = errfound + 1
@@ -29,24 +29,26 @@ function init()
 end
 
 function run()
+    local spossecond = 180
     local scanresults = { }
     local oldspos, curspos = 0, 0
     
     robot.setservo(0)
     waityield(1500)
     
-    for i = 1, 50 do
+    for i = 1, 15 do
         scanresults[i] = { }
         
-        local scantime = 3000
-        local lifetime = gettimems() + scantime
-        local delay = 0
         local dspos = curspos - oldspos -- UNDONE: Make absolute?
+--         local delay = gettimems() + (math.abs(dspos) / spossecond * 1000)
+        local delay = gettimems()
+        local scantime = 4000
+        local lifetime = delay + scantime
         
         scanresults[i][dspos] = { set = { }, settimes = { } }
         
         while lifetime >= gettimems() do
-            if delay < gettimems() then
+            if delay <= gettimems() then
 --                 table.insert(scanresults[i][dspos], robot.sensors.sharpir())
                 local stime = scantime - (lifetime - gettimems())
                 table.insert(scanresults[i][dspos].set, robot.sensors.sharpir())
@@ -78,10 +80,12 @@ function run()
                 for j, dist in ipairs(scanresults[i][dspos].set) do
                     local RSD, accuracy = 0, 100
                     if j > 1 then
+--                     if j >= 5 then
                         local pset = table.part(scanresults[i][dspos].set, j)
+--                         local pset = table.part(scanresults[i][dspos].set, j - 4, j)
                         RSD = math.stdev(pset) / math.mean(pset) * 100
-                        accuracy = math.round(math.mean(pset) / mean * 100)
-                        if accuracy >= 95 and accuracy <= 105 then
+                        accuracy = math.round(math.median(pset) / mean * 100)
+                        if accuracy >= 90 and accuracy <= 110 then
                             if not scanresults[i][dspos].stabletime then
                                 scanresults[i][dspos].stabletime = scanresults[i][dspos].settimes[j]
                             end

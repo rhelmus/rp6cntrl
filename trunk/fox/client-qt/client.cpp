@@ -92,7 +92,7 @@ QWidget *createSlider(const QString &title, QwtSlider *&slider, int min, int max
     return ret;
 }
 
-QPushButton *createCompatPushButton(const QString &label)
+QPushButton *createCompactPushButton(const QString &label)
 {
     QPushButton *ret = new QPushButton(label);
     ret->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -914,7 +914,7 @@ QWidget *CQtClient::createSimNavWidget()
     simNavHeightSpinBox->setValue(gridsize.height());
     connect(simNavHeightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(simNavHeightSpinBoxChanged(int)));
 
-    QPushButton *button = createCompatPushButton("Edit...");
+    QPushButton *button = createCompactPushButton("Edit...");
     button->setCheckable(true);
     connect(button, SIGNAL(toggled(bool)), this, SLOT(simNavEditButtonToggled(bool)));
     form->addRow(button);
