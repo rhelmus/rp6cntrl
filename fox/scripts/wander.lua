@@ -48,13 +48,16 @@ driveTask =
         self.initmotor = true
         self.acsfreetime = 0
         self.sharpirclosetime = 0
+        self.scandelay = 0
         self.scanstate = "idle"
+        self.servopos = 90
+        self.scandir = "right"
         print("Started drive task")
     end,
     
     run = function(self)
         if self.delay > gettimems() then
-            return
+            return false
         end
        
         self.delay = gettimems() + 100
@@ -81,35 +84,50 @@ driveTask =
                 self.sharpirclosetime = gettimems()
             end
             
-            if self.scandelay < gettimems() and
-               self.sharpirclosetime < (gettimems() - 500) then
-                self.scandelay = gettimems() + 1000
-                self.scantime = self.scandelay + 500
+            if self.scandelay < gettimems() then
                 self.scanstate = "scan"
                 self.scanarray = { }
-                -- UNDONE
-                self.scanservopos = 0
-                robot.setservo(0)
+                
+                local dspos
+                if self.servopos > 90 then
+                    self.scandir = "left"
+                    dspos = 180 - self.servopos
+                    self.servopos = 180
+                else
+                    self.scandir = "right"
+                    dspos = self.servopos
+                    self.servopos = 0
+                end
+                
+                self.scandelay = gettimems() + (dspos / robot.servospeed())
+                self.scantime = self.scandelay + 200
+                robot.setservo(self.servopos)
             end
         elseif self.scanstate == "scan" then
             if self.scandelay < gettimems() then
-                local curscanangle = robot.servoangle(self.scanservopos)
+                local curscanangle = robot.servoangle(self.servopos)
                 self.scanarray[curscanangle] = self.scanarray[curscanangle] or { }
                 table.insert(self.scanarray[curscanangle], robot.sensors.sharpir())
                 
                 if self.scantime < gettimems() then
-                    -- ...
-                    self.scanservopos = self.scanservopos + 20
-                    if self.scanservopos > 180 then
-                        self.scanstate = "idle"
-                        robot.setservo(90)
-                        self.scandelay = gettimems() + math.random(2000, 10000)
+                    local newspos
+                    if self.scandir == "left" then
+                        newspos = self.servopos - 30
                     else
-                        robot.setservo(self.scanservopos)
-                        self.scandelay = gettimems() + 1000
+                        newspos = self.servopos + 30
                     end
-                else
-                    self.scandelay = gettimems() + 50
+                    
+                    if newspos < 0 or newspos > 180 then
+                        -- Process results
+                        
+                        self.scanstate = "idle"
+                        self.scandelay = gettimems() + math.random(1000, 3000)
+                    else
+                        self.scandelay = gettimems() + (30 / robot.servospeed())
+                        self.scantime = self.scandelay + 200
+                        robot.setservo(newspos)
+                        self.servopos = newspos
+                    end
                 end
             end
         end
@@ -161,7 +179,7 @@ scanTask =
     end,
     
     getbestangle = function(self)
-        local freeangles = { } -- Angles were no hit is found
+        local freeangles = { } -- Angles where no hit is found
         local furthest = { } -- Angles at which no close hit was found
         for angle, scans in pairs(self.scanarray) do
             if not self:isvalidscandata(scans) then

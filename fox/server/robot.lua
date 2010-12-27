@@ -80,3 +80,7 @@ end
 function sensoroffset()
     return nav.newvector(0, 3)
 end
+
+function servospeed()
+    return 0.180 -- degrees/millisecond
+end
