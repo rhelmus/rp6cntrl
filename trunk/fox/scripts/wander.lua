@@ -36,6 +36,21 @@ local function settask(task)
     end
 end
 
+local function isvalidscandata(scanset)
+    local maxerr = 2
+    local errfound = 0
+    for _, v in ipairs(scanset) do
+        if v < 20 or v > 150 then
+            errfound = errfound + 1
+            if errfound > maxerr then
+                return false
+            end
+        end
+    end
+    
+    return true
+end
+
 -- Declare tasks
 local driveTask, collisionTask, scanTask
 
@@ -52,6 +67,7 @@ driveTask =
         self.scanstate = "idle"
         self.servopos = 90
         self.scandir = "right"
+        self.moveslow, self.checkslow = false, true
         print("Started drive task")
     end,
     
@@ -121,8 +137,41 @@ driveTask =
                         -- Process results
                         
                         self.scanstate = "idle"
+                        -- UNDONE: Base delay on presence of obstacles
                         self.scandelay = gettimems() + math.random(1000, 3000)
-                    else
+                        self.checkslow = true
+                    else                      
+                        if isvalidscandata(self.scanarray[curscanangle]) then
+                            local frontscan = (curscanangle > 350 or curscanangle < 10)
+                            local avdist = math.median(self.scanarray[curscanangle])
+                            
+                            if frontscan and avdist < 40 then
+                                return true, scanTask
+                            end
+                            
+                            if self.checkslow and
+                               (curscanangle >= 330 or curscanangle <= 30) then
+                                local goslow = false
+                            
+                                if frontscan and avdist < 100 then
+                                    goslow = true
+                                elseif avdist < 25 then
+                                    goslow = true
+                                end
+                                    
+                                if goslow ~= self.moveslow then
+                                    if goslow then
+                                        robot.motor.setspeed(60, 60)
+                                        self.checkslow = false -- Only check once each scan
+                                    else
+                                        robot.motor.setspeed(80, 80)
+                                    end
+                                    self.moveslow = goslow
+                                end
+                            else
+                                -- UNDONE: Wall following
+                            end
+                        end                        
                         self.scandelay = gettimems() + (30 / robot.servospeed())
                         self.scantime = self.scandelay + 200
                         robot.setservo(newspos)
@@ -163,26 +212,11 @@ collisionTask =
 
 scanTask =
 {
-    isvalidscandata = function(self, scanset)
-        local maxerr = 2
-        local errfound = 0
-        for _, v in ipairs(scanset) do
-            if v < 20 or v > 150 then
-                errfound = errfound + 1
-                if errfound > maxerr then
-                    return false
-                end
-            end
-        end
-        
-        return true
-    end,
-    
     getbestangle = function(self)
         local freeangles = { } -- Angles where no hit is found
         local furthest = { } -- Angles at which no close hit was found
         for angle, scans in pairs(self.scanarray) do
-            if not self:isvalidscandata(scans) then
+            if not isvalidscandata(scans) then
                 table.insert(freeangles, angle)
             else
                 local avdist = math.median(scans)
