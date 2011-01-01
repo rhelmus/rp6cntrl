@@ -35,6 +35,11 @@ function shortrotate(angle, speed)
     end
 end
 
+function driverotatetime(angle, speed)
+    -- Calibrated for 180 degrees with speed 70, 80, 90 and 100
+    return (angle / 180) * (16549.25 - 99.19166667 * speed)
+end
+
 function motor.setspeed(left, right)
     exec(string.format("set speed %d %d", left, right))
 end

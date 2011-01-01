@@ -51,23 +51,55 @@ local function isvalidscandata(scanset)
     return true
 end
 
+local function getbestangle(scanarray, mindist)
+    local freeangles = { } -- Angles where no hit is found
+    local furthest = { } -- Angles at which no close hit was found
+    mindist = mindist or 0
+    
+    for angle, scans in pairs(scanarray) do
+        if not isvalidscandata(scans) then
+            table.insert(freeangles, angle)
+        else
+            local avdist = math.median(scans)
+            if avdist >= mindist and
+                    (not furthest.angle or avdist > furthest.dist) then
+                furthest.angle = angle
+                furthest.dist = avdist
+            end
+        end
+    end
+    
+    if #freeangles > 0 then -- Best case, some place without obstacles
+        -- Pick a random one
+        -- UNDONE: Score
+        return freeangles[math.random(#freeangles)]
+    elseif furthest.angle then
+        return furthest.angle
+    end
+
+    -- return nil
+end
+                       
 -- Declare tasks
 local driveTask, collisionTask, scanTask
 
 driveTask =
 {   
+    drivespeed = 90,
+    slowspeed = 70,
+    
     init = function(self)
         robot.setservo(90)
         robot.motor.stop()
-        self.delay = gettimems() + 750
-        self.initmotor = true
         self.acsfreetime = 0
         self.sharpirclosetime = 0
         self.scandelay = 0
-        self.scanstate = "idle"
         self.servopos = 90
         self.scandir = "right"
         self.moveslow, self.checkslow = false, true
+        
+        self.state = "initmotor"
+        self.delay = gettimems() + 750
         print("Started drive task")
     end,
     
@@ -82,15 +114,20 @@ driveTask =
             self.acsfreetime = gettimems()
         end
 
-        if self.initmotor then
-            robot.motor.setspeed(80, 80)
-            robot.motor.setdir("fwd")
-            self.initmotor = false
-        elseif robot.sensors.bumperleft() or robot.sensors.bumperright() then
+        if self.turntime < gettimems() then
+            robot.motor.setspeed(self.drivespeed, self.drivespeed)
+            self.turntime = 0
+        end
+        
+        if robot.sensors.bumperleft() or robot.sensors.bumperright() then
             return true, collisionTask
         elseif self.acsfreetime < (gettimems() - 300) then
             return true, scanTask
-        elseif self.scanstate == "idle" then
+        elseif self.state == "initmotor" then
+            robot.motor.setspeed(self.drivespeed, self.drivespeed)
+            robot.motor.setdir("fwd")
+            self.state = "idledrive"                
+        elseif self.state == "idledrive" then
             local dist = robot.sensors.sharpir()
             if dist > 20 and dist < 40 then
                 return true, scanTask
@@ -101,7 +138,7 @@ driveTask =
             end
             
             if self.scandelay < gettimems() then
-                self.scanstate = "scan"
+                self.state = "scan"
                 self.scanarray = { }
                 
                 local dspos
@@ -119,7 +156,7 @@ driveTask =
                 self.scantime = self.scandelay + 200
                 robot.setservo(self.servopos)
             end
-        elseif self.scanstate == "scan" then
+        elseif self.state == "scan" then
             if self.scandelay < gettimems() then
                 local curscanangle = robot.servoangle(self.servopos)
                 self.scanarray[curscanangle] = self.scanarray[curscanangle] or { }
@@ -135,9 +172,34 @@ driveTask =
                     
                     if newspos < 0 or newspos > 180 then
                         -- Process results
+                        self.state = "idledrive" -- May change below
                         
-                        self.scanstate = "idle"
-                        -- UNDONE: Base delay on presence of obstacles
+                        -- Something in front?
+                        if isvalidscandata(self.scanarray[0]) then
+                            local avdist = math.median(self.scanarray[0])
+                            if avdist < 120 then                               
+                                -- Check for better directions
+                                local newangle = getbestangle(self.scanarray)
+                                local absangle = newangle
+                                
+                                if absangle > 180 then
+                                    -- Go left
+                                    absangle = 360 - absangle
+                                    robot.motor.setspeed(0, self.slowspeed)
+                                    print(string.format("Going %d deg to left", absangle))
+                                else
+                                    -- Go right
+                                    robot.motor.setspeed(self.slowspeed, 0)
+                                    print(string.format("Going %d deg to right", absangle))
+                                end
+                                
+                                self.turntime = gettimems() +
+                                                robot.driverotatetime(self.slowspeed,
+                                                                      absangle)
+                            end
+                        end
+                        
+                        -- UNDONE: Base delay on presence of obstacles, correct for turning
                         self.scandelay = gettimems() + math.random(1000, 3000)
                         self.checkslow = true
                     else                      
@@ -149,11 +211,11 @@ driveTask =
                                 return true, scanTask
                             end
                             
-                            if self.checkslow and
+                            if self.checkslow and self.turntime == 0 and
                                (curscanangle >= 330 or curscanangle <= 30) then
                                 local goslow = false
                             
-                                if frontscan and avdist < 100 then
+                                if frontscan and avdist < 80 then
                                     goslow = true
                                 elseif avdist < 25 then
                                     goslow = true
@@ -161,17 +223,18 @@ driveTask =
                                     
                                 if goslow ~= self.moveslow then
                                     if goslow then
-                                        robot.motor.setspeed(60, 60)
+                                        robot.motor.setspeed(self.slowspeed, self.slowspeed)
                                         self.checkslow = false -- Only check once each scan
                                     else
-                                        robot.motor.setspeed(80, 80)
+                                        robot.motor.setspeed(self.drivespeed, self.drivespeed)
                                     end
                                     self.moveslow = goslow
                                 end
                             else
                                 -- UNDONE: Wall following
                             end
-                        end                        
+                        end
+                        
                         self.scandelay = gettimems() + (30 / robot.servospeed())
                         self.scantime = self.scandelay + 200
                         robot.setservo(newspos)
@@ -179,13 +242,12 @@ driveTask =
                     end
                 end
             end
-        end
-        
+        end        
         return false
     end,
 
     finish = function(self)
-        if self.scanstate ~= "idle" then
+        if self.servopos ~= 90 then
             robot.setservo(90)
         end
     end
@@ -212,33 +274,6 @@ collisionTask =
 
 scanTask =
 {
-    getbestangle = function(self)
-        local freeangles = { } -- Angles where no hit is found
-        local furthest = { } -- Angles at which no close hit was found
-        for angle, scans in pairs(self.scanarray) do
-            if not isvalidscandata(scans) then
-                table.insert(freeangles, angle)
-            else
-                local avdist = math.median(scans)
-                if avdist >= 100 and
-                   (not furthest.angle or avdist > furthest.dist) then
-                    furthest.angle = angle
-                    furthest.dist = avdist
-                end
-            end
-        end
-        
-        if #freeangles > 0 then -- Best case, some place without obstacles
-            -- Pick a random one
-            -- UNDONE: Score
-            return freeangles[math.random(#freeangles)]
-        elseif furthest.angle then
-            return furthest.angle
-        end
-        
-        -- return nil
-    end,
-    
     init = function(self)
         robot.motor.stop()
         self.delay = gettimems() + 100
@@ -283,7 +318,7 @@ scanTask =
                     self.scandelay = gettimems() + 50 -- UNDONE
                 end
             elseif self.state == "initrotate" then
-                local targetangle = self:getbestangle()
+                local targetangle = getbestangle(self.scanarray, 100)
                 
                 if not targetangle then
                     -- Just rotate 180 degrees and hope for the best
