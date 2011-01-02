@@ -97,6 +97,7 @@ driveTask =
         self.servopos = 90
         self.scandir = "right"
         self.moveslow, self.checkslow = false, true
+        self.turntime = 0
         
         self.state = "initmotor"
         self.delay = gettimems() + 750
