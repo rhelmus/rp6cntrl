@@ -1,9 +1,7 @@
 TEMPLATE = app
 TARGET = client-ncurses
-
 DEPENDPATH += tui
-HEADERS += \
-    tui/basescroll.h \
+HEADERS += tui/basescroll.h \
     tui/box.h \
     tui/button.h \
     tui/buttonbar.h \
@@ -19,8 +17,7 @@ HEADERS += \
     tui/widget.h \
     tui/window.h \
     tui/windowmanager.h
-SOURCES += \
-    tui/basescroll.cpp \
+SOURCES += tui/basescroll.cpp \
     tui/box.cpp \
     tui/button.cpp \
     tui/buttonbar.cpp \
@@ -35,22 +32,19 @@ SOURCES += \
     tui/widget.cpp \
     tui/window.cpp \
     tui/windowmanager.cpp
-    
-HEADERS += client.h display_widget.h
-SOURCES += client.cpp display_widget.cpp main.cpp
-
+HEADERS += client.h \
+    display_widget.h
+SOURCES += client.cpp \
+    display_widget.cpp \
+    main.cpp
 QT -= gui
 QT += network
-
 LIBS += -lncursesw
-
 INCLUDEPATH += ../../shared
 DEPENDPATH += ../../shared
 SOURCES += tcputil.cpp
-
 INCLUDEPATH += ../client-base
 DEPENDPATH += ../client-base
 HEADERS += client_base.h
 SOURCES += client_base.cpp
-
 OBJECTS_DIR = obj

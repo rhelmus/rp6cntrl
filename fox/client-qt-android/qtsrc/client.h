@@ -4,6 +4,7 @@
 #include <QMainWindow>
 
 #include "client_base.h"
+#include "flickcharm/flickcharm.h"
 
 class QLineEdit;
 class QPlainTextEdit;
@@ -34,18 +35,22 @@ class CQtClient: public QMainWindow, public CBaseClient
         DISPLAY_KEYS
     };
 
+    FlickCharm flickCharm; // For 'kinetic scrolling'
+
     QLineEdit *serverEdit;
     QPushButton *connectButton;
 
     QMap<EDisplayType, CStatWidget *> statWidgets;
 
     QPlainTextEdit *consoleOut;
+    QLineEdit *consoleIn;
     QPlainTextEdit *logWidget;
 
     QWidget *createConnectTab(void);
     QWidget *createStatTab(void);
     QWidget *createConsoleTab(void);
     QWidget *createLogTab(void);
+    QWidget *createDriveTab(void);
 
     virtual void updateConnection(bool connected);
     virtual void tcpError(const QString &error);
@@ -56,6 +61,7 @@ class CQtClient: public QMainWindow, public CBaseClient
 
 private slots:
     void toggleServerConnection(void);
+    void sendConsolePressed(void);
 
 protected:
     virtual void appendConsoleOutput(const QString &text);
