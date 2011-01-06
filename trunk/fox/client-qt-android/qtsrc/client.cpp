@@ -1,6 +1,7 @@
 #include <QtGui>
 
 #include "client.h"
+#include "drivewidget.h"
 #include "statwidget.h"
 
 namespace {
@@ -29,6 +30,7 @@ CQtClient::CQtClient()
     tabw->addTab(createStatTab(), "Status");
     tabw->addTab(createConsoleTab(), "Console");
     tabw->addTab(createLogTab(), "Log");
+    tabw->addTab(createDriveTab(), "Drive");
 }
 
 QWidget *CQtClient::createConnectTab()
@@ -48,33 +50,49 @@ QWidget *CQtClient::createStatTab()
 {
     QScrollArea *ret = new QScrollArea;
     ret->setWidgetResizable(true);
+    flickCharm.activateOn(ret);
 
     QWidget *sw = new QWidget;
     ret->setWidget(sw);
     QVBoxLayout *vbox = new QVBoxLayout(sw);
 
-    QGroupBox *group = new QGroupBox("Movement");
-    vbox->addWidget(group);
+    QFrame *frame = new QFrame;
+    frame->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    vbox->addWidget(frame);
 
-    QVBoxLayout *subvbox = new QVBoxLayout(group);
+    QVBoxLayout *subvbox = new QVBoxLayout(frame);
+    QLabel *l = new QLabel;
+    l->setText("<qt><b>Movement</b>");
+    l->setAlignment(Qt::AlignCenter);
+    subvbox->addWidget(l);
     subvbox->addWidget(statWidgets[DISPLAY_SPEED] = new CStatWidget("Speed", 2));
     subvbox->addWidget(statWidgets[DISPLAY_DISTANCE] = new CStatWidget("Distance", 2));
     subvbox->addWidget(statWidgets[DISPLAY_CURRENT] = new CStatWidget("Current", 2));
     subvbox->addWidget(statWidgets[DISPLAY_DIRECTION] = new CStatWidget("Direction", 2));
 
-    group = new QGroupBox("Sensors");
-    vbox->addWidget(group);
+    frame = new QFrame;
+    frame->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    vbox->addWidget(frame);
 
-    subvbox = new QVBoxLayout(group);
+    subvbox = new QVBoxLayout(frame);
+    l = new QLabel;
+    l->setText("<qt><b>Sensors</b>");
+    l->setAlignment(Qt::AlignCenter);
+    subvbox->addWidget(l);
     subvbox->addWidget(statWidgets[DISPLAY_LIGHT] = new CStatWidget("Light", 2));
     subvbox->addWidget(statWidgets[DISPLAY_ACS] = new CStatWidget("ACS", 2));
     subvbox->addWidget(statWidgets[DISPLAY_BUMPERS] = new CStatWidget("Bumpers", 2));
     subvbox->addWidget(statWidgets[DISPLAY_SHARPIR] = new CStatWidget("Sharp IR", 1));
 
-    group = new QGroupBox("Other");
-    vbox->addWidget(group);
+    frame = new QFrame;
+    frame->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    vbox->addWidget(frame);
 
-    subvbox = new QVBoxLayout(group);
+    subvbox = new QVBoxLayout(frame);
+    l = new QLabel;
+    l->setText("<qt><b>Other</b>");
+    l->setAlignment(Qt::AlignCenter);
+    subvbox->addWidget(l);
     subvbox->addWidget(statWidgets[DISPLAY_BATTERY] = new CStatWidget("Battery", 1));
     subvbox->addWidget(statWidgets[DISPLAY_RC5] = new CStatWidget("RC5", 3));
     subvbox->addWidget(statWidgets[DISPLAY_MAIN_LEDS] = new CStatWidget("Main LEDs", 6));
@@ -86,20 +104,56 @@ QWidget *CQtClient::createStatTab()
 
 QWidget *CQtClient::createConsoleTab()
 {
-    consoleOut = new QPlainTextEdit;
+    QWidget *ret = new QWidget;
+
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    vbox->addWidget(consoleOut = new QPlainTextEdit);
     consoleOut->setReadOnly(true);
     consoleOut->setCenterOnScroll(true);
 
-    return consoleOut;
+    QHBoxLayout *hbox = new QHBoxLayout;
+    vbox->addLayout(hbox);
+
+    hbox->addWidget(consoleIn = new QLineEdit);
+
+    QPushButton *button = new QPushButton("Send");
+    connect(button, SIGNAL(clicked()), this, SLOT(sendConsolePressed()));
+    connect(consoleIn, SIGNAL(returnPressed()), button, SLOT(click()));
+    hbox->addWidget(button);
+
+    button = new QPushButton("Clear console");
+    connect(button, SIGNAL(clicked()), consoleOut, SLOT(clear()));
+    hbox->addWidget(button);
+
+    return ret;
 }
 
 QWidget *CQtClient::createLogTab()
 {
-    logWidget = new QPlainTextEdit;
+    QWidget *ret = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    vbox->addWidget(logWidget = new QPlainTextEdit);
     logWidget->setReadOnly(true);
     logWidget->setCenterOnScroll(true);
 
-    return logWidget;
+    QPushButton *button = new QPushButton("Clear log");
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    connect(button, SIGNAL(clicked()), logWidget, SLOT(clear()));
+    vbox->addWidget(button, 0, Qt::AlignCenter);
+
+    return ret;
+}
+
+QWidget *CQtClient::createDriveTab()
+{
+    QWidget *ret = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    vbox->addWidget(new CDriveWidget);
+
+    return ret;
 }
 
 void CQtClient::updateConnection(bool connected)
@@ -203,6 +257,13 @@ void CQtClient::toggleServerConnection()
         connectToHost(serverEdit->text());
 }
 
+void CQtClient::sendConsolePressed()
+{
+    // Append cmd
+    appendConsoleOutput(QString("> %1\n").arg(consoleIn->text()));
+    executeCommand(consoleIn->text());
+    consoleIn->clear();
+}
 
 void CQtClient::appendConsoleOutput(const QString &text)
 {
