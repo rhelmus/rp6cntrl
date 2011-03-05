@@ -1,6 +1,7 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
+#include <stdint.h>
 #include "shared.h"
 
 // From RP6RobotBaseLib.h. Keep this in sync!
@@ -98,6 +99,15 @@ void setServoTimer1(uint32_t timer);
 uint8_t getSharpIRDistance(void); 
 
 void updateInterface(void);
+
+typedef struct
+{
+    uint16_t LEDDelay, lightDelay, motorDelay, batteryDelay, ACSDelay;
+    uint16_t micDelay, RC5Delay, sharpIRDelay;
+} SUpdateSlaveData;
+
+// Modulo of delays with this needs to be zero!
+#define SLAVE_ROLLBACK_TIME 10000
 
 #endif
 

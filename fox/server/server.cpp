@@ -234,6 +234,7 @@ void CControl::handleSerialText(const QByteArray &text)
 void CControl::handleSerialMSG(ESerialMessage msg, const QByteArray &data)
 {
     const ETcpMessage tcpmsg = serial2TcpMap[msg].tcpMessage;
+
     int tcpdata;
 
     switch (tcpDataTypes[tcpmsg])

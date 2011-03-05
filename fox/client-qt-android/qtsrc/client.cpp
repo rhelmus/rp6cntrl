@@ -4,6 +4,7 @@
 #include "drivewidget.h"
 #include "statwidget.h"
 
+
 namespace {
 
 QString directionString(uint8_t dir)
@@ -31,6 +32,16 @@ CQtClient::CQtClient()
     tabw->addTab(createConsoleTab(), "Console");
     tabw->addTab(createLogTab(), "Log");
     tabw->addTab(createDriveTab(), "Drive");
+
+    accelerometer = new QRotationSensor(this);
+    /*connect(accelerometer, SIGNAL(readingChanged()), this,
+            SLOT(accelSensorChanged()));*/
+    accelerometer->start();
+}
+
+CQtClient::~CQtClient()
+{
+    accelerometer->stop();
 }
 
 QWidget *CQtClient::createConnectTab()
@@ -153,6 +164,8 @@ QWidget *CQtClient::createDriveTab()
 
     vbox->addWidget(new CDriveWidget);
 
+    vbox->addWidget(accelLabel = new QLabel("Accel: --"));
+
     return ret;
 }
 
@@ -263,6 +276,13 @@ void CQtClient::sendConsolePressed()
     appendConsoleOutput(QString("> %1\n").arg(consoleIn->text()));
     executeCommand(consoleIn->text());
     consoleIn->clear();
+}
+
+void CQtClient::accelSensorChanged()
+{
+    QRotationReading *reading = accelerometer->reading();
+    accelLabel->setText(QString("Accel: %1, %2, %3").arg(reading->x())
+                        .arg(reading->y()).arg(reading->z()));
 }
 
 void CQtClient::appendConsoleOutput(const QString &text)

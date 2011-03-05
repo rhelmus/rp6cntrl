@@ -11,5 +11,6 @@ int main(int argc, char **argv)
     QApplication app(argc, argv);
     app.setAutoSipEnabled(true);
     (new CQtClient)->show();
+    //(new CQtClient)->showFullScreen();
     return app.exec();
 }

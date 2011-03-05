@@ -3,8 +3,11 @@ package org.androidclient.qt;
 import java.util.List;
 import android.util.Log;
 import android.os.Bundle;
-import com.nokia.qt.android.QtActivity;
-import com.nokia.qt.common.QtLibraryLoader;
+//import com.nokia.qt.android.QtActivity;
+//import com.nokia.qt.common.QtLibraryLoader;
+//import org.qt.lite.QtActivity;
+//import org.qt.core.QtLibraryLoader;
+import eu.licentia.necessitas.industrius.QtActivity;
 
 public class QtClientAct extends QtActivity
 {
@@ -12,7 +15,7 @@ public class QtClientAct extends QtActivity
 
     public QtClientAct()
     {
-        super(
+ /*       super(
             "client-qt-android", // Name of the library containing your Qt application
                                      // (without "lib" and ".so")
             true,  // Use "hard" exit? (Don't leave preloaded binaries in memory;
@@ -20,8 +23,11 @@ public class QtClientAct extends QtActivity
                    // because static / global variables are not reinitialized.)
             true,  // Pause app when activity is not running
             false  // Don't use keepalive service
-        );
+        );*/
+        //super("client-qt-android");
+        super();
         // setPlugin("QtAndroidNoGl"); // QtAndroidNoGl is the default plugin.
-        addQtLibrary(QtLibraryLoader.QtLibrary.QtNetwork);
+        //addQtLibrary(QtLibraryLoader.QtLibrary.QtNetwork);
+        //addLibrary("QtSensors");
     }
 }

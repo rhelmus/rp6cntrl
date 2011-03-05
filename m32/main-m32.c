@@ -37,7 +37,7 @@ int main(void)
     // Stopwatch 1: Reserved by servo lib
     // Stopwatch 2: ping
     // Stopwatch 3: Refresh delay
-    // Stopwatch 4: Slave mic
+    // Stopwatch 4: Slave serial timer
     
     dischargePeakDetector();
 

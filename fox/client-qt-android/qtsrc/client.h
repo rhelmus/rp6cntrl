@@ -6,6 +6,10 @@
 #include "client_base.h"
 #include "flickcharm/flickcharm.h"
 
+#include <QRotationSensor>
+QTM_USE_NAMESPACE
+
+class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
 class QPushButton;
@@ -46,6 +50,9 @@ class CQtClient: public QMainWindow, public CBaseClient
     QLineEdit *consoleIn;
     QPlainTextEdit *logWidget;
 
+    QRotationSensor *accelerometer;
+    QLabel *accelLabel;
+
     QWidget *createConnectTab(void);
     QWidget *createStatTab(void);
     QWidget *createConsoleTab(void);
@@ -62,6 +69,7 @@ class CQtClient: public QMainWindow, public CBaseClient
 private slots:
     void toggleServerConnection(void);
     void sendConsolePressed(void);
+    void accelSensorChanged(void);
 
 protected:
     virtual void appendConsoleOutput(const QString &text);
@@ -69,6 +77,7 @@ protected:
 
 public:
     CQtClient(void);
+    ~CQtClient(void);
 };
 
 #endif

@@ -13,6 +13,7 @@ uint16_t lastPing;
 RC5data_t lastRC5Data;
 uint8_t slaveMode;
 uint16_t slaveMicUpdateTime;
+SUpdateSlaveData updateSlaveData;
 
 // Replaced macros from servolib to these
 uint8_t servoLeftTouch = 46;
@@ -49,6 +50,70 @@ void sendSerialMSGWord(ESerialMessage msg, uint16_t data)
     sendSerialByte(data >> 8); // High
 }
 
+void sendSlaveData(void)
+{
+    // Update stats through serial
+
+    static uint16_t lastUpdate = 0;
+
+    const uint16_t curtime = getStopwatch4();
+    const uint16_t delta = curtime - lastUpdate;
+
+    // TODO: Replace slow modulo operations? (http://embeddedgurus.com/stack-overflow/2011/02/efficient-c-tip-13-use-the-modulus-operator-with-caution/)
+    // Evil macro and stuff
+#define CheckDelay(d) (d && (delta > (curtime % d)))
+
+    if (CheckDelay(updateSlaveData.LEDDelay))
+    {
+        sendSerialMSGByte(SERIAL_BASE_LEDS, getBaseLEDs());
+        sendSerialMSGByte(SERIAL_M32_LEDS, externalPort.LEDS);
+    }
+
+    if (CheckDelay(updateSlaveData.lightDelay))
+    {
+        sendSerialMSGWord(SERIAL_LIGHT_LEFT, getLeftLightSensor());
+        sendSerialMSGWord(SERIAL_LIGHT_RIGHT, getRightLightSensor());
+    }
+
+    if (CheckDelay(updateSlaveData.motorDelay))
+    {
+        sendSerialMSGByte(SERIAL_MOTOR_SPEED_LEFT, getLeftMotorSpeed());
+        sendSerialMSGByte(SERIAL_MOTOR_SPEED_RIGHT, getRightMotorSpeed());
+        sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_LEFT, getLeftDestMotorSpeed());
+        sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_RIGHT, getRightDestMotorSpeed());
+        sendSerialMSGWord(SERIAL_MOTOR_DIST_LEFT, getLeftMotorDist());
+        sendSerialMSGWord(SERIAL_MOTOR_DIST_RIGHT, getRightMotorDist());
+        sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_LEFT, getLeftMotorDestDist());
+        sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_RIGHT, getRightMotorDestDist());
+        sendSerialMSGWord(SERIAL_MOTOR_CURRENT_LEFT, getLeftMotorCurrent());
+        sendSerialMSGWord(SERIAL_MOTOR_CURRENT_RIGHT, getRightMotorCurrent());
+        sendSerialMSGByte(SERIAL_MOTOR_DIRECTIONS, getMotorDirections().byte);
+    }
+
+    if (CheckDelay(updateSlaveData.batteryDelay))
+        sendSerialMSGWord(SERIAL_BATTERY, getBattery());
+
+    if (CheckDelay(updateSlaveData.ACSDelay))
+        sendSerialMSGByte(SERIAL_ACS_POWER, getACSPowerState());
+
+    if (CheckDelay(updateSlaveData.micDelay))
+        sendSerialMSGWord(SERIAL_MIC, getMicrophonePeak());
+
+    if (CheckDelay(updateSlaveData.RC5Delay))
+        sendSerialMSGWord(SERIAL_LASTRC5, getLastRC5().data);
+
+    if (CheckDelay(updateSlaveData.sharpIRDelay))
+        sendSerialMSGByte(SERIAL_SHARPIR, getSharpIRDistance());
+
+    if (getStopwatch4() >= SLAVE_ROLLBACK_TIME)
+    {
+        setStopwatch4(SLAVE_ROLLBACK_TIME - lastUpdate);
+        lastUpdate = 0;
+    }
+    else
+        lastUpdate = curtime;
+}
+
 void I2CError(uint8_t error)
 {
     writeString_P("\nI2C ERROR - TWI STATE: 0x");
@@ -81,40 +146,7 @@ void I2CRequestReady(uint8_t id)
         I2CTWI_transmit2Bytes(I2C_SLAVEADDRESS, I2C_CMD_REGISTER, I2C_CMD_ACK);
 
         if (slaveMode)
-        {
-            // Update stats through serial
-            sendSerialMSGByte(SERIAL_BASE_LEDS, getBaseLEDs());
-            sendSerialMSGByte(SERIAL_M32_LEDS, externalPort.LEDS);
-            
-            sendSerialMSGWord(SERIAL_LIGHT_LEFT, getLeftLightSensor());
-            sendSerialMSGWord(SERIAL_LIGHT_RIGHT, getRightLightSensor());
-            
-            sendSerialMSGByte(SERIAL_MOTOR_SPEED_LEFT, getLeftMotorSpeed());
-            sendSerialMSGByte(SERIAL_MOTOR_SPEED_RIGHT, getRightMotorSpeed());
-            sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_LEFT, getLeftDestMotorSpeed());
-            sendSerialMSGByte(SERIAL_MOTOR_DESTSPEED_RIGHT, getRightDestMotorSpeed());
-            sendSerialMSGWord(SERIAL_MOTOR_DIST_LEFT, getLeftMotorDist());
-            sendSerialMSGWord(SERIAL_MOTOR_DIST_RIGHT, getRightMotorDist());
-            sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_LEFT, getLeftMotorDestDist());
-            sendSerialMSGWord(SERIAL_MOTOR_DESTDIST_RIGHT, getRightMotorDestDist());
-            sendSerialMSGWord(SERIAL_MOTOR_CURRENT_LEFT, getLeftMotorCurrent());
-            sendSerialMSGWord(SERIAL_MOTOR_CURRENT_RIGHT, getRightMotorCurrent());
-            sendSerialMSGByte(SERIAL_MOTOR_DIRECTIONS, getMotorDirections().byte);
-
-            sendSerialMSGWord(SERIAL_BATTERY, getBattery());
-
-            sendSerialMSGByte(SERIAL_ACS_POWER, getACSPowerState());
-
-            if (slaveMicUpdateTime && (getStopwatch4() >= slaveMicUpdateTime))
-            {
-                sendSerialMSGWord(SERIAL_MIC, getMicrophonePeak());
-                setStopwatch4(0);
-            }
-
-            sendSerialMSGWord(SERIAL_LASTRC5, getLastRC5().data);
-
-            sendSerialMSGByte(SERIAL_SHARPIR, getSharpIRDistance());
-        }
+            sendSlaveData();
     }
 }
 

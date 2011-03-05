@@ -2,13 +2,14 @@
 #define DRIVEWIDGET_H
 
 #include <QFrame>
+#include <QVector2D>
 
 class QLabel;
 class QMouseEvent;
 
 class CDriveWidget: public QFrame
 {
-    QPoint startDragPos, endDragPos;
+    QVector2D startDragPos, endDragPos;
 
 protected:
     void paintEvent(QPaintEvent *event);

@@ -127,5 +127,5 @@ void CSerialPort::sendCommand(const QString &command)
     commandQueue.enqueue(command);
 
     if (!commandProcessTimer->isActive())
-        commandProcessTimer->start(5); // Execute console commands every 25 msec
+        commandProcessTimer->start(25); // Execute console commands every 25 msec
 }
