@@ -92,7 +92,6 @@ driveTask =
         robot.setservo(90)
         robot.motor.stop()
         self.acsfreetime = 0
-        self.sharpirclosetime = 0
         self.scandelay = 0
         self.servopos = 90
         self.scandir = "right"
@@ -115,7 +114,7 @@ driveTask =
             self.acsfreetime = gettimems()
         end
 
-        if self.turntime < gettimems() then
+        if self.turntime ~=0 and self.turntime < gettimems() then
             robot.motor.setspeed(self.drivespeed, self.drivespeed)
             self.turntime = 0
         end
@@ -134,11 +133,7 @@ driveTask =
                 return true, scanTask
             end
             
-            if dist < 100 and dist > 20 then
-                self.sharpirclosetime = gettimems()
-            end
-            
-            if self.scandelay < gettimems() then
+            if self.turntime == 0 and self.scandelay < gettimems() then
                 self.state = "scan"
                 self.scanarray = { }
                 
@@ -343,6 +338,11 @@ scanTask =
 }
 
 function init()
+    setserialdelay("sharpir", 100)
+    setserialdelay("led", 0)
+    setserialdelay("light", 0)
+    setserialdelay("motor", 0)
+    setserialdelay("rc5", 0)
     robot.setacs("low")
     settask(driveTask)
     math.randomseed(os.time())

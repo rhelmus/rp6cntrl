@@ -177,16 +177,49 @@ void handleSetCommand(const char **cmd, uint8_t count)
     {
         extern uint8_t slaveMode;
         slaveMode = cmd[1][0] == '1';
-    }
-    else if (!strcmp_P(cmd[0], PSTR("slavemic")))
-    {
-        extern uint16_t slaveMicUpdateTime;
-        slaveMicUpdateTime = atoi(cmd[1]);
-        setStopwatch4(0);
-        if (slaveMicUpdateTime)
-            startStopwatch4();
-        else
+        if (slaveMode)
+        {
+            if (!isStopwatch4Running())
+            {
+                setStopwatch4(0);
+                startStopwatch4();
+            }
+        }
+        else if (isStopwatch4Running())
             stopStopwatch4();
+    }
+    else if (!strcmp_P(cmd[0], PSTR("slavedelay")))
+    {
+        if (count < 3)
+            writeString_P("Error: need atleast 3 arguments\n");
+        else
+        {
+            extern SUpdateSlaveData updateSlaveData;
+            uint16_t delay = atoi(cmd[2]);
+
+            writeString_P("Setting "); writeString(cmd[1]);
+            writeString_P(" to "); writeInteger(delay, 10); writeChar('\n');
+
+            if (delay && ((SLAVE_ROLLBACK_TIME % delay) != 0))
+                writeString_P("WARNING: delay does not 'fit' to rollback\n");
+
+            if (!strcmp_P(cmd[1], PSTR("led")))
+                updateSlaveData.LEDDelay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("light")))
+                updateSlaveData.lightDelay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("motor")))
+                updateSlaveData.motorDelay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("battery")))
+                updateSlaveData.batteryDelay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("acs")))
+                updateSlaveData.ACSDelay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("mic")))
+                updateSlaveData.micDelay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("rc5")))
+                updateSlaveData.RC5Delay = delay;
+            else if (!strcmp_P(cmd[1], PSTR("sharpir")))
+                updateSlaveData.sharpIRDelay = delay;
+        }
     }
     else if (!strcmp_P(cmd[0], PSTR("servo")))
     {

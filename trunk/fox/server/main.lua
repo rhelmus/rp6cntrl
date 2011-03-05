@@ -6,11 +6,31 @@ require "nav"
 -- External script functions
 local curscript = nil
 
+-- Default delay times (ms). Restored when scripts finish. Zero == disabled
+local defaultserialdelays =
+{
+    { "led", 1000 },
+    { "light", 500 },
+    { "motor", 1000 },
+    { "battery", 2000 },
+    { "acs", 500 },
+    { "mic", 0 },
+    { "rc5", 500 },
+    { "sharpir", 500 },
+}
+    
+
 local function calloptscriptfunc(f, ...)
     -- Use rawget to avoid obtaining data from global environment
     local func = rawget(curscript, f)
     if func then
         func(...)
+    end
+end
+
+local function restoreserialdelays()
+    for _, t in ipairs(defaultserialdelays) do
+        exec(string.format("set slavedelay %s %d", t[1], t[2]))
     end
 end
 
@@ -37,6 +57,7 @@ function think()
         if coroutine.status(curscript.corun) == "dead" then
             calloptscriptfunc("finish")
             curscript = nil
+            restoreserialdelays()
             scriptrunning(false)
         end
     end 
@@ -49,6 +70,7 @@ function execcmd(cmd, ...)
         if curscript then
             calloptscriptfunc("finish")
             curscript = nil
+            restoreserialdelays()
             scriptrunning(false)
         end
     elseif curscript then
@@ -56,11 +78,17 @@ function execcmd(cmd, ...)
     end
 end
 
+function setserialdelay(var, delay)
+    exec(string.format("set slavedelay %s %d", var, delay))
+end
+
 function initclient()
     print("initclient:", tostring(curscript ~= nil))
     scriptrunning(curscript ~= nil)
     if curscript then
         calloptscriptfunc("initclient")
+    else
+        restoreserialdelays()
     end
 end
 

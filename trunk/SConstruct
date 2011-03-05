@@ -67,7 +67,9 @@ cflags = [
     "-fdata-sections",
 ]
 # Additional optims
-ldflags = [ "-Wl,--gc-sections", "-Wl,--relax" ]
+#ldflags = [ "-Wl,--gc-sections", "-Wl,--relax" ]
+# UNDONE: relax suddenly fails (regression: http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewtopic&p=764529)
+ldflags = [ "-Wl,--gc-sections" ]
 libs = [ "m" ]
 
 # ---------------------------------------------

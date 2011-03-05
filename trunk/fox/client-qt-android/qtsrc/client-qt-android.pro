@@ -1,3 +1,8 @@
+#INCLUDEPATH += /mnt/stuff/shared/src/android/lighthouse/android-qt-mobility/install/include \
+#    /mnt/stuff/shared/src/android/lighthouse/android-qt-mobility/install/include/QtMobility
+CONFIG += mobility
+MOBILITY += sensors
+
 QT = core \
     gui \
     network \
