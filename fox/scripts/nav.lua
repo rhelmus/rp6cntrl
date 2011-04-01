@@ -251,6 +251,7 @@ taskIRScan =
 
 -- Module functions
 function init()
+	setserialdelay("sharpir", 50)
     grid = nav.newgrid()
     grid:setsize(10, 10)
 end

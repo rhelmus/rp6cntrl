@@ -712,8 +712,8 @@ QWidget *CQtClient::createLuaScriptTab()
     hbox->addWidget(createLocalLuaWidget());
     hbox->addWidget(createServerLuaWidget());
 
-    split->setStretchFactor(0, 66);
-    split->setStretchFactor(1, 33);
+    split->setStretchFactor(0, 75);
+    split->setStretchFactor(1, 25);
     return split;
 }
 
@@ -863,6 +863,10 @@ QWidget *CQtClient::createRobotNavWidget()
 
     subhbox->addWidget(robotNavSetGridButton = new QPushButton("Grid size..."));
     connect(robotNavSetGridButton, SIGNAL(clicked()), this, SLOT(robotNavSetGridPressed()));
+
+    QPushButton *expbut = new QPushButton("Expand...");
+    connect(expbut, SIGNAL(clicked()), this, SLOT(robotNavExpandGridPressed()));
+    subhbox->addWidget(expbut);
 
     subhbox->addWidget(robotNavMoveCheckBox = new QCheckBox("Move"));
     robotNavMoveCheckBox->setChecked(true);
@@ -1757,9 +1761,51 @@ void CQtClient::robotNavSetGridPressed()
     if (dialog.exec() == QDialog::Accepted)
     {
         const QSize size(widthspin->value(), heightspin->value());
-        robotNavMap->setGrid(size);
+//        robotNavMap->setGrid(size);
         executeScriptCommand("setgrid", QStringList() << QString::number(size.width()) <<
                              QString::number(size.height()));
+    }
+}
+
+void CQtClient::robotNavExpandGridPressed()
+{
+    QDialog dialog;
+    dialog.setModal(true);
+
+    QFormLayout *form = new QFormLayout(&dialog);
+
+    QSpinBox *leftspin = new QSpinBox;
+    leftspin->setRange(0, 10000);
+    leftspin->setValue(0);
+    form->addRow("Left", leftspin);
+
+    QSpinBox *upspin = new QSpinBox;
+    upspin->setRange(0, 10000);
+    upspin->setValue(0);
+    form->addRow("Up", upspin);
+
+    QSpinBox *rightspin = new QSpinBox;
+    rightspin->setRange(0, 10000);
+    rightspin->setValue(0);
+    form->addRow("Right", rightspin);
+
+    QSpinBox *downspin = new QSpinBox;
+    downspin->setRange(0, 10000);
+    downspin->setValue(0);
+    form->addRow("Down", downspin);
+
+    QDialogButtonBox *bbox = new QDialogButtonBox(QDialogButtonBox::Ok |
+                QDialogButtonBox::Cancel);
+    connect(bbox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+    connect(bbox, SIGNAL(rejected()), &dialog, SLOT(reject()));
+    form->addWidget(bbox);
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+//        robotNavMap->setGrid(size);
+        executeScriptCommand("expandgrid", QStringList() << QString::number(leftspin->value()) <<
+                             QString::number(upspin->value()) << QString::number(rightspin->value()) <<
+                             QString::number(downspin->value()));
     }
 }
 

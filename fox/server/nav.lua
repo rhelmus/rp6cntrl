@@ -64,6 +64,25 @@ function gridMT:init(cellsize)
     self.robotangle = 0
 end
 
+function gridMT:updatecellrefs()
+    local function updateref(cell, func)
+        if cell then
+            local newx, newy = cell.x, cell.y
+            if newx > self.size.w-1 then
+                newx = self.size.w - 1
+            end
+            if newy > self.size.h-1 then
+                newy = self.size.h - 1
+            end
+            func(self, self.grid[newx][newy])
+        end
+    end
+    
+    updateref(self.pathstart, self.setpathstart)
+    updateref(self.pathgoal, self.setpathgoal)
+    updateref(self.robot, self.setrobot)
+end
+
 function gridMT:initclient()
     sendmsg("enablepathclient", true)
     sendmsg("grid", self.size.w, self.size.h)
@@ -80,6 +99,9 @@ function gridMT:handlecmd(cmd, ...)
         self.pathgoal = self.grid[tonumber(selectone(1, ...))][tonumber(selectone(2, ...))]
     elseif cmd == "setgrid" then
         self:setsize(tonumber(selectone(1, ...)), tonumber(selectone(2, ...)))
+    elseif cmd == "expandgrid" then
+        self:expand(tonumber(selectone(1, ...)), tonumber(selectone(2, ...)),
+                tonumber(selectone(3, ...)), tonumber(selectone(4, ...)))
     else
         return false
     end
@@ -102,6 +124,8 @@ function gridMT:setsize(w, h)
     
     self.pathengine:setgrid(w, h)
     sendmsg("grid", w, h)
+    
+    self:updatecellrefs()
 end
 
 function gridMT:getsize()
