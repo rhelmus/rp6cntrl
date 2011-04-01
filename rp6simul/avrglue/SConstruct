@@ -1,0 +1,17 @@
+import os
+
+AVRSrcFiles = ['../avrmain.c']
+
+glueSrcFiles = [ 'glue.cpp', 'generalio.cpp' ]
+totalSrcFiles = AVRSrcFiles + glueSrcFiles
+libName = 'myrp6'
+
+# Build environment
+rp6 = Environment(ENV = {'PATH' : os.environ['PATH']})
+
+rp6.Append(CPPPATH = [ '.', '../shared' ])
+rp6.Append(CFLAGS = Split("-x c++"))
+rp6.Append(CPPDEFINES = '-DGLUE')
+
+rp6.SharedLibrary(libName, totalSrcFiles)
+

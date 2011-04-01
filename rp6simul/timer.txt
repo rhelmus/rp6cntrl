@@ -1,0 +1,129 @@
+Timer Resolution = (1 / (Input Frequency / Prescale)) 
+                 = (Prescale / Input Frequency)
+
+
+
+
+
+
+
+timeout()
+{
+    delta = curtime - lasttime; // in us
+    if (!delta)
+        return;
+    
+    ticks_s = CPU_F;
+    ticks_us = CPU_F / 1E6;
+    
+    ticks = ticks_us * delta;
+    
+    // or
+    ticks = CPU_F / 1E6 * delta;
+    
+    pushTicks(ticks);
+}
+
+/*
+timer list
+- prescaler
+- compare
+- ticks_left_till_update
+
+*/
+
+class CTickData
+{
+    uint32_t cycles; // Complete F_CPU cycles (i.e. seconds)
+    uint32_t ticks; // ticks of this cycle
+
+    MAX = F_CPU;
+    
+    void clamp(void)
+    {
+        while (ticks > MAX)
+        {
+            cycles++;
+            ticks = ticks - MAX;
+        }
+    }
+    
+public:
+
+    operator+(CTickData &other)
+    {
+        cycles += other.cycles;
+        ticks += other.ticks;
+        clamp();
+    }
+    
+    operator >(CTickData &other)
+    {
+        if other.cycles > cycles
+            return true;
+        else if other.cycles == cycles
+            return other.ticks > ticks;
+        else
+            return false;
+    }
+    
+    operator <(CTickData &other)
+    {
+        if other.cycles < cycles
+            return true;
+        else if other.cycles == cycles
+            return other.ticks < ticks;
+        else
+            return false;
+    }
+}
+
+pushTicks(ticks)
+{
+    finalticks = curticks + ticks;
+        
+    while (true)
+    {
+        timer = getClosestTimer(curticks)
+        
+        if finalticks >= timer.targetticks
+        {
+            curticks = timer.targetticks;
+            timer.targetticks += timer.compare * timer.prescaler;
+            timer.execISR();
+        }
+        else
+            break;
+    }
+    
+    curticks = finalticks;
+}
+
+
+
+
+pushTicks(ticks)
+{
+    ticks += previous_remaining_ticks;
+    
+    while (true)
+    {
+        timer = getClosestTimer();
+        assert(timer);
+        target_ticks = timer.ticks_left;
+        if (target_ticks <= ticks)
+        {
+            current_ticks += target_ticks;
+            timer.ticks_left = compare * prescaler;
+            timer.execISR();
+        }
+        else
+        {
+            timer.ticks_left -= ticks;
+            previous_remaining_ticks
+            break;
+        }
+        
+        
+    }
+}
