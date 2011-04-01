@@ -221,6 +221,7 @@ private slots:
     void robotNavSetStartToggled(bool e);
     void robotNavSetGoalToggled(bool e);
     void robotNavSetGridPressed(void);
+    void robotNavExpandGridPressed(void);
     void simNavWidthSpinBoxChanged(int w);
     void simNavHeightSpinBoxChanged(int h);
     void simNavEditButtonToggled(bool e);
