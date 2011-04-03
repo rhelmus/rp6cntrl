@@ -42,6 +42,21 @@ extern NRP6SimulGlue::CGeneralIO UDR;
 extern NRP6SimulGlue::CGeneralIO TCCR0;
 extern NRP6SimulGlue::CGeneralIO OCR0;
 
+// Timer1
+extern NRP6SimulGlue::CGeneralIO TCCR1A;
+extern NRP6SimulGlue::CGeneralIO TCCR1B;
+extern NRP6SimulGlue::CGeneralIO OCR1A;
+extern NRP6SimulGlue::CGeneralIO OCR1B;
+extern NRP6SimulGlue::CGeneralIO OCR1AL;
+extern NRP6SimulGlue::CGeneralIO OCR1AH;
+extern NRP6SimulGlue::CGeneralIO OCR1BL;
+extern NRP6SimulGlue::CGeneralIO OCR1BH;
+extern NRP6SimulGlue::CGeneralIO ICR1;
+
+// Timer2
+extern NRP6SimulGlue::CGeneralIO TCCR2;
+extern NRP6SimulGlue::CGeneralIO OCR2;
+
 // TIMSK
 extern NRP6SimulGlue::CGeneralIO TIMSK;
 

@@ -15,6 +15,7 @@ unsigned long getusecs(const timespec &start, const timespec &end)
 
 CAVRClock::CAVRClock(void) : initClockTime(true)
 {
+    // UNDONE: Support TIMER1B?
     timerArray[TIMER_0] = new CAVRTimer(ISR_TIMER0_COMP_vect);
     timerArray[TIMER_1A] = new CAVRTimer(ISR_TIMER1_COMPA_vect);
     timerArray[TIMER_2] = new CAVRTimer(ISR_TIMER2_COMP_vect);
@@ -48,10 +49,12 @@ CAVRTimer *CAVRClock::getClosestTimer()
     return closest;
 }
 
+#include <QThread>
+
 void CAVRClock::run()
 {
-    timespec curtime;
-    clock_gettime(CLOCK_REALTIME, &curtime);
+    static timespec curtime;
+    clock_gettime(CLOCK_MONOTONIC, &curtime);
 
     if (initClockTime)
     {
@@ -60,22 +63,32 @@ void CAVRClock::run()
         return;
     }
 
+    static unsigned long delta_total = 0, delta_count = 0;
+
     const unsigned long delta = getusecs(lastClockTime, curtime);
     const CTicks newticks(RP6_CLOCK / 1000000 * delta);
     const CTicks finalticks = currentTicks + newticks;
 
-//    qDebug() << "delta:" << delta << "newticks:" << RP6_CLOCK / 1000000 * delta;
+    delta_total += delta;
+    delta_count++;
 
+    if (delta_total >= 1000000)
+    {
+        qDebug() << "AVG delta:" << (delta_total / delta_count);
+        delta_total = delta_count = 0;
+    }
+
+    static CAVRTimer *timer;
     while (true)
     {
-        CAVRTimer *timer = getClosestTimer();
+        timer = getClosestTimer();
         if (!timer)
             break;
 
         if (finalticks > timer->getNextTick())
         {
             currentTicks = timer->getNextTick();
-            timer->getRefNextTick() += timer->getCompareValue();
+            timer->getRefNextTick() += timer->getTrueCompareValue();
             timer->execISR();
         }
         else
@@ -84,6 +97,10 @@ void CAVRClock::run()
 
     currentTicks = finalticks;
     lastClockTime = curtime;
+
+    // Relieve CPU a bit
+    timespec ts = { 0, 1000 };
+    nanosleep(&ts, 0);
 }
 
 void CAVRClock::enableTimer(EAVRTimers timer, bool e)
@@ -92,7 +109,7 @@ void CAVRClock::enableTimer(EAVRTimers timer, bool e)
     if (e != t->isEnabled())
     {
         if (e) // Init timer?
-            t->getRefNextTick() = currentTicks + t->getCompareValue();
+            t->getRefNextTick() = currentTicks + t->getTrueCompareValue();
         t->setEnabled(e);
     }
 }
@@ -108,11 +125,9 @@ void CAVRClock::reset()
 void CAVRClock::start()
 {
     emit startTimer();
-//    clockTimer->start();
 }
 
 void CAVRClock::stop()
 {
     emit stopTimer();
-//    clockTimer->stop();
 }

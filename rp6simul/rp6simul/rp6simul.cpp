@@ -45,6 +45,7 @@ const char *getCString(const QString &s)
 
 CRP6Simulator *CRP6Simulator::instance = 0;
 QReadWriteLock CRP6Simulator::generalIOReadWriteLock;
+QMutex CRP6Simulator::ISRExecMutex;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     pluginMainThread(0)
@@ -97,8 +98,13 @@ void CRP6Simulator::addIOHandler(CBaseIOHandler *handler)
 
 void CRP6Simulator::initIOHandlers()
 {
+    for (int i=0; i<IO_END; ++i)
+        IOHandlerArray[i] = 0;
+
     addIOHandler(new CUARTHandler(this));
     addIOHandler(new CTimer0Handler(this));
+    addIOHandler(new CTimer1Handler(this));
+    addIOHandler(new CTimer2Handler(this));
     addIOHandler(new CTimerMaskHandler(this));
 }
 
@@ -179,8 +185,7 @@ void CRP6Simulator::generalIOSetCB(EGeneralIOTypes type, TGeneralIOData data)
 
 TGeneralIOData CRP6Simulator::generalIOGetCB(EGeneralIOTypes type)
 {
-    QReadLocker locker(&generalIOReadWriteLock);
-    return instance->generalIOData[type];
+    return instance->getGeneralIO(type);
 }
 
 void CRP6Simulator::runPlugin()
@@ -194,6 +199,12 @@ void CRP6Simulator::runPlugin()
     }
 }
 
+TGeneralIOData CRP6Simulator::getGeneralIO(EGeneralIOTypes type) const
+{
+    QReadLocker locker(&generalIOReadWriteLock);
+    return generalIOData[type];
+}
+
 void CRP6Simulator::setGeneralIO(EGeneralIOTypes type, TGeneralIOData data)
 {
     QWriteLocker locker(&generalIOReadWriteLock);
@@ -202,7 +213,7 @@ void CRP6Simulator::setGeneralIO(EGeneralIOTypes type, TGeneralIOData data)
 
 void CRP6Simulator::execISR(EISRTypes type)
 {
-    // UNDONE: disable ISR calling
+    QMutexLocker lock(&ISRExecMutex);
 
     if (ISRFailedArray[type])
         return;
