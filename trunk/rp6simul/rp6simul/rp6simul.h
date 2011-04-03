@@ -9,6 +9,7 @@
 
 #include <QList>
 #include <QMap>
+#include <QMutex>
 #include <QReadWriteLock>
 #include <QString>
 
@@ -53,6 +54,7 @@ class CRP6Simulator : public QMainWindow
 
     static CRP6Simulator *instance;
     static QReadWriteLock generalIOReadWriteLock;
+    static QMutex ISRExecMutex;
 
     void initAVRClock(void);
     void addIOHandler(CBaseIOHandler *handler);
@@ -71,6 +73,7 @@ public:
     CRP6Simulator(QWidget *parent = 0);
     ~CRP6Simulator(void);
 
+    TGeneralIOData getGeneralIO(EGeneralIOTypes type) const;
     void setGeneralIO(EGeneralIOTypes type, TGeneralIOData data);
     void execISR(EISRTypes type);
     CAVRClock *getAVRClock(void) { return AVRClock; }

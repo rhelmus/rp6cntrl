@@ -12,7 +12,12 @@ inline bool bitSet(TGeneralIOData data, TGeneralIOData bit)
     return (data & (1<<bit));
 }
 
-CAVRTimer *getAVRTimer(CAVRClock::EAVRTimers t)
+inline TGeneralIOData bitValue(TGeneralIOData b)
+{
+    return (1 << b);
+}
+
+inline CAVRTimer *getAVRTimer(CAVRClock::EAVRTimers t)
 {
     return CRP6Simulator::getInstance()->getAVRClock()->getTimer(t);
 }
@@ -84,18 +89,15 @@ void CTimer0Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
         // UNDONE: Neater error handling
         // UNDONE: More config options handled
 
-        if ((data & (1<<WGM00)) || !(data & (1<<WGM01)))
+        if (bitSet(data, WGM00) || !bitSet(data, WGM01))
             qDebug() << "Unsupported timer0 mode set!";
 
-        if ((data & (1<<COM00)) || (data & (1<<COM01)))
+        if (bitSet(data, COM00) || bitSet(data, COM01))
             qDebug() << "Unsupported COM set for timer0!";
 
         // Prescaler
         if (!bitSet(data, CS00) && !bitSet(data, CS01) && !bitSet(data, CS02))
             timer->setPrescaler(0);
-        else if (bitSet(data, CS00) && !bitSet(data, CS01) &&
-                 !bitSet(data, CS02))
-            timer->setPrescaler(1);
         else if (bitSet(data, CS00) && !bitSet(data, CS01) &&
                  !bitSet(data, CS02))
             timer->setPrescaler(1);
@@ -112,7 +114,7 @@ void CTimer0Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
                  bitSet(data, CS02))
             timer->setPrescaler(1024);
         else
-            qDebug() << "Unsupported timer mode set!";
+            qDebug() << "Unsupported timer mode set for timer0!";
     }
     else if (type == IO_OCR0)
         timer->setCompareValue(data);
@@ -131,10 +133,196 @@ void CTimer0Handler::initPlugin()
 }
 
 
+bool CTimer1Handler::PWMEnabled() const
+{
+    TGeneralIOData A = (bitValue(WGM11) & bitValue(COM1A1) & bitValue(COM1B1));
+    TGeneralIOData B = (bitValue(WGM13) & bitValue(CS10));
+    return ((channelA == A) && (channelB == B));
+}
+
+int CTimer1Handler::getPrescaler() const
+{
+    int ret = 1;
+
+    if (!bitSet(channelB, CS10) && !bitSet(channelB, CS11) &&
+            !bitSet(channelB, CS12))
+        ret = 0;
+    else if (bitSet(channelB, CS10) && !bitSet(channelB, CS11) &&
+             !bitSet(channelB, CS12))
+        ret = 1;
+    else if (!bitSet(channelB, CS10) && bitSet(channelB, CS11) &&
+             !bitSet(channelB, CS12))
+        ret = 8;
+    else if (!bitSet(channelB, CS10) && !bitSet(channelB, CS11) &&
+             bitSet(channelB, CS12))
+        ret = 256;
+    else if (bitSet(channelB, CS10) && bitSet(channelB, CS11) &&
+             !bitSet(channelB, CS12))
+        ret = 64;
+    else if (bitSet(channelB, CS10) && !bitSet(channelB, CS11) &&
+             bitSet(channelB, CS12))
+        ret = 1024;
+    else
+        qDebug() << "Unsupported timer mode set for timer1!";
+
+    return ret;
+}
+
+void CTimer1Handler::updateTimerEnabled()
+{
+    CAVRClock *avrclock = CRP6Simulator::getInstance()->getAVRClock();
+    bool e = (!PWMEnabled());
+
+    if (e)
+        e = bitSet(CRP6Simulator::getInstance()->getGeneralIO(IO_TIMSK), OCIE1A);
+
+    avrclock->enableTimer(CAVRClock::TIMER_1A, e);
+}
+
+void CTimer1Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
+{
+    CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_1A);
+
+    if (type == IO_TCCR1A)
+    {
+        // UNDONE: Neater error handling
+        // UNDONE: More config options handled
+
+        channelA = data;
+
+        if (bitSet(data, WGM10))
+            qDebug() << "Unsupported timer1 mode set!";
+
+        if (bitSet(data, COM1A0) || bitSet(data, COM1B0) ||
+                (bitSet(data, COM1A1) != bitSet(data, COM1B1)))
+            qDebug() << "Unsupported COM set for timer1!";
+
+        updateTimerEnabled();
+    }
+    else if (type == IO_TCCR1B)
+    {
+        // UNDONE: Neater error handling
+        // UNDONE: More config options handled
+
+        channelB = data;
+
+        // UNDONE: Check for supported bits
+
+        prescaler = getPrescaler();
+        timer->setPrescaler(prescaler);
+        updateTimerEnabled();
+    }
+    else if (type == IO_OCR1A)
+    {
+        timer->setCompareValue(data);
+        compareValue = data;
+    }
+    else if (type == IO_OCR1AL)
+    {
+        // Assuming data is 16 bits
+        compareValue = (data & 0xFF00) + (compareValue & 0x00FF);
+        timer->setCompareValue(compareValue);
+    }
+    else if (type == IO_OCR1AH)
+    {
+        // Assuming data is 16 bits
+        compareValue = (compareValue & 0xFF00) + (data & 0x00FF);
+        timer->setCompareValue(compareValue);
+    }
+    else if (type == IO_ICR1)
+    {
+        // ...
+    }
+}
+
+void CTimer1Handler::registerHandler(CBaseIOHandler **array)
+{
+    array[IO_TCCR1A] = this;
+    array[IO_TCCR1B] = this;
+    array[IO_OCR1A] = this;
+//    array[IO_OCR1B] = this;
+    array[IO_OCR1AL] = this;
+    array[IO_OCR1AH] = this;
+//    array[IO_OCR1BL] = this;
+//    array[IO_OCR1BH] = this;
+    array[IO_ICR1] = this;
+}
+
+void CTimer1Handler::initPlugin()
+{
+    CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_1A);
+    timer->setPrescaler(1);
+    channelA = channelB = 0;
+    prescaler = 1;
+    compareValue = 0;
+}
+
+
+void CTimer2Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
+{
+    CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_2);
+    if (type == IO_TCCR2)
+    {
+        // UNDONE: Neater error handling
+        // UNDONE: More config options handled
+
+        if (bitSet(data, WGM20) || !bitSet(data, WGM21))
+            qDebug() << "Unsupported timer2 mode set!";
+
+        if (bitSet(data, COM20) || bitSet(data, COM21))
+            qDebug() << "Unsupported COM set for timer2!";
+
+        // Prescaler
+        if (!bitSet(data, CS20) && !bitSet(data, CS21) && !bitSet(data, CS22))
+            timer->setPrescaler(0);
+        else if (bitSet(data, CS20) && !bitSet(data, CS21) &&
+                 !bitSet(data, CS22))
+            timer->setPrescaler(1);
+        else if (!bitSet(data, CS20) && bitSet(data, CS21) &&
+                 !bitSet(data, CS22))
+            timer->setPrescaler(8);
+        else if (!bitSet(data, CS20) && !bitSet(data, CS21) &&
+                 bitSet(data, CS22))
+            timer->setPrescaler(64);
+        else if (bitSet(data, CS20) && bitSet(data, CS21) &&
+                 !bitSet(data, CS22))
+            timer->setPrescaler(32);
+        else if (bitSet(data, CS20) && !bitSet(data, CS21) &&
+                 bitSet(data, CS22))
+            timer->setPrescaler(128);
+        else if (!bitSet(data, CS20) && bitSet(data, CS21) &&
+                 bitSet(data, CS22))
+            timer->setPrescaler(256);
+        else if (bitSet(data, CS20) && bitSet(data, CS21) &&
+                 bitSet(data, CS22))
+            timer->setPrescaler(1024);
+        else
+            qDebug() << "Unsupported timer mode set for timer2!";
+    }
+    else if (type == IO_OCR2)
+        timer->setCompareValue(data);
+}
+
+void CTimer2Handler::registerHandler(CBaseIOHandler **array)
+{
+    array[IO_TCCR2] = this;
+    array[IO_OCR2] = this;
+}
+
+void CTimer2Handler::initPlugin()
+{
+    CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_2);
+    timer->setPrescaler(1);
+}
+
+
 void CTimerMaskHandler::handleIOData(EGeneralIOTypes, TGeneralIOData data)
 {
-    CRP6Simulator::getInstance()->getAVRClock()->enableTimer(CAVRClock::TIMER_0,
-                                                             bitSet(data, OCIE0));
+    CAVRClock *avrclock = CRP6Simulator::getInstance()->getAVRClock();
+
+    avrclock->enableTimer(CAVRClock::TIMER_0, bitSet(data, OCIE0));
+    avrclock->enableTimer(CAVRClock::TIMER_1A, bitSet(data, OCIE1A));
+    avrclock->enableTimer(CAVRClock::TIMER_2, bitSet(data, OCIE2));
 
     // UNDONE: Other timers
 }

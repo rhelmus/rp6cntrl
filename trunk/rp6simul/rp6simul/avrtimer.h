@@ -108,17 +108,21 @@ class CAVRTimer
     bool enabled;
     CTicks nextTick;
     EISRTypes ISRType; // ISR to call
-    uint32_t compareValue, prescaler;
+    uint32_t compareValue, prescaler, trueCompareValue;
+
+    void updateTrueCompareValue(void)
+    { trueCompareValue = compareValue * prescaler; }
 
 public:
     CAVRTimer(EISRTypes isr) : enabled(false), ISRType(isr),
-        compareValue(0), prescaler(1) { }
+        compareValue(0), prescaler(1), trueCompareValue(0) { }
 
     const CTicks &getNextTick(void) const { return nextTick; }
     CTicks &getRefNextTick(void) { return nextTick; }
-    void setCompareValue(uint32_t c) { compareValue = c; }
-    void setPrescaler(uint32_t p) { prescaler = p; }
-    uint32_t getCompareValue(void) const { return compareValue * prescaler; }
+    void setCompareValue(uint32_t c)
+    { compareValue = c; updateTrueCompareValue(); }
+    void setPrescaler(uint32_t p) { prescaler = p; updateTrueCompareValue(); }
+    uint32_t getTrueCompareValue(void) const { return trueCompareValue; }
     void execISR(void) { CRP6Simulator::getInstance()->execISR(ISRType); }
     bool isEnabled(void) const { return enabled; }
     void setEnabled(bool e) { enabled = e; }

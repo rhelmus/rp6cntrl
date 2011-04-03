@@ -184,6 +184,33 @@ volatile uint16_t delay_timer;
 ISR (TIMER0_COMP_vect)
 {
     delay_timer++;
+
+    static timespec start, end;
+    static bool init = true;
+    static uint32_t total = 0, count = 0;
+
+    if (init)
+    {
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        init = false;
+    }
+    else
+    {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        uint32_t delta = ((end.tv_sec-start.tv_sec) * 1000000) +
+                ((end.tv_nsec-start.tv_nsec) / 1000);
+        start = end;
+
+        total += delta;
+        count++;
+
+        if (total > 1000000)
+        {
+            printf("avg-delta: %d\n", total / count);
+            fflush(stdout);
+            total = count = 0;
+        }
+    }
 }
 
 void uSleep(uint8_t time)
@@ -196,6 +223,34 @@ void mSleep(uint16_t time)
     while (time--) uSleep(10);
 }
 
+volatile uint32_t delay_timer_high;
+
+
+ISR (TIMER2_COMP_vect)
+{
+    static timespec start, end;
+    static bool init = true;
+
+    delay_timer_high++;
+
+    if (init)
+    {
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        init = false;
+    }
+    else if (delay_timer_high >= 72000)
+    {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        uint32_t delta = ((end.tv_sec-start.tv_sec) * 1000000) +
+                ((end.tv_nsec-start.tv_nsec) / 1000);
+        start = end;
+
+        printf("timer2 res: %d\n", delta);
+        fflush(stdout);
+        delay_timer_high = 0;
+    }
+}
+
 int main()
 {
     // Init
@@ -205,19 +260,41 @@ int main()
             | (0 << COM00) | (0 << COM01)
             | (0 << CS02)  | (1 << CS01) | (0 << CS00);
     OCR0  = 99;
-    TIMSK = (1 << OCIE0);
+
+    TCCR2 = (1 << WGM21) | (0 << COM20) | (1 << CS20);
+    OCR2  = 0x6E; // 0x6E = 72kHz @8MHz
+
+    TCCR1A = (0 << WGM10) | (1 << WGM11) | (1 << COM1A1) | (1 << COM1B1);
+    TCCR1B =  (1 << WGM13) | (0 << WGM12) | (1 << CS10);
+    ICR1 = 210; // Phase corret PWM top value - 210 results in
+                // about 19 kHz PWM.
+                // ICR1 is the maximum (=100% duty cycle) PWM value!
+                // This means that the PWM resolution is a bit lower, but
+                // if the frequency is lower than 19 kHz you may hear very
+                // annoying high pitch noises from the motors!
+                // 19 kHz is a bit over the maximum frequency most people can
+                // hear!
+                //
+                // ATTENTION: Max PWM value is 210 and NOT 255 !!!
+    OCR1AL = 0;
+    OCR1BL = 0;
+
+    TIMSK = (1 << OCIE0) | (1 << OCIE2);
+
+
 
     for (;;)
     {
         timespec start, end;
 
-        clock_gettime(CLOCK_REALTIME, &start);
-        mSleep(1000);
-        clock_gettime(CLOCK_REALTIME, &end);
+        clock_gettime(CLOCK_MONOTONIC, &start);
+//        mSleep(1000);
+        sleep(1);
+        clock_gettime(CLOCK_MONOTONIC, &end);
 
-        printf("delta: %d\n", ((end.tv_sec-start.tv_sec) * 1000000) +
-               ((end.tv_nsec-start.tv_nsec) / 1000));
-        fflush(stdout);
+//        printf("delta: %d\n", ((end.tv_sec-start.tv_sec) * 1000000) +
+//               ((end.tv_nsec-start.tv_nsec) / 1000));
+//        fflush(stdout);
 
 //        writeString("UART test :-)\n");
 //        sleep(1);

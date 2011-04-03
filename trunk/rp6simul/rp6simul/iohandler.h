@@ -55,6 +55,34 @@ public:
     virtual void initPlugin(void);
 };
 
+class CTimer1Handler: public CBaseIOHandler
+{
+    TGeneralIOData channelA, channelB;
+    int prescaler;
+    TGeneralIOData compareValue;
+
+    bool PWMEnabled(void) const;
+    int getPrescaler(void) const;
+    void updateTimerEnabled(void);
+
+public:
+    explicit CTimer1Handler(QObject *parent) : CBaseIOHandler(parent) { }
+
+    virtual void handleIOData(EGeneralIOTypes type, TGeneralIOData data);
+    virtual void registerHandler(CBaseIOHandler **array);
+    virtual void initPlugin(void);
+};
+
+class CTimer2Handler: public CBaseIOHandler
+{
+public:
+    explicit CTimer2Handler(QObject *parent) : CBaseIOHandler(parent) { }
+
+    virtual void handleIOData(EGeneralIOTypes type, TGeneralIOData data);
+    virtual void registerHandler(CBaseIOHandler **array);
+    virtual void initPlugin(void);
+};
+
 class CTimerMaskHandler: public CBaseIOHandler
 {
 public:
