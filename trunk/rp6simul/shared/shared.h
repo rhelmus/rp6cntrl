@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+// NOTE: When adding stuff here, don't forget to set them also for Lua!
+
 #ifdef GLUE
 namespace NRP6SimulGlue {
 #endif
@@ -48,7 +50,6 @@ typedef uint16_t TGeneralIOData;
 // Macros were copied from avr/iom32.h (avr-libc)
 
 // Timer0
-#define FOC0    7
 #define WGM00   6
 #define COM01   5
 #define COM00   4
@@ -73,7 +74,6 @@ typedef uint16_t TGeneralIOData;
 #define CS10    0
 
 // Timer2
-#define FOC2    7
 #define WGM20   6
 #define COM21   5
 #define COM20   4

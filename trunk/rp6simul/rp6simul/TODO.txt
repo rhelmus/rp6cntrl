@@ -1,1 +1,3 @@
 - General IO: Check for overflows (reintroduce 8/16 bit separation?)
+- UART/SPI: Set ready flag when ready (instead of always enabled)
+

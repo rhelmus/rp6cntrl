@@ -2,6 +2,7 @@
 #include "pluginthread.h"
 #include "iohandler.h"
 #include "avrtimer.h"
+#include "lua.h"
 
 #include <QtGui>
 #include <QLibrary>
@@ -64,6 +65,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
 
     initAVRClock();
     initIOHandlers();
+    initLua();
     initPlugin();
 }
 
@@ -106,6 +108,110 @@ void CRP6Simulator::initIOHandlers()
     addIOHandler(new CTimer1Handler(this));
     addIOHandler(new CTimer2Handler(this));
     addIOHandler(new CTimerMaskHandler(this));
+}
+
+void CRP6Simulator::setLuaIOTypes()
+{
+    // Evil macros and stuff
+#define SET_LUA_IO(IO) NLua::setVariable(IO_##IO, #IO, "avr")
+
+    // UART
+    SET_LUA_IO(UCSRA);
+    SET_LUA_IO(UDR);
+
+    // Timer0
+    SET_LUA_IO(TCCR0);
+    SET_LUA_IO(OCR0);
+
+    // Timer1
+    SET_LUA_IO(TCCR1A);
+    SET_LUA_IO(TCCR1B);
+    SET_LUA_IO(OCR1A);
+    SET_LUA_IO(OCR1B);
+    SET_LUA_IO(OCR1AL);
+    SET_LUA_IO(OCR1AH);
+    SET_LUA_IO(OCR1BL);
+    SET_LUA_IO(OCR1BH);
+    SET_LUA_IO(ICR1);
+
+    // Timer2
+    SET_LUA_IO(TCCR2);
+    SET_LUA_IO(OCR2);
+
+    // TIMSK
+    SET_LUA_IO(TIMSK);
+}
+
+void CRP6Simulator::setLuaAVRConstants()
+{
+    // Evil macros and stuff
+#define SET_LUA_CONSTANT(C) NLua::setVariable(C, #C, "avr")
+
+    // Timer0
+    SET_LUA_CONSTANT(WGM00);
+    SET_LUA_CONSTANT(COM01);
+    SET_LUA_CONSTANT(COM00);
+    SET_LUA_CONSTANT(WGM01);
+    SET_LUA_CONSTANT(CS02);
+    SET_LUA_CONSTANT(CS01);
+    SET_LUA_CONSTANT(CS00);
+
+    // Timer1A
+    SET_LUA_CONSTANT(COM1A1);
+    SET_LUA_CONSTANT(COM1A0);
+    SET_LUA_CONSTANT(COM1B1);
+    SET_LUA_CONSTANT(COM1B0);
+    SET_LUA_CONSTANT(WGM11);
+    SET_LUA_CONSTANT(WGM10);
+
+    // Timer1B
+    SET_LUA_CONSTANT(WGM13);
+    SET_LUA_CONSTANT(WGM12);
+    SET_LUA_CONSTANT(CS12);
+    SET_LUA_CONSTANT(CS11);
+    SET_LUA_CONSTANT(CS10);
+
+    // Timer2
+    SET_LUA_CONSTANT(WGM20);
+    SET_LUA_CONSTANT(COM21);
+    SET_LUA_CONSTANT(COM20);
+    SET_LUA_CONSTANT(WGM21);
+    SET_LUA_CONSTANT(CS22);
+    SET_LUA_CONSTANT(CS21);
+    SET_LUA_CONSTANT(CS20);
+
+    // TIMSK
+    SET_LUA_CONSTANT(OCIE2);
+    SET_LUA_CONSTANT(OCIE1A);
+    SET_LUA_CONSTANT(OCIE1B);
+    SET_LUA_CONSTANT(OCIE0);
+}
+
+void CRP6Simulator::registerLuaClock()
+{
+    NLua::setVariable(CAVRClock::TIMER_0, "TIMER0", "clock");
+    NLua::setVariable(CAVRClock::TIMER_1A, "TIMER1A", "clock");
+    NLua::setVariable(CAVRClock::TIMER_2, "TIMER2", "clock");
+}
+
+void CRP6Simulator::registerLuaBindings()
+{
+    NLua::registerFunction(luaGetGeneralIO, "getGeneralIO", "avr");
+    NLua::registerFunction(luaSetGeneralIO, "setGeneralIO", "avr");
+
+    NLua::registerFunction(luaEnableTimer, "enableTimer", "clock");
+    NLua::registerFunction(luaSetTimerCompareValue, "setCompareValue", "clock");
+    NLua::registerFunction(luaSetTimerPrescaler, "setPrescaler", "clock");
+}
+
+void CRP6Simulator::initLua()
+{
+    setLuaIOTypes();
+    setLuaAVRConstants();
+    registerLuaClock();
+    registerLuaBindings();
+
+    NLua::luaInterface.exec();
 }
 
 void CRP6Simulator::terminateAVRClock()
@@ -188,6 +294,45 @@ TGeneralIOData CRP6Simulator::generalIOGetCB(EGeneralIOTypes type)
     return instance->getGeneralIO(type);
 }
 
+int CRP6Simulator::luaGetGeneralIO(lua_State *l)
+{
+    const EGeneralIOTypes type = static_cast<EGeneralIOTypes>(luaL_checkint(l, 1));
+    lua_pushinteger(l, instance->getGeneralIO(type));
+    return 1;
+}
+
+int CRP6Simulator::luaSetGeneralIO(lua_State *l)
+{
+    const EGeneralIOTypes type = static_cast<EGeneralIOTypes>(luaL_checkint(l, 1));
+    const int data = luaL_checkint(l, 2);
+    instance->setGeneralIO(type, data);
+    return 0;
+}
+
+int CRP6Simulator::luaEnableTimer(lua_State *l)
+{
+    const CAVRClock::EAVRTimers timer = static_cast<CAVRClock::EAVRTimers>(luaL_checkint(l, 1));
+    const bool e = NLua::checkBoolean(2);
+    instance->AVRClock->enableTimer(timer, e);
+    return 0;
+}
+
+int CRP6Simulator::luaSetTimerCompareValue(lua_State *l)
+{
+    const CAVRClock::EAVRTimers timer = static_cast<CAVRClock::EAVRTimers>(luaL_checkint(l, 1));
+    const int compare = luaL_checkint(l, 2);
+    instance->AVRClock->getTimer(timer)->setCompareValue(compare);
+    return 0;
+}
+
+int CRP6Simulator::luaSetTimerPrescaler(lua_State *l)
+{
+    const CAVRClock::EAVRTimers timer = static_cast<CAVRClock::EAVRTimers>(luaL_checkint(l, 1));
+    const int pre = luaL_checkint(l, 2);
+    instance->AVRClock->getTimer(timer)->setCompareValue(pre);
+    return 0;
+}
+
 void CRP6Simulator::runPlugin()
 {
     if (pluginMainThread && !pluginMainThread->isRunning())
@@ -213,6 +358,8 @@ void CRP6Simulator::setGeneralIO(EGeneralIOTypes type, TGeneralIOData data)
 
 void CRP6Simulator::execISR(EISRTypes type)
 {
+    // UNDONE: Renable/disable ISR's (cli()/sei())
+
     QMutexLocker lock(&ISRExecMutex);
 
     if (ISRFailedArray[type])

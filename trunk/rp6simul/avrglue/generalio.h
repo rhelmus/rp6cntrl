@@ -5,6 +5,7 @@
 #include "shared.h"
 
 #include <stdint.h>
+#include <time.h>
 
 namespace NRP6SimulGlue {
 
@@ -20,16 +21,19 @@ public:
 private:
     EGeneralIOTypes IOType;
 
+    static timespec lastDelay;
+
     CGeneralIO(const CGeneralIO &); // No copying
 
-    void set(TGeneralIOData d) { setCallback(IOType, d); }
+    void set(TGeneralIOData d) { setCallback(IOType, d); checkDelay(); }
+    void checkDelay(void); // Relieves CPU a bit
 
 public:
     CGeneralIO(EGeneralIOTypes t) : IOType(t) { }
 
     CGeneralIO &operator=(TGeneralIOData d) { set(d); return *this; }
     CGeneralIO &operator=(CGeneralIO &other) { set(other); return *this; }
-    operator TGeneralIOData(void) { return getCallback(IOType); }
+    operator TGeneralIOData(void) { checkDelay(); return getCallback(IOType); }
 };
 
 }
