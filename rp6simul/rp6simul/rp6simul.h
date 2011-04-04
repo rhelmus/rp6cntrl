@@ -13,6 +13,8 @@
 #include <QReadWriteLock>
 #include <QString>
 
+#include <lua.hpp>
+
 typedef void (*TCallPluginMainFunc)(void);
 
 typedef void (*TGeneralIOSetCB)(EGeneralIOTypes, TGeneralIOData);
@@ -59,12 +61,24 @@ class CRP6Simulator : public QMainWindow
     void initAVRClock(void);
     void addIOHandler(CBaseIOHandler *handler);
     void initIOHandlers(void);
+    void setLuaIOTypes(void);
+    void setLuaAVRConstants(void);
+    void registerLuaClock(void);
+    void registerLuaBindings(void);
+    void initLua(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     void initPlugin(void);
 
     static void generalIOSetCB(EGeneralIOTypes type, TGeneralIOData data);
     static TGeneralIOData generalIOGetCB(EGeneralIOTypes type);
+
+    // Lua bindings
+    static int luaGetGeneralIO(lua_State *l);
+    static int luaSetGeneralIO(lua_State *l);
+    static int luaEnableTimer(lua_State *l);
+    static int luaSetTimerCompareValue(lua_State *l);
+    static int luaSetTimerPrescaler(lua_State *l);
 
 private slots:
     void runPlugin(void);

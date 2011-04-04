@@ -15,13 +15,20 @@ SOURCES += main.cpp\
         rp6simul.cpp \
     pluginthread.cpp \
     iohandler.cpp \
-    avrtimer.cpp
+    avrtimer.cpp \
+    lua.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
     ../shared/shared.h \
     iohandler.h \
-    avrtimer.h
+    avrtimer.h \
+    lua.h
 
 OTHER_FILES += \
-    TODO.txt
+    TODO.txt \
+    lua/main.lua \
+    lua/drivers/timer0.lua
+
+INCLUDEPATH += /usr/include/lua5.1
+LIBS += -llua

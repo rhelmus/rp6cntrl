@@ -4,6 +4,26 @@ namespace NRP6SimulGlue {
 
 CGeneralIO::TSetCallback CGeneralIO::setCallback = 0;
 CGeneralIO::TGetCallback CGeneralIO::getCallback = 0;
+timespec CGeneralIO::lastDelay = { 0, 0 };
+
+void CGeneralIO::checkDelay()
+{
+    if (!lastDelay.tv_sec && !lastDelay.tv_nsec) // Init?
+        clock_gettime(CLOCK_MONOTONIC, &lastDelay);
+    else
+    {
+        timespec current;
+        clock_gettime(CLOCK_MONOTONIC, &current);
+        long delta = ((current.tv_sec-lastDelay.tv_sec) * 1000000) +
+                ((current.tv_nsec-lastDelay.tv_nsec) / 1000);
+        if (delta > 10) // Delay every 10 us
+        {
+            lastDelay = current;
+            current.tv_sec = 0; current.tv_nsec = 1000;
+            nanosleep(&current, 0);
+        }
+    }
+}
 
 }
 

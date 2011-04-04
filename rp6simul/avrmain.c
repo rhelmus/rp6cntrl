@@ -285,12 +285,14 @@ int main()
 
     for (;;)
     {
-        timespec start, end;
+        if (OCR0 != 99)
+            printf("say what????!1?!/!");
+//        timespec start, end;
 
-        clock_gettime(CLOCK_MONOTONIC, &start);
+//        clock_gettime(CLOCK_MONOTONIC, &start);
 //        mSleep(1000);
-        sleep(1);
-        clock_gettime(CLOCK_MONOTONIC, &end);
+////        sleep(1);
+//        clock_gettime(CLOCK_MONOTONIC, &end);
 
 //        printf("delta: %d\n", ((end.tv_sec-start.tv_sec) * 1000000) +
 //               ((end.tv_nsec-start.tv_nsec) / 1000));

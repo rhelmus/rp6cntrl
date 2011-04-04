@@ -170,6 +170,9 @@ int CTimer1Handler::getPrescaler() const
 
 void CTimer1Handler::updateTimerEnabled()
 {
+    // UNDONE: Do we actually need this? Don't think it makes sense to set
+    // TIMSK when doing PWM?
+
     CAVRClock *avrclock = CRP6Simulator::getInstance()->getAVRClock();
     bool e = (!PWMEnabled());
 
