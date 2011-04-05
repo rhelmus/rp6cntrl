@@ -4,6 +4,6 @@ glue.h
 SConstruct
 glue.cpp
 ../avrmain.c
-generalio.h
-generalio.cpp
+ioregisters.h
+ioregisters.cpp
 ../shared/shared.h

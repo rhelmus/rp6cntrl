@@ -45,7 +45,7 @@ const char *getCString(const QString &s)
 }
 
 CRP6Simulator *CRP6Simulator::instance = 0;
-QReadWriteLock CRP6Simulator::generalIOReadWriteLock;
+QReadWriteLock CRP6Simulator::IORegisterReadWriteLock;
 QMutex CRP6Simulator::ISRExecMutex;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
@@ -94,8 +94,10 @@ void CRP6Simulator::initAVRClock()
 
 void CRP6Simulator::addIOHandler(CBaseIOHandler *handler)
 {
+#if 0
     IOHandlerList << handler;
     handler->registerHandler(IOHandlerArray);
+#endif
 }
 
 void CRP6Simulator::initIOHandlers()
@@ -103,17 +105,19 @@ void CRP6Simulator::initIOHandlers()
     for (int i=0; i<IO_END; ++i)
         IOHandlerArray[i] = 0;
 
+#if 0
     addIOHandler(new CUARTHandler(this));
     addIOHandler(new CTimer0Handler(this));
     addIOHandler(new CTimer1Handler(this));
     addIOHandler(new CTimer2Handler(this));
     addIOHandler(new CTimerMaskHandler(this));
+#endif
 }
 
 void CRP6Simulator::setLuaIOTypes()
 {
     // Evil macros and stuff
-#define SET_LUA_IO(IO) NLua::setVariable(IO_##IO, #IO, "avr")
+#define SET_LUA_IO(IO) NLua::setVariable(IO_##IO, "IO_"#IO, "avr")
 
     // UART
     SET_LUA_IO(UCSRA);
@@ -140,6 +144,8 @@ void CRP6Simulator::setLuaIOTypes()
 
     // TIMSK
     SET_LUA_IO(TIMSK);
+
+#undef SET_LUA_IO
 }
 
 void CRP6Simulator::setLuaAVRConstants()
@@ -185,33 +191,39 @@ void CRP6Simulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(OCIE1A);
     SET_LUA_CONSTANT(OCIE1B);
     SET_LUA_CONSTANT(OCIE0);
-}
 
-void CRP6Simulator::registerLuaClock()
-{
-    NLua::setVariable(CAVRClock::TIMER_0, "TIMER0", "clock");
-    NLua::setVariable(CAVRClock::TIMER_1A, "TIMER1A", "clock");
-    NLua::setVariable(CAVRClock::TIMER_2, "TIMER2", "clock");
-}
+    // ISRs
+    SET_LUA_CONSTANT(ISR_USART_RXC_vect);
+    SET_LUA_CONSTANT(ISR_TIMER0_COMP_vect);
+    SET_LUA_CONSTANT(ISR_TIMER1_COMPA_vect);
+    SET_LUA_CONSTANT(ISR_TIMER2_COMP_vect);
 
-void CRP6Simulator::registerLuaBindings()
-{
-    NLua::registerFunction(luaGetGeneralIO, "getGeneralIO", "avr");
-    NLua::registerFunction(luaSetGeneralIO, "setGeneralIO", "avr");
-
-    NLua::registerFunction(luaEnableTimer, "enableTimer", "clock");
-    NLua::registerFunction(luaSetTimerCompareValue, "setCompareValue", "clock");
-    NLua::registerFunction(luaSetTimerPrescaler, "setPrescaler", "clock");
+#undef SET_LUA_CONSTANT
 }
 
 void CRP6Simulator::initLua()
 {
     setLuaIOTypes();
     setLuaAVRConstants();
-    registerLuaClock();
-    registerLuaBindings();
+
+    // avr
+    NLua::registerFunction(luaGetIORegister, "getIORegister", "avr");
+    NLua::registerFunction(luaSetIORegister, "setIORegister", "avr");
+
+    // clock
+    NLua::registerFunction(luaCreateTimer, "createTimer", "clock");
+    NLua::registerFunction(luaEnableTimer, "enableTimer", "clock");
+
+    // timer class
+    NLua::registerClassFunction(luaSetTimerCompareValue, "setCompareValue", "timer");
+    NLua::registerClassFunction(luaSetTimerPrescaler, "setPrescaler", "timer");
+    NLua::registerClassFunction(luaSetTimerTimeOut, "setTimeOut", "timer");
 
     NLua::luaInterface.exec();
+
+    // UNDONE: Needed?
+    lua_getglobal(NLua::luaInterface, "init");
+    lua_call(NLua::luaInterface, 0, 0);
 }
 
 void CRP6Simulator::terminateAVRClock()
@@ -253,22 +265,23 @@ void CRP6Simulator::initPlugin()
 
     TCallPluginMainFunc mainfunc =
             getLibFunc<TCallPluginMainFunc>(lib, "callAvrMain");
-    TSetGeneralIOCallbacks setiocb =
-            getLibFunc<TSetGeneralIOCallbacks>(lib, "setGeneralIOCallbacks");
+    TSetIORegisterCallbacks setiocb =
+            getLibFunc<TSetIORegisterCallbacks>(lib, "setIORegisterCallbacks");
 
     if (!mainfunc || !setiocb)
         return; // UNDONE
 
     AVRClock->stop();
+    AVRClock->reset();
 
     terminatePluginMainThread();
 
     pluginMainThread = new CCallPluginMainThread(mainfunc, this);
 
-    setiocb(generalIOSetCB, generalIOGetCB);
+    setiocb(IORegisterSetCB, IORegisterGetCB);
 
     for (int i=0; i<IO_END; ++i)
-        generalIOData[i] = 0;
+        IORegisterData[i] = 0;
 
     for (int i=0; i<ISR_END; ++i)
     {
@@ -276,60 +289,104 @@ void CRP6Simulator::initPlugin()
         ISRFailedArray[i] = false;
     }
 
+    lua_getglobal(NLua::luaInterface, "initPlugin");
+    lua_call(NLua::luaInterface, 0, 0);
+
+#if 0
     foreach (CBaseIOHandler *handler, IOHandlerList)
     {
         handler->initPlugin();
     }
+#endif
 }
 
-void CRP6Simulator::generalIOSetCB(EGeneralIOTypes type, TGeneralIOData data)
+void CRP6Simulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
 {
-    instance->setGeneralIO(type, data);
+    instance->setIORegister(type, data);
+
+    lua_getglobal(NLua::luaInterface, "handleIOData");
+    lua_pushinteger(NLua::luaInterface, type);
+    lua_pushinteger(NLua::luaInterface, data);
+
+    lua_call(NLua::luaInterface, 2, 0);
+
+#if 0
     if (instance->IOHandlerArray[type])
         instance->IOHandlerArray[type]->handleIOData(type, data);
+#endif
 }
 
-TGeneralIOData CRP6Simulator::generalIOGetCB(EGeneralIOTypes type)
+TIORegisterData CRP6Simulator::IORegisterGetCB(EIORegisterTypes type)
 {
-    return instance->getGeneralIO(type);
+    return instance->getIORegister(type);
 }
 
-int CRP6Simulator::luaGetGeneralIO(lua_State *l)
+int CRP6Simulator::luaGetIORegister(lua_State *l)
 {
-    const EGeneralIOTypes type = static_cast<EGeneralIOTypes>(luaL_checkint(l, 1));
-    lua_pushinteger(l, instance->getGeneralIO(type));
+    const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
+    lua_pushinteger(l, instance->getIORegister(type));
     return 1;
 }
 
-int CRP6Simulator::luaSetGeneralIO(lua_State *l)
+int CRP6Simulator::luaSetIORegister(lua_State *l)
 {
-    const EGeneralIOTypes type = static_cast<EGeneralIOTypes>(luaL_checkint(l, 1));
+    const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
     const int data = luaL_checkint(l, 2);
-    instance->setGeneralIO(type, data);
+    instance->setIORegister(type, data);
     return 0;
+}
+
+int CRP6Simulator::luaTimerDestr(lua_State *l)
+{
+    delete NLua::checkClassData<CAVRTimer>(l, 1, "timer");
+    qDebug() << "Removing timer";
+    return 0;
+}
+
+int CRP6Simulator::luaCreateTimer(lua_State *l)
+{
+    CAVRTimer *timer = instance->AVRClock->createTimer();
+    NLua::createClass(l, timer, "timer", luaTimerDestr);
+    return 1;
 }
 
 int CRP6Simulator::luaEnableTimer(lua_State *l)
 {
-    const CAVRClock::EAVRTimers timer = static_cast<CAVRClock::EAVRTimers>(luaL_checkint(l, 1));
-    const bool e = NLua::checkBoolean(2);
+    CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
+    const bool e = NLua::checkBoolean(l, 2);
     instance->AVRClock->enableTimer(timer, e);
     return 0;
 }
 
 int CRP6Simulator::luaSetTimerCompareValue(lua_State *l)
 {
-    const CAVRClock::EAVRTimers timer = static_cast<CAVRClock::EAVRTimers>(luaL_checkint(l, 1));
+    CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const int compare = luaL_checkint(l, 2);
-    instance->AVRClock->getTimer(timer)->setCompareValue(compare);
+    timer->setCompareValue(compare);
     return 0;
 }
 
 int CRP6Simulator::luaSetTimerPrescaler(lua_State *l)
 {
-    const CAVRClock::EAVRTimers timer = static_cast<CAVRClock::EAVRTimers>(luaL_checkint(l, 1));
+    CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const int pre = luaL_checkint(l, 2);
-    instance->AVRClock->getTimer(timer)->setCompareValue(pre);
+    timer->setPrescaler(pre);
+    return 0;
+}
+
+int CRP6Simulator::luaSetTimerTimeOut(lua_State *l)
+{
+    CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
+
+    if (lua_isnumber(l, 2))
+        timer->setTimeOutISR(static_cast<EISRTypes>(lua_tointeger(l, 2)));
+    else
+    {
+        lua_pushvalue(l, 2); // Push lua function
+        timer->setTimeOutLua();
+    }
+
+    // UNDONE: Check arg types
     return 0;
 }
 
@@ -338,22 +395,21 @@ void CRP6Simulator::runPlugin()
     if (pluginMainThread && !pluginMainThread->isRunning())
     {
         // NOTE: AVR clock should be stopped earlier
-        AVRClock->reset();
         AVRClock->start();
         pluginMainThread->start();
     }
 }
 
-TGeneralIOData CRP6Simulator::getGeneralIO(EGeneralIOTypes type) const
+TIORegisterData CRP6Simulator::getIORegister(EIORegisterTypes type) const
 {
-    QReadLocker locker(&generalIOReadWriteLock);
-    return generalIOData[type];
+    QReadLocker locker(&IORegisterReadWriteLock);
+    return IORegisterData[type];
 }
 
-void CRP6Simulator::setGeneralIO(EGeneralIOTypes type, TGeneralIOData data)
+void CRP6Simulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
 {
-    QWriteLocker locker(&generalIOReadWriteLock);
-    generalIOData[type] = data;
+    QWriteLocker locker(&IORegisterReadWriteLock);
+    IORegisterData[type] = data;
 }
 
 void CRP6Simulator::execISR(EISRTypes type)

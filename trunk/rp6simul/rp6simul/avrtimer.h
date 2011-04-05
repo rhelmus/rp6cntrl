@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <time.h>
 
+#include <QList>
 #include <QObject>
 
 class QTimer;
@@ -103,27 +104,41 @@ public:
 
 // Not really a 8 or 16 bit timer. Instead it uses a 32 bit uint that also
 // takes care of any prescalers.
+// The timer either calls an ISR or lua function
 class CAVRTimer
 {
     bool enabled;
     CTicks nextTick;
-    EISRTypes ISRType; // ISR to call
+    EISRTypes ISRTimeOut; // ISR to call
+    int luaTimeOutRef;
+    enum { TIMEOUT_ISR, TIMEOUT_LUA, TIMEOUT_NONE } timeOutType;
     uint32_t compareValue, prescaler, trueCompareValue;
 
     void updateTrueCompareValue(void)
     { trueCompareValue = compareValue * prescaler; }
+    void timeOutLua(void);
 
 public:
-    CAVRTimer(EISRTypes isr) : enabled(false), ISRType(isr),
+    CAVRTimer(void) : enabled(false), timeOutType(TIMEOUT_NONE),
         compareValue(0), prescaler(1), trueCompareValue(0) { }
+    ~CAVRTimer(void);
 
     const CTicks &getNextTick(void) const { return nextTick; }
     CTicks &getRefNextTick(void) { return nextTick; }
+    void setTimeOutISR(EISRTypes isr)
+    { timeOutType = TIMEOUT_ISR; ISRTimeOut = isr; }
+    void setTimeOutLua(void);
     void setCompareValue(uint32_t c)
     { compareValue = c; updateTrueCompareValue(); }
     void setPrescaler(uint32_t p) { prescaler = p; updateTrueCompareValue(); }
     uint32_t getTrueCompareValue(void) const { return trueCompareValue; }
-    void execISR(void) { CRP6Simulator::getInstance()->execISR(ISRType); }
+    void timeOut(void)
+    {
+        if (timeOutType == TIMEOUT_ISR)
+            CRP6Simulator::getInstance()->execISR(ISRTimeOut);
+        else if (timeOutType == TIMEOUT_LUA)
+            timeOutLua();
+    }
     bool isEnabled(void) const { return enabled; }
     void setEnabled(bool e) { enabled = e; }
 };
@@ -132,17 +147,8 @@ class CAVRClock: public QObject
 {
     Q_OBJECT
 
-public:
-    enum EAVRTimers
-    {
-        TIMER_0=0, // 8 bit
-        TIMER_1A, // 16 bit, channel A
-        TIMER_2, // 16 bit
-        TIMER_END
-    };
-
-private:
-    CAVRTimer *timerArray[TIMER_END];
+    typedef QList<CAVRTimer *> TTimerList;
+    TTimerList timerList;
     CTicks currentTicks;
     QTimer *clockTimer;
     timespec lastClockTime;
@@ -157,8 +163,8 @@ public:
     CAVRClock(void);
     ~CAVRClock(void);
 
-    CAVRTimer *getTimer(EAVRTimers timer) { return timerArray[timer]; }
-    void enableTimer(EAVRTimers timer, bool e);
+    CAVRTimer *createTimer(void);
+    void enableTimer(CAVRTimer *timer, bool e);
     void reset(void);
 
 public slots:

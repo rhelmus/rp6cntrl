@@ -9,7 +9,7 @@
 namespace NRP6SimulGlue {
 #endif
 
-enum EGeneralIOTypes
+enum EIORegisterTypes
 {
     // UART
     IO_UCSRA=0,
@@ -41,7 +41,7 @@ enum EGeneralIOTypes
 };
 
 // Just use single type that is able to contain both 8 and 16 bit io types
-typedef uint16_t TGeneralIOData;
+typedef uint16_t TIORegisterData;
 
 #ifdef GLUE
 } // end namespace

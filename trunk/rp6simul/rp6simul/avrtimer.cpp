@@ -1,4 +1,5 @@
 #include "avrtimer.h"
+#include "lua.h"
 
 #include <QDebug>
 #include <QTimer>
@@ -13,13 +14,28 @@ unsigned long getusecs(const timespec &start, const timespec &end)
 
 }
 
+CAVRTimer::~CAVRTimer()
+{
+    if (timeOutType == TIMEOUT_LUA)
+        luaL_unref(NLua::luaInterface, LUA_REGISTRYINDEX, luaTimeOutRef);
+}
+
+void CAVRTimer::timeOutLua()
+{
+    lua_rawgeti(NLua::luaInterface, LUA_REGISTRYINDEX, luaTimeOutRef);
+    lua_call(NLua::luaInterface, 0, 0); // UNDONE: error handling
+}
+
+void CAVRTimer::setTimeOutLua()
+{
+    // Lua function should be at top of stack
+    timeOutType = TIMEOUT_LUA;
+    luaTimeOutRef = luaL_ref(NLua::luaInterface, LUA_REGISTRYINDEX);
+}
+
+
 CAVRClock::CAVRClock(void) : initClockTime(true)
 {
-    // UNDONE: Support TIMER1B?
-    timerArray[TIMER_0] = new CAVRTimer(ISR_TIMER0_COMP_vect);
-    timerArray[TIMER_1A] = new CAVRTimer(ISR_TIMER1_COMPA_vect);
-    timerArray[TIMER_2] = new CAVRTimer(ISR_TIMER2_COMP_vect);
-
     clockTimer = new QTimer(this);
     clockTimer->setInterval(0);
     connect(clockTimer, SIGNAL(timeout()), this, SLOT(run()));
@@ -29,27 +45,26 @@ CAVRClock::CAVRClock(void) : initClockTime(true)
 
 CAVRClock::~CAVRClock()
 {
-    for (int i=0; i<TIMER_END; ++i)
-        delete timerArray[i];
+    // UNDONE: Needed?
+//    foreach(CAVRTimer *timer, timerList)
+//        delete timer;
 }
 
 CAVRTimer *CAVRClock::getClosestTimer()
 {
     CAVRTimer *closest = 0;
 
-    for (int i=0; i<TIMER_END; ++i)
+    foreach(CAVRTimer *timer, timerList)
     {
-        if (!timerArray[i]->isEnabled())
+        if (!timer->isEnabled())
             continue;
 
-        if (!closest || (timerArray[i]->getNextTick() < closest->getNextTick()))
-            closest = timerArray[i];
+        if (!closest || (timer->getNextTick() < closest->getNextTick()))
+            closest = timer;
     }
 
     return closest;
 }
-
-#include <QThread>
 
 void CAVRClock::run()
 {
@@ -89,7 +104,7 @@ void CAVRClock::run()
         {
             currentTicks = timer->getNextTick();
             timer->getRefNextTick() += timer->getTrueCompareValue();
-            timer->execISR();
+            timer->timeOut();
         }
         else
             break;
@@ -103,22 +118,29 @@ void CAVRClock::run()
     nanosleep(&ts, 0);
 }
 
-void CAVRClock::enableTimer(EAVRTimers timer, bool e)
+CAVRTimer *CAVRClock::createTimer()
 {
-    CAVRTimer *t = timerArray[timer];
-    if (e != t->isEnabled())
+    CAVRTimer *ret = new CAVRTimer;
+    timerList << ret;
+    return ret;
+}
+
+void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
+{
+    if (e != timer->isEnabled())
     {
         if (e) // Init timer?
-            t->getRefNextTick() = currentTicks + t->getTrueCompareValue();
-        t->setEnabled(e);
+            timer->getRefNextTick() = currentTicks + timer->getTrueCompareValue();
+        timer->setEnabled(e);
     }
 }
 
 void CAVRClock::reset()
 {
     currentTicks.reset();
-    for (int i=0; i<TIMER_END; ++i)
-        timerArray[i]->setEnabled(false);
+    // UNDONE: Needed?
+//    foreach(CAVRTimer *timer, timerList)
+//        timer->setEnabled(false);
     initClockTime = true;
 }
 
