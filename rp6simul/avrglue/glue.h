@@ -13,6 +13,6 @@ void debugOut(const char *s, ...);
 
 #define ISR(vec) EXPORT void ISR_##vec(void)
 
-#include "generalio.h"
+#include "ioregisters.h"
 
 #endif

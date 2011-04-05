@@ -1,0 +1,67 @@
+#ifndef RP6SIMUL_IOREGISTERS_H
+#define RP6SIMUL_IOREGISTERS_H
+
+#include "glue.h"
+#include "shared.h"
+
+#include <stdint.h>
+#include <time.h>
+
+namespace NRP6SimulGlue {
+
+class CIORegister
+{
+public:
+    typedef TIORegisterData (*TGetCallback)(EIORegisterTypes);
+    typedef void (*TSetCallback)(EIORegisterTypes, TIORegisterData);
+
+    static TGetCallback getCallback;
+    static TSetCallback setCallback;
+
+private:
+    EIORegisterTypes IOType;
+
+    static timespec lastDelay;
+
+    CIORegister(const CIORegister &); // No copying
+
+    void set(TIORegisterData d) { setCallback(IOType, d); checkDelay(); }
+    void checkDelay(void); // Relieves CPU a bit
+
+public:
+    CIORegister(EIORegisterTypes t) : IOType(t) { }
+
+    CIORegister &operator=(TIORegisterData d) { set(d); return *this; }
+    CIORegister &operator=(CIORegister &other) { set(other); return *this; }
+    operator TIORegisterData(void) { checkDelay(); return getCallback(IOType); }
+};
+
+}
+
+// UART
+extern NRP6SimulGlue::CIORegister UCSRA;
+extern NRP6SimulGlue::CIORegister UDR;
+
+// Timer0
+extern NRP6SimulGlue::CIORegister TCCR0;
+extern NRP6SimulGlue::CIORegister OCR0;
+
+// Timer1
+extern NRP6SimulGlue::CIORegister TCCR1A;
+extern NRP6SimulGlue::CIORegister TCCR1B;
+extern NRP6SimulGlue::CIORegister OCR1A;
+extern NRP6SimulGlue::CIORegister OCR1B;
+extern NRP6SimulGlue::CIORegister OCR1AL;
+extern NRP6SimulGlue::CIORegister OCR1AH;
+extern NRP6SimulGlue::CIORegister OCR1BL;
+extern NRP6SimulGlue::CIORegister OCR1BH;
+extern NRP6SimulGlue::CIORegister ICR1;
+
+// Timer2
+extern NRP6SimulGlue::CIORegister TCCR2;
+extern NRP6SimulGlue::CIORegister OCR2;
+
+// TIMSK
+extern NRP6SimulGlue::CIORegister TIMSK;
+
+#endif // RP6SIMUL_IOREGISTERS_H

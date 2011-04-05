@@ -49,6 +49,22 @@ void setGlobalVar(const char *var, const char *tab)
     }
 }
 
+void getClassMT(lua_State *l, const char *type)
+{
+    bool init = (luaL_newmetatable(l, type) != 0);
+
+    if (init)
+    {
+        int mt = lua_gettop(l);
+
+        lua_pushstring(l, "__index");
+        lua_pushvalue(l, mt);
+        lua_settable(l, mt); // __index = metatable
+    }
+
+    // MT left on stack
+}
+
 }
 
 namespace NLua {
@@ -155,15 +171,59 @@ void registerFunction(lua_CFunction func, const char *name, const char *tab,
     lua_setglobal(luaInterface, tab);
 }
 
+void registerClassFunction(lua_CFunction func, const char *name,
+                           const char *type, void *d)
+{
+    getClassMT(luaInterface, type);
+    const int mt = lua_gettop(luaInterface);
+
+    lua_pushstring(luaInterface, name);
+
+    if (d)
+    {
+        lua_pushlightuserdata(luaInterface, d);
+        lua_pushcclosure(luaInterface, func, 1);
+    }
+    else
+        lua_pushcfunction(luaInterface, func);
+
+    lua_settable(luaInterface, mt);
+    lua_remove(luaInterface, mt);
+}
+
+void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr)
+{
+    void **p = static_cast<void **>(lua_newuserdata(l, sizeof(void **)));
+    *p = data;
+    const int ud = lua_gettop(l);
+
+    getClassMT(l, type);
+    const int mt = lua_gettop(l);
+
+    lua_pushvalue(l, mt);
+    lua_setmetatable(l, ud); // Set metatable for userdata
+
+    if (destr) // Add destructor?
+    {
+        lua_pushstring(l, "__gc");
+        lua_pushcfunction(l, destr);
+        lua_settable(l, mt);
+    }
+
+    lua_remove(l, mt);
+
+    // New userdata is left on stack
+}
+
 void setVariable(int val, const char *var, const char *tab)
 {
     lua_pushinteger(luaInterface, val);
     setGlobalVar(var, tab);
 }
 
-bool checkBoolean(int index)
+bool checkBoolean(lua_State *l, int index)
 {
-    luaL_checktype(luaInterface, index, LUA_TBOOLEAN);
+    luaL_checktype(l, index, LUA_TBOOLEAN);
     return lua_toboolean(luaInterface, index);
 }
 

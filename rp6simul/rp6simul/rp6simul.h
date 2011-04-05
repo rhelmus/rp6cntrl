@@ -17,9 +17,9 @@
 
 typedef void (*TCallPluginMainFunc)(void);
 
-typedef void (*TGeneralIOSetCB)(EGeneralIOTypes, TGeneralIOData);
-typedef TGeneralIOData (*TGeneralIOGetCB)(EGeneralIOTypes);
-typedef void (*TSetGeneralIOCallbacks)(TGeneralIOSetCB, TGeneralIOGetCB);
+typedef void (*TIORegisterSetCB)(EIORegisterTypes, TIORegisterData);
+typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes);
+typedef void (*TSetIORegisterCallbacks)(TIORegisterSetCB, TIORegisterGetCB);
 
 enum EISRTypes
 {
@@ -46,7 +46,7 @@ class CRP6Simulator : public QMainWindow
     QThread *AVRClockThread;
     CCallPluginMainThread *pluginMainThread;
 
-    TGeneralIOData generalIOData[IO_END];
+    TIORegisterData IORegisterData[IO_END];
     CBaseIOHandler *IOHandlerArray[IO_END];
     QList<CBaseIOHandler *> IOHandlerList;
 
@@ -55,7 +55,7 @@ class CRP6Simulator : public QMainWindow
     bool ISRFailedArray[ISR_END];
 
     static CRP6Simulator *instance;
-    static QReadWriteLock generalIOReadWriteLock;
+    static QReadWriteLock IORegisterReadWriteLock;
     static QMutex ISRExecMutex;
 
     void initAVRClock(void);
@@ -63,22 +63,23 @@ class CRP6Simulator : public QMainWindow
     void initIOHandlers(void);
     void setLuaIOTypes(void);
     void setLuaAVRConstants(void);
-    void registerLuaClock(void);
-    void registerLuaBindings(void);
     void initLua(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     void initPlugin(void);
 
-    static void generalIOSetCB(EGeneralIOTypes type, TGeneralIOData data);
-    static TGeneralIOData generalIOGetCB(EGeneralIOTypes type);
+    static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
+    static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
 
     // Lua bindings
-    static int luaGetGeneralIO(lua_State *l);
-    static int luaSetGeneralIO(lua_State *l);
+    static int luaGetIORegister(lua_State *l);
+    static int luaSetIORegister(lua_State *l);
+    static int luaCreateTimer(lua_State *l);
+    static int luaTimerDestr(lua_State *l);
     static int luaEnableTimer(lua_State *l);
     static int luaSetTimerCompareValue(lua_State *l);
     static int luaSetTimerPrescaler(lua_State *l);
+    static int luaSetTimerTimeOut(lua_State *l);
 
 private slots:
     void runPlugin(void);
@@ -87,8 +88,8 @@ public:
     CRP6Simulator(QWidget *parent = 0);
     ~CRP6Simulator(void);
 
-    TGeneralIOData getGeneralIO(EGeneralIOTypes type) const;
-    void setGeneralIO(EGeneralIOTypes type, TGeneralIOData data);
+    TIORegisterData getIORegister(EIORegisterTypes type) const;
+    void setIORegister(EIORegisterTypes type, TIORegisterData data);
     void execISR(EISRTypes type);
     CAVRClock *getAVRClock(void) { return AVRClock; }
 

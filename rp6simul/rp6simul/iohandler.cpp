@@ -5,14 +5,16 @@
 
 #include <QTimer>
 
+#if 0
+
 namespace {
 
-inline bool bitSet(TGeneralIOData data, TGeneralIOData bit)
+inline bool bitSet(TIORegisterData data, TIORegisterData bit)
 {
     return (data & (1<<bit));
 }
 
-inline TGeneralIOData bitValue(TGeneralIOData b)
+inline TIORegisterData bitValue(TIORegisterData b)
 {
     return (1 << b);
 }
@@ -36,12 +38,12 @@ void CUARTHandler::writeText()
 
     for (const char *c = text; c && *c; ++c)
     {
-        CRP6Simulator::getInstance()->setGeneralIO(IO_UDR, *c);
+        CRP6Simulator::getInstance()->setIORegister(IO_UDR, *c);
         CRP6Simulator::getInstance()->execISR(ISR_USART_RXC_vect);
     }
 }
 
-void CUARTHandler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
+void CUARTHandler::handleIOData(EIORegisterTypes type, TIORegisterData data)
 {
     switch (type)
     {
@@ -77,11 +79,11 @@ void CUARTHandler::initPlugin()
 {
     // UNDONE (define, variable or something)
     // UNDONE: also this flag should be set even when it's changed elsewhere (always 'ready')
-    CRP6Simulator::getInstance()->setGeneralIO(IO_UCSRA, 1<<5);
+    CRP6Simulator::getInstance()->setIORegister(IO_UCSRA, 1<<5);
 }
 
 
-void CTimer0Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
+void CTimer0Handler::handleIOData(EIORegisterTypes type, TIORegisterData data)
 {
     CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_0);
     if (type == IO_TCCR0)
@@ -135,8 +137,8 @@ void CTimer0Handler::initPlugin()
 
 bool CTimer1Handler::PWMEnabled() const
 {
-    TGeneralIOData A = (bitValue(WGM11) & bitValue(COM1A1) & bitValue(COM1B1));
-    TGeneralIOData B = (bitValue(WGM13) & bitValue(CS10));
+    TIORegisterData A = (bitValue(WGM11) & bitValue(COM1A1) & bitValue(COM1B1));
+    TIORegisterData B = (bitValue(WGM13) & bitValue(CS10));
     return ((channelA == A) && (channelB == B));
 }
 
@@ -177,12 +179,12 @@ void CTimer1Handler::updateTimerEnabled()
     bool e = (!PWMEnabled());
 
     if (e)
-        e = bitSet(CRP6Simulator::getInstance()->getGeneralIO(IO_TIMSK), OCIE1A);
+        e = bitSet(CRP6Simulator::getInstance()->getIORegister(IO_TIMSK), OCIE1A);
 
     avrclock->enableTimer(CAVRClock::TIMER_1A, e);
 }
 
-void CTimer1Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
+void CTimer1Handler::handleIOData(EIORegisterTypes type, TIORegisterData data)
 {
     CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_1A);
 
@@ -261,7 +263,7 @@ void CTimer1Handler::initPlugin()
 }
 
 
-void CTimer2Handler::handleIOData(EGeneralIOTypes type, TGeneralIOData data)
+void CTimer2Handler::handleIOData(EIORegisterTypes type, TIORegisterData data)
 {
     CAVRTimer *timer = getAVRTimer(CAVRClock::TIMER_2);
     if (type == IO_TCCR2)
@@ -319,7 +321,7 @@ void CTimer2Handler::initPlugin()
 }
 
 
-void CTimerMaskHandler::handleIOData(EGeneralIOTypes, TGeneralIOData data)
+void CTimerMaskHandler::handleIOData(EIORegisterTypes, TIORegisterData data)
 {
     CAVRClock *avrclock = CRP6Simulator::getInstance()->getAVRClock();
 
@@ -334,3 +336,5 @@ void CTimerMaskHandler::registerHandler(CBaseIOHandler **array)
 {
     array[IO_TIMSK] = this;
 }
+
+#endif

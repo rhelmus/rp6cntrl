@@ -1,9 +1,16 @@
 module(..., package.seeall)
 
-handledTypes = { avr.UCSRA, avr.UDR }
+handledTypes = { avr.IO_TCCR0, avr.IO_OCR0 }
+
+local timer
 
 function initPlugin()
-    clock.setPrescaler(clock.TIMER0, 1)
+    timer = clock.createTimer()
+    timer:setPrescaler(1)
+    timer:setCompareValue(2000)
+--    timer:setTimeOut(function () print("Hi there ") end)
+    timer:setTimeOut(avr.ISR_TIMER0_COMP_vect)
+    clock.enableTimer(timer, true)
 end
 
 function handleIOData(type, data)
@@ -13,3 +20,5 @@ function handleIOData(type, data)
         clock.setCompareValue(data)
     end
 end
+
+-- UNDONE! Reset timer
