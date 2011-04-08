@@ -26,21 +26,6 @@ void debugOut(const char *s...)
 
 }
 
-#include <unistd.h>
-#include <pthread.h>
-#include <sched.h>
-
-namespace {
-
-void timerSigHandler(int)
-{
-    timespec ts = { 0, 100 };
-//    nanosleep(&ts, 0);
-    pthread_yield();
-}
-
-}
-
 // Exported functions
 
 extern "C" int main();

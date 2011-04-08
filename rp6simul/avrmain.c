@@ -211,6 +211,8 @@ ISR (TIMER0_COMP_vect)
             total = count = 0;
         }
     }
+
+//    UDR = UDR + 1;
 }
 
 void uSleep(uint8_t time)
@@ -259,7 +261,8 @@ int main()
     TCCR0 =   (0 << WGM00) | (1 << WGM01)
             | (0 << COM00) | (0 << COM01)
             | (0 << CS02)  | (1 << CS01) | (0 << CS00);
-    OCR0  = 99;
+//    OCR0  = 99;
+    OCR0 = 1;
 
     TCCR2 = (1 << WGM21) | (0 << COM20) | (1 << CS20);
     OCR2  = 0x6E; // 0x6E = 72kHz @8MHz
@@ -285,8 +288,12 @@ int main()
 
     for (;;)
     {
-        if (OCR0 != 99)
-            printf("say what????!1?!/!");
+//        UDR = UDR + 1;
+//        if (ICR1 != 210)
+//        {
+//            printf("say what????!1?!/!\n");
+//            fflush(stdout);
+//        }
 //        timespec start, end;
 
 //        clock_gettime(CLOCK_MONOTONIC, &start);

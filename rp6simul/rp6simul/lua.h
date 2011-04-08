@@ -3,6 +3,8 @@
 
 #include <lua.hpp>
 
+#include <QMutex>
+
 namespace NLua
 {
 
@@ -36,6 +38,19 @@ template <typename C> C *checkClassData(lua_State *l, int index, const char *typ
     void **p = static_cast<void **>(luaL_checkudata(l, index, type));
     return static_cast <C*>(*p);
 }
+
+class CLuaLocker
+{
+    static QMutex mutex;
+    bool locked;
+
+public:
+    CLuaLocker(void) : locked(false) { lock(); }
+    ~CLuaLocker(void) { unlock(); }
+
+    void lock(void) { if (!locked) { mutex.lock(); locked = true; } }
+    void unlock(void) { if (locked) { mutex.unlock(); locked = false; } }
+};
 
 }
 
