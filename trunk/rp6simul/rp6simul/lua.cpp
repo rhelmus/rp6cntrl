@@ -227,4 +227,6 @@ bool checkBoolean(lua_State *l, int index)
     return lua_toboolean(luaInterface, index);
 }
 
+QMutex CLuaLocker::mutex(QMutex::Recursive);
+
 }

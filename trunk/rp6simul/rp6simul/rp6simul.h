@@ -34,6 +34,8 @@ enum EISRTypes
     ISR_END
 };
 
+class QPlainTextEdit;
+
 class CAVRClock;
 class CBaseIOHandler;
 class CCallPluginMainThread;
@@ -41,6 +43,8 @@ class CCallPluginMainThread;
 class CRP6Simulator : public QMainWindow
 {
     Q_OBJECT
+
+    enum ELogType { LOG_LOG, LOG_DEBUG, LOG_WARNING, LOG_ERROR };
 
     CAVRClock *AVRClock;
     QThread *AVRClockThread;
@@ -53,6 +57,8 @@ class CRP6Simulator : public QMainWindow
     typedef void (*TISR)(void);
     TISR ISRCacheArray[ISR_END];
     bool ISRFailedArray[ISR_END];
+
+    QPlainTextEdit *logWidget;
 
     static CRP6Simulator *instance;
     static QReadWriteLock IORegisterReadWriteLock;
@@ -67,19 +73,25 @@ class CRP6Simulator : public QMainWindow
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     void initPlugin(void);
+    void appendLogOutput(ELogType type, const QString &text);
 
     static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
     static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
 
     // Lua bindings
-    static int luaGetIORegister(lua_State *l);
-    static int luaSetIORegister(lua_State *l);
-    static int luaCreateTimer(lua_State *l);
+    static int luaAvrGetIORegister(lua_State *l);
+    static int luaAvrSetIORegister(lua_State *l);
+    static int luaClockCreateTimer(lua_State *l);
+    static int luaClockEnableTimer(lua_State *l);
     static int luaTimerDestr(lua_State *l);
-    static int luaEnableTimer(lua_State *l);
-    static int luaSetTimerCompareValue(lua_State *l);
-    static int luaSetTimerPrescaler(lua_State *l);
-    static int luaSetTimerTimeOut(lua_State *l);
+    static int luaTimerSetCompareValue(lua_State *l);
+    static int luaTimerSetPrescaler(lua_State *l);
+    static int luaTimerSetTimeOut(lua_State *l);
+    static int luaTimerIsEnabled(lua_State *l);
+    static int luaBitIsSet(lua_State *l);
+    static int luaBitSet(lua_State *l);
+    static int luaBitUnpack(lua_State *l);
+    static int luaAppendLogOutput(lua_State *l);
 
 private slots:
     void runPlugin(void);

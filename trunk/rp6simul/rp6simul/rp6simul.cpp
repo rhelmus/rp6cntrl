@@ -63,6 +63,10 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     connect(button, SIGNAL(clicked()), this, SLOT(runPlugin()));
     vbox->addWidget(button);
 
+    vbox->addWidget(logWidget = new QPlainTextEdit);
+    logWidget->setReadOnly(true);
+    logWidget->setCenterOnScroll(true);
+
     initAVRClock();
     initIOHandlers();
     initLua();
@@ -207,17 +211,26 @@ void CRP6Simulator::initLua()
     setLuaAVRConstants();
 
     // avr
-    NLua::registerFunction(luaGetIORegister, "getIORegister", "avr");
-    NLua::registerFunction(luaSetIORegister, "setIORegister", "avr");
+    NLua::registerFunction(luaAvrGetIORegister, "getIORegister", "avr");
+    NLua::registerFunction(luaAvrSetIORegister, "setIORegister", "avr");
 
     // clock
-    NLua::registerFunction(luaCreateTimer, "createTimer", "clock");
-    NLua::registerFunction(luaEnableTimer, "enableTimer", "clock");
+    NLua::registerFunction(luaClockCreateTimer, "createTimer", "clock");
+    NLua::registerFunction(luaClockEnableTimer, "enableTimer", "clock");
 
     // timer class
-    NLua::registerClassFunction(luaSetTimerCompareValue, "setCompareValue", "timer");
-    NLua::registerClassFunction(luaSetTimerPrescaler, "setPrescaler", "timer");
-    NLua::registerClassFunction(luaSetTimerTimeOut, "setTimeOut", "timer");
+    NLua::registerClassFunction(luaTimerSetCompareValue, "setCompareValue", "timer");
+    NLua::registerClassFunction(luaTimerSetPrescaler, "setPrescaler", "timer");
+    NLua::registerClassFunction(luaTimerSetTimeOut, "setTimeOut", "timer");
+    NLua::registerClassFunction(luaTimerIsEnabled, "isEnabled", "timer");
+
+    // bit
+    NLua::registerFunction(luaBitIsSet, "isSet", "bit");
+    NLua::registerFunction(luaBitSet, "set", "bit");
+    NLua::registerFunction(luaBitUnpack, "unpack", "bit");
+
+    // global
+    NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
 
     NLua::luaInterface.exec();
 
@@ -300,10 +313,28 @@ void CRP6Simulator::initPlugin()
 #endif
 }
 
+void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
+{
+    qDebug() << "LOG:" << text;
+
+    QString fs;
+    switch (type)
+    {
+    case LOG_LOG: fs = text; break;
+    case LOG_DEBUG: fs = QString("<i>%1</i>").arg(text);
+    case LOG_WARNING: fs = QString("<FONT color=#FF8040>DEBUG:</FONT> %1").arg(text); break;
+    case LOG_ERROR: fs = QString("<FONT color=#FF0000><strong>ERROR: </strong></FONT> %1").arg(text); break;
+    }
+
+    logWidget->appendHtml(QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2")
+            .arg(QTime::currentTime().toString()).arg(fs));
+}
+
 void CRP6Simulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
 {
     instance->setIORegister(type, data);
 
+    NLua::CLuaLocker lualocker;
     lua_getglobal(NLua::luaInterface, "handleIOData");
     lua_pushinteger(NLua::luaInterface, type);
     lua_pushinteger(NLua::luaInterface, data);
@@ -321,61 +352,69 @@ TIORegisterData CRP6Simulator::IORegisterGetCB(EIORegisterTypes type)
     return instance->getIORegister(type);
 }
 
-int CRP6Simulator::luaGetIORegister(lua_State *l)
+int CRP6Simulator::luaAvrGetIORegister(lua_State *l)
 {
+    NLua::CLuaLocker lualocker;
     const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
     lua_pushinteger(l, instance->getIORegister(type));
     return 1;
 }
 
-int CRP6Simulator::luaSetIORegister(lua_State *l)
+int CRP6Simulator::luaAvrSetIORegister(lua_State *l)
 {
+    NLua::CLuaLocker lualocker;
     const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
     const int data = luaL_checkint(l, 2);
     instance->setIORegister(type, data);
     return 0;
 }
 
-int CRP6Simulator::luaTimerDestr(lua_State *l)
+int CRP6Simulator::luaClockCreateTimer(lua_State *l)
 {
-    delete NLua::checkClassData<CAVRTimer>(l, 1, "timer");
-    qDebug() << "Removing timer";
-    return 0;
-}
-
-int CRP6Simulator::luaCreateTimer(lua_State *l)
-{
+    NLua::CLuaLocker lualocker;
     CAVRTimer *timer = instance->AVRClock->createTimer();
     NLua::createClass(l, timer, "timer", luaTimerDestr);
     return 1;
 }
 
-int CRP6Simulator::luaEnableTimer(lua_State *l)
+int CRP6Simulator::luaClockEnableTimer(lua_State *l)
 {
+    NLua::CLuaLocker lualocker;
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const bool e = NLua::checkBoolean(l, 2);
     instance->AVRClock->enableTimer(timer, e);
     return 0;
 }
 
-int CRP6Simulator::luaSetTimerCompareValue(lua_State *l)
+int CRP6Simulator::luaTimerDestr(lua_State *l)
 {
+    NLua::CLuaLocker lualocker;
+    delete NLua::checkClassData<CAVRTimer>(l, 1, "timer");
+    qDebug() << "Removing timer";
+    return 0;
+}
+
+int CRP6Simulator::luaTimerSetCompareValue(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const int compare = luaL_checkint(l, 2);
     timer->setCompareValue(compare);
     return 0;
 }
 
-int CRP6Simulator::luaSetTimerPrescaler(lua_State *l)
+int CRP6Simulator::luaTimerSetPrescaler(lua_State *l)
 {
+    NLua::CLuaLocker lualocker;
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const int pre = luaL_checkint(l, 2);
     timer->setPrescaler(pre);
     return 0;
 }
 
-int CRP6Simulator::luaSetTimerTimeOut(lua_State *l)
+int CRP6Simulator::luaTimerSetTimeOut(lua_State *l)
 {
+    NLua::CLuaLocker lualocker;
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
 
     if (lua_isnumber(l, 2))
@@ -390,11 +429,91 @@ int CRP6Simulator::luaSetTimerTimeOut(lua_State *l)
     return 0;
 }
 
+int CRP6Simulator::luaTimerIsEnabled(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
+    lua_pushboolean(l, timer->isEnabled());
+    return 1;
+}
+
+int CRP6Simulator::luaBitIsSet(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int data = luaL_checkint(l, 1);
+    const int nargs = lua_gettop(l);
+
+    luaL_checktype(l, 2, LUA_TNUMBER);
+
+    bool ret = true;
+    for (int i=2; i<=nargs; ++i)
+    {
+        const int bit = luaL_checkint(l, i);
+        if (!(data & (1 << bit)))
+        {
+            ret = false;
+            break;
+        }
+    }
+
+    lua_pushboolean(l, ret);
+    return 1;
+}
+
+int CRP6Simulator::luaBitSet(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    int data = luaL_checkint(l, 1);
+    const int nargs = lua_gettop(l);
+
+    luaL_checktype(l, 2, LUA_TNUMBER);
+
+    for (int i=2; i<=nargs; ++i)
+    {
+        const int bit = luaL_checkint(l, i);
+        data |= (1 << bit);
+    }
+
+    lua_pushinteger(l, data);
+    return 1;
+}
+
+int CRP6Simulator::luaBitUnpack(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const uint32_t low = luaL_checkint(l, 1);
+    const uint32_t high = luaL_checkint(l, 2);
+    lua_pushinteger(l, (low & 0xFFFF0000) + (high & 0x0000FFFF));
+    return 1;
+}
+
+int CRP6Simulator::luaAppendLogOutput(lua_State *l)
+{return 0; // UNDONE
+    NLua::CLuaLocker lualocker;
+    const char *type = luaL_checkstring(l, 1);
+    const char *text = luaL_checkstring(l, 2);
+
+    ELogType t;
+    if (!strcmp(type, "LOG"))
+        t = LOG_LOG;
+    else if (!strcmp(type, "DEBUG"))
+        t = LOG_DEBUG;
+    else if (!strcmp(type, "WARNING"))
+        t = LOG_WARNING;
+    else if (!strcmp(type, "ERROR"))
+        t = LOG_ERROR;
+    else
+        luaL_argerror(l, 1, "Wrong log type.");
+
+    instance->appendLogOutput(t, text);
+    return 0;
+}
+
 void CRP6Simulator::runPlugin()
 {
     if (pluginMainThread && !pluginMainThread->isRunning())
     {
-        // NOTE: AVR clock should be stopped earlier
+        // NOTE: AVR clock should be stopped/reset earlier
         AVRClock->start();
         pluginMainThread->start();
     }

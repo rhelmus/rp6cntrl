@@ -14,6 +14,14 @@ unsigned long getusecs(const timespec &start, const timespec &end)
 
 }
 
+
+QDebug operator<<(QDebug dbg, const CTicks &ticks)
+{
+    dbg.nospace() << "CTicks(" << ((ticks.cycles * RP6_CLOCK) + ticks.ticks) << ")";
+    return dbg.maybeSpace();
+}
+
+
 CAVRTimer::~CAVRTimer()
 {
     if (timeOutType == TIMEOUT_LUA)
@@ -22,6 +30,7 @@ CAVRTimer::~CAVRTimer()
 
 void CAVRTimer::timeOutLua()
 {
+    NLua::CLuaLocker lualocker;
     lua_rawgeti(NLua::luaInterface, LUA_REGISTRYINDEX, luaTimeOutRef);
     lua_call(NLua::luaInterface, 0, 0); // UNDONE: error handling
 }
@@ -79,22 +88,27 @@ void CAVRClock::run()
     }
 
     static unsigned long delta_total = 0, delta_count = 0;
+    static unsigned long timeout_total = 0, timeout_count = 0;
+    static CTicks tickspersec = 0;
 
     const unsigned long delta = getusecs(lastClockTime, curtime);
     const CTicks newticks(RP6_CLOCK / 1000000 * delta);
     const CTicks finalticks = currentTicks + newticks;
+    const CTicks curticks(currentTicks);
 
     delta_total += delta;
     delta_count++;
 
-    if (delta_total >= 1000000)
-    {
-        qDebug() << "AVG delta:" << (delta_total / delta_count);
-        delta_total = delta_count = 0;
-    }
-
     static CAVRTimer *timer;
-    while (true)
+    static int timeouts;
+
+    currentTicks = finalticks; // May be less, see below
+    lastClockTime = curtime;
+
+    timeouts = 0;
+
+    // UNDONE: Make this an option; ie higher value gives 'faster timer' (more correct MHz), but hammers CPU more.
+    while (timeouts < 150)
     {
         timer = getClosestTimer();
         if (!timer)
@@ -105,15 +119,33 @@ void CAVRClock::run()
             currentTicks = timer->getNextTick();
             timer->getRefNextTick() += timer->getTrueCompareValue();
             timer->timeOut();
+            timeouts++;
         }
         else
+        {
+            currentTicks = finalticks;
             break;
+        }
     }
 
-    currentTicks = finalticks;
-    lastClockTime = curtime;
+    tickspersec += (currentTicks - curticks);
+
+    timeout_total += timeouts;
+    timeout_count++;
+
+    if (delta_total >= 1000000)
+    {
+        qDebug() << "delta_total:" << delta_total;
+        qDebug() << "AVG delta:" << (delta_total / delta_count);
+        qDebug() << "AVG timeout:" << (timeout_total / timeout_count);
+        qDebug() << "Frequency (ticks/s):" << tickspersec;
+        delta_total = delta_count = 0;
+        timeout_total = timeout_count = 0;
+        tickspersec.reset();
+    }
 
     // Relieve CPU a bit
+    // UNDONE: Make optional (same reasoning as above: get more accurate MHz for fast timers)
     timespec ts = { 0, 1000 };
     nanosleep(&ts, 0);
 }

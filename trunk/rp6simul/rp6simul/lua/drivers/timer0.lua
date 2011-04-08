@@ -1,23 +1,88 @@
 module(..., package.seeall)
 
-handledTypes = { avr.IO_TCCR0, avr.IO_OCR0 }
+handledIORegisters = { avr.IO_TCCR0, avr.IO_OCR0, avr.IO_TIMSK }
 
 local timer
+local prescaler = 0
+
+local function getPrescaler(data)
+    local clockSet0 = bit.isSet(data, avr.CS00)
+    local clockSet1 = bit.isSet(data, avr.CS01)
+    local clockSet2 = bit.isSet(data, avr.CS02)
+
+    if not clockSet0 and not clockSet1 and not clockSet2 then
+        return 0
+    elseif clockSet0 and not clockSet1 and not clockSet2 then
+        return 1
+    elseif not clockSet0 and clockSet1 and not clockSet2 then
+        return 8
+    elseif not clockSet0 and not clockSet1 and clockSet2 then
+        return 64
+    elseif clockSet0 and clockSet1 and not clockSet2 then
+        return 32
+    elseif clockSet0 and not clockSet1 and clockSet2 then
+        return 128
+    elseif not clockSet0 and clockSet1 and not clockSet2 then
+        return 256
+    end
+
+    -- return nil
+end
+
+local function checkSettings()
+    local tccr0 = avr.getIORegister(avr.IO_TCCR0)
+    local ret = true
+
+    if not (not bit.isSet(tccr0, avr.COM00, avr.COM01, avr.WGM00) and
+            bit.isSet(tccr0, avr.WGM01)) then
+        warning("Incompatible settings for timer0\n")
+        ret = false
+    end
+
+    if not getPrescaler(tccr0) then
+        warning("Unsupported prescaler set")
+        ret = false
+    end
+
+    return ret
+end
 
 function initPlugin()
     timer = clock.createTimer()
-    timer:setPrescaler(1)
-    timer:setCompareValue(2000)
---    timer:setTimeOut(function () print("Hi there ") end)
     timer:setTimeOut(avr.ISR_TIMER0_COMP_vect)
-    clock.enableTimer(timer, true)
+--    timer:setTimeOut(function () print("Heuh!\n") end)
 end
 
 function handleIOData(type, data)
-    if type == avr.TCCR0 then
-        
-    elseif type == avr.OCR0 then
-        clock.setCompareValue(data)
+    if type == avr.IO_TCCR0 then
+        local ps = getPrescaler(data)
+        if ps and ps ~= prescaler then
+            prescaler = ps
+            timer:setPrescaler(ps)
+            log(string.format("Changed prescaler to %d\n", ps))
+        end
+
+        if timer:isEnabled() and not checkSettings() then
+            warning("Disabling timer0\n")
+            clock.enableTimer(timer, false)
+        end
+    elseif type == avr.IO_OCR0 then
+        timer:setCompareValue(data)
+    elseif type == avr.IO_TIMSK then
+        local e = bit.isSet(data, avr.OCIE0)
+        if e ~= timer:isEnabled() then
+            if e then
+                if not checkSettings() then
+                    warning("Not enabling timer0\n")
+                else
+                    log("Enabling timer0\n")
+                    clock.enableTimer(timer, e)
+                end
+            else
+                log("Disabling timer0\n")
+                clock.enableTimer(timer, e)
+            end
+        end
     end
 end
 

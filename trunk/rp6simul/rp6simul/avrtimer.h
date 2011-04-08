@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <time.h>
 
+#include <QDebug>
 #include <QList>
 #include <QObject>
 
@@ -29,6 +30,8 @@ class CTicks
     }
 
     CTicks(unsigned long c, unsigned long t) : cycles(c), ticks(t) { }
+
+    friend QDebug operator<<(QDebug dbg, const CTicks &ticks);
 
 public:
     CTicks(void) : cycles(0), ticks(0) { }
@@ -63,6 +66,27 @@ public:
         CTicks ret(cycles, ticks + t);
         ret.clamp();
         return ret;
+    }
+
+    CTicks operator-(const CTicks &other) const
+    {
+        // Note: no overflow checking; other must be <
+        unsigned long c = cycles - other.cycles, t;
+
+        if (ticks >= other.ticks)
+            t = ticks - other.ticks;
+        else
+        {
+            c--;
+            t = RP6_CLOCK - (other.ticks - ticks);
+        }
+
+        return CTicks(c, t);
+    }
+
+    bool operator ==(const CTicks &other) const
+    {
+        return ((other.cycles == cycles) && (other.ticks == ticks));
     }
 
     bool operator<(const CTicks &other) const
@@ -101,6 +125,9 @@ public:
         return false;
     }
 };
+
+QDebug operator<<(QDebug dbg, const CTicks &ticks);
+
 
 // Not really a 8 or 16 bit timer. Instead it uses a 32 bit uint that also
 // takes care of any prescalers.
