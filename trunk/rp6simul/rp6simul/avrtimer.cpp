@@ -4,16 +4,6 @@
 #include <QDebug>
 #include <QTimer>
 
-namespace {
-
-unsigned long getusecs(const timespec &start, const timespec &end)
-{
-    return ((end.tv_sec-start.tv_sec) * 1000000) +
-            ((end.tv_nsec-start.tv_nsec) / 1000);
-}
-
-}
-
 
 QDebug operator<<(QDebug dbg, const CTicks &ticks)
 {
@@ -91,8 +81,9 @@ void CAVRClock::run()
     static unsigned long timeout_total = 0, timeout_count = 0;
     static CTicks tickspersec = 0;
 
-    const unsigned long delta = getusecs(lastClockTime, curtime);
-    const CTicks newticks(RP6_CLOCK / 1000000 * delta);
+    const unsigned long delta = getUSDiff(lastClockTime, curtime);
+
+    const CTicks newticks(remainingTicks + (RP6_CLOCK / 1000000 * delta));
     const CTicks finalticks = currentTicks + newticks;
     const CTicks curticks(currentTicks);
 
@@ -108,7 +99,7 @@ void CAVRClock::run()
     timeouts = 0;
 
     // UNDONE: Make this an option; ie higher value gives 'faster timer' (more correct MHz), but hammers CPU more.
-    while (timeouts < 150)
+    while (timeouts < 15000)
     {
         timer = getClosestTimer();
         if (!timer)
@@ -129,6 +120,7 @@ void CAVRClock::run()
     }
 
     tickspersec += (currentTicks - curticks);
+    remainingTicks = finalticks - currentTicks;
 
     timeout_total += timeouts;
     timeout_count++;
@@ -141,6 +133,9 @@ void CAVRClock::run()
         qDebug() << "Frequency (ticks/s):" << tickspersec;
         delta_total = delta_count = 0;
         timeout_total = timeout_count = 0;
+
+        // UNDONE: Move out of debug code
+        emit clockSpeed(tickspersec.get());
         tickspersec.reset();
     }
 
@@ -170,6 +165,7 @@ void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
 void CAVRClock::reset()
 {
     currentTicks.reset();
+    remainingTicks.reset();
     // UNDONE: Needed?
 //    foreach(CAVRTimer *timer, timerList)
 //        timer->setEnabled(false);

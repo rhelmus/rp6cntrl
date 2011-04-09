@@ -63,9 +63,13 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     connect(button, SIGNAL(clicked()), this, SLOT(runPlugin()));
     vbox->addWidget(button);
 
+    vbox->addWidget(clockDisplay = new QLCDNumber(4));
+
     vbox->addWidget(logWidget = new QPlainTextEdit);
     logWidget->setReadOnly(true);
     logWidget->setCenterOnScroll(true);
+    connect(this, SIGNAL(logTextReady(QString)), logWidget,
+            SLOT(appendHtml(QString)));
 
     initAVRClock();
     initIOHandlers();
@@ -85,14 +89,12 @@ void CRP6Simulator::initAVRClock()
     // From http://labs.qt.nokia.com/2010/06/17/youre-doing-it-wrong/
 
     AVRClock = new CAVRClock;
+    connect(AVRClock, SIGNAL(clockSpeed(unsigned long)), this,
+            SLOT(updateClockDisplay(unsigned long)));
+
     AVRClockThread = new QThread(this);
-
-    // UNDONE
-//    connect(AVRClockThread, SIGNAL(started()), AVRClock, SLOT(start()));
     connect(AVRClockThread, SIGNAL(finished()), AVRClock, SLOT(stop()));
-
     AVRClock->moveToThread(AVRClockThread);
-
     AVRClockThread->start();
 }
 
@@ -227,6 +229,7 @@ void CRP6Simulator::initLua()
     // bit
     NLua::registerFunction(luaBitIsSet, "isSet", "bit");
     NLua::registerFunction(luaBitSet, "set", "bit");
+    NLua::registerFunction(luaBitUnSet, "unset", "bit");
     NLua::registerFunction(luaBitUnpack, "unpack", "bit");
 
     // global
@@ -313,21 +316,54 @@ void CRP6Simulator::initPlugin()
 #endif
 }
 
-void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
+void CRP6Simulator::checkPluginThreadDelay()
 {
-    qDebug() << "LOG:" << text;
+    // This function is called whenever register data is accessed (get/set)
+    // from the RP6 plugin thread. It adds a small delay (nanosleep) within small
+    // intervals to prevent constant CPU hammering by the plugin. This
+    // obviously will only work when the RP6 program accesses IO, however this
+    // is commonly done.
 
+    // Plugin thread running? (ISRs may also call this function which do not
+    // have to be delayed)
+    if (QThread::currentThread() == pluginMainThread)
+    {
+        // Init?
+        if (!lastPluginDelay.tv_sec && !lastPluginDelay.tv_nsec)
+            clock_gettime(CLOCK_MONOTONIC, &lastPluginDelay);
+        else
+        {
+            timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &lastPluginDelay);
+            const unsigned long delta = getUSDiff(lastPluginDelay, ts);
+
+            if (delta > 50) // Delay every 50 us
+            {
+                lastPluginDelay = ts;
+                ts.tv_sec = 0; ts.tv_nsec = 1000;
+                nanosleep(&ts, 0);
+            }
+        }
+    }
+}
+
+QString CRP6Simulator::getLogOutput(ELogType type, const QString &text) const
+{
     QString fs;
     switch (type)
     {
     case LOG_LOG: fs = text; break;
-    case LOG_DEBUG: fs = QString("<i>%1</i>").arg(text);
-    case LOG_WARNING: fs = QString("<FONT color=#FF8040>DEBUG:</FONT> %1").arg(text); break;
+    case LOG_WARNING: fs = QString("<FONT color=#FF8040>WARNING:</FONT> %1").arg(text); break;
     case LOG_ERROR: fs = QString("<FONT color=#FF0000><strong>ERROR: </strong></FONT> %1").arg(text); break;
     }
 
-    logWidget->appendHtml(QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2")
-            .arg(QTime::currentTime().toString()).arg(fs));
+    return QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2")
+            .arg(QTime::currentTime().toString()).arg(fs);
+}
+
+void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
+{
+    logWidget->appendHtml(getLogOutput(type, text));
 }
 
 void CRP6Simulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
@@ -341,6 +377,9 @@ void CRP6Simulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
 
     lua_call(NLua::luaInterface, 2, 0);
 
+    lualocker.unlock();
+
+    instance->checkPluginThreadDelay();
 #if 0
     if (instance->IOHandlerArray[type])
         instance->IOHandlerArray[type]->handleIOData(type, data);
@@ -349,6 +388,7 @@ void CRP6Simulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
 
 TIORegisterData CRP6Simulator::IORegisterGetCB(EIORegisterTypes type)
 {
+    instance->checkPluginThreadDelay();
     return instance->getIORegister(type);
 }
 
@@ -478,6 +518,24 @@ int CRP6Simulator::luaBitSet(lua_State *l)
     return 1;
 }
 
+int CRP6Simulator::luaBitUnSet(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    int data = luaL_checkint(l, 1);
+    const int nargs = lua_gettop(l);
+
+    luaL_checktype(l, 2, LUA_TNUMBER);
+
+    for (int i=2; i<=nargs; ++i)
+    {
+        const int bit = luaL_checkint(l, i);
+        data &= ~(1 << bit);
+    }
+
+    lua_pushinteger(l, data);
+    return 1;
+}
+
 int CRP6Simulator::luaBitUnpack(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
@@ -488,7 +546,7 @@ int CRP6Simulator::luaBitUnpack(lua_State *l)
 }
 
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
-{return 0; // UNDONE
+{
     NLua::CLuaLocker lualocker;
     const char *type = luaL_checkstring(l, 1);
     const char *text = luaL_checkstring(l, 2);
@@ -496,8 +554,6 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
     ELogType t;
     if (!strcmp(type, "LOG"))
         t = LOG_LOG;
-    else if (!strcmp(type, "DEBUG"))
-        t = LOG_DEBUG;
     else if (!strcmp(type, "WARNING"))
         t = LOG_WARNING;
     else if (!strcmp(type, "ERROR"))
@@ -505,8 +561,14 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
     else
         luaL_argerror(l, 1, "Wrong log type.");
 
-    instance->appendLogOutput(t, text);
+    // Emit: function called outside main thread
+    instance->emit logTextReady(instance->getLogOutput(t, text));
     return 0;
+}
+
+void CRP6Simulator::updateClockDisplay(unsigned long hz)
+{
+    clockDisplay->display(static_cast<double>(hz) / 1000000);
 }
 
 void CRP6Simulator::runPlugin()
@@ -515,6 +577,7 @@ void CRP6Simulator::runPlugin()
     {
         // NOTE: AVR clock should be stopped/reset earlier
         AVRClock->start();
+        lastPluginDelay.tv_sec = lastPluginDelay.tv_nsec = 0;
         pluginMainThread->start();
     }
 }

@@ -21,19 +21,16 @@ public:
 private:
     EIORegisterTypes IOType;
 
-    static timespec lastDelay;
-
     CIORegister(const CIORegister &); // No copying
 
-    void set(TIORegisterData d) { setCallback(IOType, d); checkDelay(); }
-    void checkDelay(void); // Relieves CPU a bit
+    void set(TIORegisterData d) { setCallback(IOType, d); }
 
 public:
     CIORegister(EIORegisterTypes t) : IOType(t) { }
 
     CIORegister &operator=(TIORegisterData d) { set(d); return *this; }
     CIORegister &operator=(CIORegister &other) { set(other); return *this; }
-    operator TIORegisterData(void) { checkDelay(); return getCallback(IOType); }
+    operator TIORegisterData(void) { return getCallback(IOType); }
 };
 
 }
