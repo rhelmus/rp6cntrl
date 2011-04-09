@@ -34,6 +34,7 @@ enum EISRTypes
     ISR_END
 };
 
+class QLCDNumber;
 class QPlainTextEdit;
 
 class CAVRClock;
@@ -44,11 +45,13 @@ class CRP6Simulator : public QMainWindow
 {
     Q_OBJECT
 
-    enum ELogType { LOG_LOG, LOG_DEBUG, LOG_WARNING, LOG_ERROR };
+    enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
     CAVRClock *AVRClock;
     QThread *AVRClockThread;
+
     CCallPluginMainThread *pluginMainThread;
+    timespec lastPluginDelay;
 
     TIORegisterData IORegisterData[IO_END];
     CBaseIOHandler *IOHandlerArray[IO_END];
@@ -58,6 +61,7 @@ class CRP6Simulator : public QMainWindow
     TISR ISRCacheArray[ISR_END];
     bool ISRFailedArray[ISR_END];
 
+    QLCDNumber *clockDisplay;
     QPlainTextEdit *logWidget;
 
     static CRP6Simulator *instance;
@@ -73,8 +77,11 @@ class CRP6Simulator : public QMainWindow
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     void initPlugin(void);
+    void checkPluginThreadDelay(void);
+    QString getLogOutput(ELogType type, const QString &text) const;
     void appendLogOutput(ELogType type, const QString &text);
 
+    // Callbacks for RP6 plugin
     static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
     static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
 
@@ -90,10 +97,12 @@ class CRP6Simulator : public QMainWindow
     static int luaTimerIsEnabled(lua_State *l);
     static int luaBitIsSet(lua_State *l);
     static int luaBitSet(lua_State *l);
+    static int luaBitUnSet(lua_State *l);
     static int luaBitUnpack(lua_State *l);
     static int luaAppendLogOutput(lua_State *l);
 
 private slots:
+    void updateClockDisplay(unsigned long hz);
     void runPlugin(void);
 
 public:
@@ -106,6 +115,16 @@ public:
     CAVRClock *getAVRClock(void) { return AVRClock; }
 
     static CRP6Simulator *getInstance(void) { return instance; }
+
+signals:
+    void logTextReady(const QString &text);
 };
+
+inline unsigned long getUSDiff(const timespec &start, const timespec &end)
+{
+    return ((end.tv_sec-start.tv_sec) * 1000000) +
+            ((end.tv_nsec-start.tv_nsec) / 1000);
+}
+
 
 #endif // RP6SIMUL_H

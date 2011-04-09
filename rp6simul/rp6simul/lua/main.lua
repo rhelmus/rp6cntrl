@@ -17,7 +17,8 @@ function log(s, ...)
 end
 
 function debug(s, ...)
-    appendLogOutput("DEBUG", getVarargString(s, ...))
+    print("Lua DEBUG:", getVarargString(s, ...))
+    io.flush()
 end
 
 function warning(s, ...)
@@ -47,6 +48,8 @@ function init()
 
     -- Load standard drivers (UNDONE: Make optional, ie move to initPlugin)
     loaddriver("timer0")
+    loaddriver("timer1")
+    loaddriver("timer2")
 end
 
 function initPlugin()

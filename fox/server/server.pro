@@ -28,4 +28,5 @@ OTHER_FILES += main.lua \
     main.lua \
     ../scripts/nav.lua \
     ../scripts/rotate.lua \
-    robot.lua
+    robot.lua \
+    utils.lua

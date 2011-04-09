@@ -28,7 +28,9 @@ HEADERS  += rp6simul.h \
 OTHER_FILES += \
     TODO.txt \
     lua/main.lua \
-    lua/drivers/timer0.lua
+    lua/drivers/timer0.lua \
+    lua/drivers/timer2.lua \
+    lua/drivers/timer1.lua
 
 INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua

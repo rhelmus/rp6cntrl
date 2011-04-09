@@ -4,26 +4,6 @@ namespace NRP6SimulGlue {
 
 CIORegister::TSetCallback CIORegister::setCallback = 0;
 CIORegister::TGetCallback CIORegister::getCallback = 0;
-timespec CIORegister::lastDelay = { 0, 0 };
-
-void CIORegister::checkDelay()
-{return;
-    if (!lastDelay.tv_sec && !lastDelay.tv_nsec) // Init?
-        clock_gettime(CLOCK_MONOTONIC, &lastDelay);
-    else
-    {
-        timespec current;
-        clock_gettime(CLOCK_MONOTONIC, &current);
-        long delta = ((current.tv_sec-lastDelay.tv_sec) * 1000000) +
-                ((current.tv_nsec-lastDelay.tv_nsec) / 1000);
-        if (delta > 50) // Delay every 50 us
-        {
-            lastDelay = current;
-            current.tv_sec = 0; current.tv_nsec = 1000;
-            nanosleep(&current, 0);
-        }
-    }
-}
 
 }
 

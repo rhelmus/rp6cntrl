@@ -39,6 +39,7 @@ public:
 
     void reset(void) { cycles = ticks = 0; }
     void set(unsigned long t) { cycles = 0; ticks = t; clamp(); }
+    unsigned long get(void) const { return (cycles * RP6_CLOCK) + ticks; }
 
     CTicks &operator+=(const CTicks &other)
     {
@@ -176,7 +177,7 @@ class CAVRClock: public QObject
 
     typedef QList<CAVRTimer *> TTimerList;
     TTimerList timerList;
-    CTicks currentTicks;
+    CTicks currentTicks, remainingTicks;
     QTimer *clockTimer;
     timespec lastClockTime;
     bool initClockTime;
@@ -193,14 +194,15 @@ public:
     CAVRTimer *createTimer(void);
     void enableTimer(CAVRTimer *timer, bool e);
     void reset(void);
+    void start(void);
 
 public slots:
-    void start(void);
     void stop(void);
 
 signals:
     void startTimer(void);
     void stopTimer(void);
+    void clockSpeed(unsigned long);
 };
 
 #endif // AVRTIMER_H

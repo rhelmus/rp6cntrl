@@ -262,11 +262,11 @@ int main()
             | (0 << COM00) | (0 << COM01)
             | (0 << CS02)  | (1 << CS01) | (0 << CS00);
 //    OCR0  = 99;
-    OCR0 = 1;
+    OCR0 = 8;
 
     TCCR2 = (1 << WGM21) | (0 << COM20) | (1 << CS20);
     OCR2  = 0x6E; // 0x6E = 72kHz @8MHz
-
+/*
     TCCR1A = (0 << WGM10) | (1 << WGM11) | (1 << COM1A1) | (1 << COM1B1);
     TCCR1B =  (1 << WGM13) | (0 << WGM12) | (1 << CS10);
     ICR1 = 210; // Phase corret PWM top value - 210 results in
@@ -280,20 +280,38 @@ int main()
                 //
                 // ATTENTION: Max PWM value is 210 and NOT 255 !!!
     OCR1AL = 0;
-    OCR1BL = 0;
+    OCR1BL = 0;*/
 
-    TIMSK = (1 << OCIE0) | (1 << OCIE2);
+    // Timer 1: Normal port operation, mode 4 (CTC), clk/8
+    TCCR1A =  (0 << COM1A1)
+          | (0 << COM1A0)
+          | (0 << COM1B1)
+          | (0 << COM1B0)
+          | (0 << FOC1A)
+          | (0 << FOC1B)
+          | (0 << WGM11)
+          | (0 << WGM10);
+    TCCR1B =  (0 << ICNC1)
+          | (0 << ICES1)
+          | (0 << WGM13)
+          | (1 << WGM12)
+          | (0 << CS12)
+          | (1 << CS11)
+          | (0 << CS10);
+    OCR1A = 9;
+
+    TIMSK = (1 << OCIE0) | (1 << OCIE1A) | (1 << OCIE2);
 
 
 
     for (;;)
     {
 //        UDR = UDR + 1;
-//        if (ICR1 != 210)
-//        {
-//            printf("say what????!1?!/!\n");
-//            fflush(stdout);
-//        }
+        if (ICR1 != 210)
+        {
+            /*printf("say what????!1?!/!\n");
+            fflush(stdout)*/;
+        }
 //        timespec start, end;
 
 //        clock_gettime(CLOCK_MONOTONIC, &start);
