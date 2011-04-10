@@ -30,7 +30,9 @@ OTHER_FILES += \
     lua/main.lua \
     lua/drivers/timer0.lua \
     lua/drivers/timer2.lua \
-    lua/drivers/timer1.lua
+    lua/drivers/timer1.lua \
+    lua/drivers/motor.lua \
+    lua/drivers/uart.lua
 
 INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua

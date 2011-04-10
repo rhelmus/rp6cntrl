@@ -14,4 +14,6 @@
     - only do within 'avr thread'
     - tune/test when and how long should be nanosleep'd
 - Exit avr thread from register access
-
+- Check for initial port settings
+    - Applying these outside lua?
+- Enabling / disabling drivers during runtime

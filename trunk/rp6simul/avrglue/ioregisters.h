@@ -35,10 +35,6 @@ public:
 
 }
 
-// UART
-extern NRP6SimulGlue::CIORegister UCSRA;
-extern NRP6SimulGlue::CIORegister UDR;
-
 // Timer0
 extern NRP6SimulGlue::CIORegister TCCR0;
 extern NRP6SimulGlue::CIORegister OCR0;
@@ -60,5 +56,14 @@ extern NRP6SimulGlue::CIORegister OCR2;
 
 // TIMSK
 extern NRP6SimulGlue::CIORegister TIMSK;
+
+// UART
+extern NRP6SimulGlue::CIORegister UCSRA;
+extern NRP6SimulGlue::CIORegister UCSRB;
+extern NRP6SimulGlue::CIORegister UCSRC;
+extern NRP6SimulGlue::CIORegister UDR;
+extern NRP6SimulGlue::CIORegister UBRR;
+extern NRP6SimulGlue::CIORegister UBRRL;
+extern NRP6SimulGlue::CIORegister UBRRH;
 
 #endif // RP6SIMUL_IOREGISTERS_H

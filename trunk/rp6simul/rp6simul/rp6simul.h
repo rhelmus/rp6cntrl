@@ -98,7 +98,7 @@ class CRP6Simulator : public QMainWindow
     static int luaBitIsSet(lua_State *l);
     static int luaBitSet(lua_State *l);
     static int luaBitUnSet(lua_State *l);
-    static int luaBitUnpack(lua_State *l);
+    static int luaBitUnPack(lua_State *l);
     static int luaAppendLogOutput(lua_State *l);
 
 private slots:
