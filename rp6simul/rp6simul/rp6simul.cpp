@@ -125,10 +125,6 @@ void CRP6Simulator::setLuaIOTypes()
     // Evil macros and stuff
 #define SET_LUA_IO(IO) NLua::setVariable(IO_##IO, "IO_"#IO, "avr")
 
-    // UART
-    SET_LUA_IO(UCSRA);
-    SET_LUA_IO(UDR);
-
     // Timer0
     SET_LUA_IO(TCCR0);
     SET_LUA_IO(OCR0);
@@ -150,6 +146,15 @@ void CRP6Simulator::setLuaIOTypes()
 
     // TIMSK
     SET_LUA_IO(TIMSK);
+
+    // UART
+    SET_LUA_IO(UCSRA);
+    SET_LUA_IO(UCSRB);
+    SET_LUA_IO(UCSRC);
+    SET_LUA_IO(UDR);
+    SET_LUA_IO(UBRR);
+    SET_LUA_IO(UBRRL);
+    SET_LUA_IO(UBRRH);
 
 #undef SET_LUA_IO
 }
@@ -198,6 +203,31 @@ void CRP6Simulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(OCIE1B);
     SET_LUA_CONSTANT(OCIE0);
 
+    // UART
+    SET_LUA_CONSTANT(RXC);
+    SET_LUA_CONSTANT(TXC);
+    SET_LUA_CONSTANT(UDRE);
+    SET_LUA_CONSTANT(FE);
+    SET_LUA_CONSTANT(DOR);
+    SET_LUA_CONSTANT(PE);
+    SET_LUA_CONSTANT(U2X);
+    SET_LUA_CONSTANT(MPCM);
+    SET_LUA_CONSTANT(RXCIE);
+    SET_LUA_CONSTANT(TXCIE);
+    SET_LUA_CONSTANT(UDRIE);
+    SET_LUA_CONSTANT(RXEN);
+    SET_LUA_CONSTANT(TXEN);
+    SET_LUA_CONSTANT(RXB8);
+    SET_LUA_CONSTANT(TXB8);
+    SET_LUA_CONSTANT(URSEL);
+    SET_LUA_CONSTANT(UMSEL);
+    SET_LUA_CONSTANT(UPM1);
+    SET_LUA_CONSTANT(UPM0);
+    SET_LUA_CONSTANT(USBS);
+    SET_LUA_CONSTANT(UCSZ1);
+    SET_LUA_CONSTANT(UCSZ0);
+    SET_LUA_CONSTANT(UCPOL);
+
     // ISRs
     SET_LUA_CONSTANT(ISR_USART_RXC_vect);
     SET_LUA_CONSTANT(ISR_TIMER0_COMP_vect);
@@ -229,8 +259,8 @@ void CRP6Simulator::initLua()
     // bit
     NLua::registerFunction(luaBitIsSet, "isSet", "bit");
     NLua::registerFunction(luaBitSet, "set", "bit");
-    NLua::registerFunction(luaBitUnSet, "unset", "bit");
-    NLua::registerFunction(luaBitUnpack, "unpack", "bit");
+    NLua::registerFunction(luaBitUnSet, "unSet", "bit");
+    NLua::registerFunction(luaBitUnPack, "unPack", "bit");
 
     // global
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
@@ -536,12 +566,23 @@ int CRP6Simulator::luaBitUnSet(lua_State *l)
     return 1;
 }
 
-int CRP6Simulator::luaBitUnpack(lua_State *l)
+int CRP6Simulator::luaBitUnPack(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
     const uint32_t low = luaL_checkint(l, 1);
     const uint32_t high = luaL_checkint(l, 2);
-    lua_pushinteger(l, (low & 0xFFFF0000) + (high & 0x0000FFFF));
+    const int size = luaL_checkint(l, 3);
+
+    // Ugh, I suck at 'bit math'
+    if (size == 8)
+        lua_pushinteger(l, (low & 0xF0) + (high & 0x0F));
+    if (size == 16)
+        lua_pushinteger(l, (low & 0xFF00) + (high & 0x00FF));
+    else if (size == 32)
+        lua_pushinteger(l, (low & 0xFFFF0000) + (high & 0x0000FFFF));
+    else
+        ; // UNDONE
+
     return 1;
 }
 

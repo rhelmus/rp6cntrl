@@ -43,7 +43,7 @@ local function checkSettings()
     end
 
     if not getPrescaler(tccr2) then
-        warning("Unsupported prescaler set for timer2")
+        warning("Unsupported prescaler set for timer2\n")
         ret = false
     end
 

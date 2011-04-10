@@ -255,8 +255,16 @@ ISR (TIMER2_COMP_vect)
 
 int main()
 {
-    // Init
-//    UCSRA = 0;
+    // UART:
+#define F_CPU 8000000
+#define BAUD_LOW		38400  //Low speed - 38.4 kBaud
+#define UBRR_BAUD_LOW	((F_CPU/(16*BAUD_LOW))-1)
+
+    UBRRH = UBRR_BAUD_LOW >> 8;	// Setup UART: Baudrate is Low Speed
+    UBRRL = (uint8_t) UBRR_BAUD_LOW;
+    UCSRA = 0x00;
+    UCSRC = (1<<URSEL)|(1<<UCSZ1)|(1<<UCSZ0);
+    UCSRB = (1 << TXEN) | (1 << RXEN) | (1 << RXCIE);
 
     TCCR0 =   (0 << WGM00) | (1 << WGM01)
             | (0 << COM00) | (0 << COM01)
@@ -266,7 +274,7 @@ int main()
 
     TCCR2 = (1 << WGM21) | (0 << COM20) | (1 << CS20);
     OCR2  = 0x6E; // 0x6E = 72kHz @8MHz
-/*
+
     TCCR1A = (0 << WGM10) | (1 << WGM11) | (1 << COM1A1) | (1 << COM1B1);
     TCCR1B =  (1 << WGM13) | (0 << WGM12) | (1 << CS10);
     ICR1 = 210; // Phase corret PWM top value - 210 results in
@@ -280,10 +288,10 @@ int main()
                 //
                 // ATTENTION: Max PWM value is 210 and NOT 255 !!!
     OCR1AL = 0;
-    OCR1BL = 0;*/
+    OCR1BL = 0;
 
     // Timer 1: Normal port operation, mode 4 (CTC), clk/8
-    TCCR1A =  (0 << COM1A1)
+    /*TCCR1A =  (0 << COM1A1)
           | (0 << COM1A0)
           | (0 << COM1B1)
           | (0 << COM1B0)
@@ -298,9 +306,10 @@ int main()
           | (0 << CS12)
           | (1 << CS11)
           | (0 << CS10);
-    OCR1A = 9;
+    OCR1A = 9;*/
 
-    TIMSK = (1 << OCIE0) | (1 << OCIE1A) | (1 << OCIE2);
+    //TIMSK = (1 << OCIE0) | (1 << OCIE1A) | (1 << OCIE2);
+    TIMSK = (1 << OCIE0) | (1 << OCIE2);
 
 
 

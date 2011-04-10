@@ -1,7 +1,7 @@
 module(..., package.seeall)
 
 -- UNDONE: Channel B support?
--- UNDONE: L/H OCR support (and other timers?)
+-- UNDONE: L/H OCR support (same for other timers?)
 handledIORegisters = {
     avr.IO_TCCR1A,
     avr.IO_TCCR1B,
@@ -52,13 +52,12 @@ local function disableTimerCond(cond, reason)
 end
 
 local function setControlRegisterA(data)
-    debug("reg1A:", data)
     return disableTimerCond((data == 0), "Unsupported flags for TCCR1A set\n")
 end
 
 local function setControlRegisterB(data)
     -- Only prescaler and CTC flags supported
-    local ret = ((bit.unset(data, avr.CS10, avr.CS11, avr.CS12, avr.WGM12) == 0) and
+    local ret = ((bit.unSet(data, avr.CS10, avr.CS11, avr.CS12, avr.WGM12) == 0) and
                  (bit.isSet(data, avr.WGM12)))
 
     if ret then
@@ -71,7 +70,7 @@ local function setControlRegisterB(data)
 
         ret = (ps ~= nil)
         if not ret then
-            warning("Unsupported prescaler set for timer1")
+            warning("Unsupported prescaler set for timer1\n")
         end
     end
 

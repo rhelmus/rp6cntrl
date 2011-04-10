@@ -11,6 +11,14 @@ local function getVarargString(s, ...)
     return s
 end
 
+local function callOptDriverFunc(driver, f, ...)
+    -- Use rawget to avoid obtaining data from global environment
+    local func = rawget(driver, f)
+    if func then
+        func(...)
+    end
+end
+
 -- Convenience log functions
 function log(s, ...)
     appendLogOutput("LOG", getVarargString(s, ...))
@@ -30,7 +38,7 @@ function errorLog(s, ...)
 end
 
 
-local function loaddriver(d)
+local function loadDriver(d)
     local driver = require(d)
     
     if driver.handledIORegisters then
@@ -47,16 +55,16 @@ function init()
     package.path = "lua/drivers/?.lua"
 
     -- Load standard drivers (UNDONE: Make optional, ie move to initPlugin)
-    loaddriver("timer0")
-    loaddriver("timer1")
-    loaddriver("timer2")
+    loadDriver("timer0")
+    loadDriver("timer1")
+    loadDriver("timer2")
+    loadDriver("motor")
+    loadDriver("uart")
 end
 
 function initPlugin()
     for _, d in ipairs(driverList) do
-        if d.initPlugin() then
-            d.initPlugin()
-        end
+        callOptDriverFunc(d, "initPlugin")
     end
 end
 
