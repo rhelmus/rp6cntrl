@@ -66,4 +66,18 @@ extern NRP6SimulGlue::CIORegister UBRR;
 extern NRP6SimulGlue::CIORegister UBRRL;
 extern NRP6SimulGlue::CIORegister UBRRH;
 
+// General IO ports
+extern NRP6SimulGlue::CIORegister PORTA;
+extern NRP6SimulGlue::CIORegister PORTB;
+extern NRP6SimulGlue::CIORegister PORTC;
+extern NRP6SimulGlue::CIORegister PORTD;
+extern NRP6SimulGlue::CIORegister DDRA;
+extern NRP6SimulGlue::CIORegister DDRB;
+extern NRP6SimulGlue::CIORegister DDRC;
+extern NRP6SimulGlue::CIORegister DDRD;
+extern NRP6SimulGlue::CIORegister PINA;
+extern NRP6SimulGlue::CIORegister PINB;
+extern NRP6SimulGlue::CIORegister PINC;
+extern NRP6SimulGlue::CIORegister PIND;
+
 #endif // RP6SIMUL_IOREGISTERS_H
