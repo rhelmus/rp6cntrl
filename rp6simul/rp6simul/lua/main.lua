@@ -60,6 +60,7 @@ function init()
     loadDriver("timer2")
     loadDriver("motor")
     loadDriver("uart")
+    loadDriver("portlog")
 end
 
 function initPlugin()

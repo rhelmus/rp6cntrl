@@ -1,5 +1,7 @@
 module(..., package.seeall)
 
+-- UNDONE: Receiving (i.e. handling user input)(don't forgot receiverEnabled/enabled!)
+
 handledIORegisters = {
     avr.IO_UCSRA,
     avr.IO_UCSRB,
@@ -67,10 +69,12 @@ local function setDataRegister(data)
     -- received data as soon as something was written to it.
     avr.setIORegister(avr.IO_UDR, receivedData)
 
-    -- Can/want/need we to buffer this?
-    local ch = string.char(data)
+    if UARTInfo.transmitterEnabled then
+        -- Can/want/need we to buffer this?
+        local ch = string.char(data)
 
-    debug(string.format("UART transmit: %s\n", ch))
+        debug(string.format("UART transmit: %s\n", ch))
+    end
 
     avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
 end
@@ -81,6 +85,8 @@ local function setBaudRate(data)
     -- Note that we do not use it yet, but this will be usefull when
     -- virtual serial ports are supported.
 
+    -- UNDONE: There seems to be a little rounding (int cutoff) error
+    -- when calculating back to the desired bps.
     local freq = 8000000 -- UNDONE
     local baud = (freq / (data + 1)) / 16
     log(string.format("Setting UART baud rate to %d (%d bps)\n", data, baud))
@@ -94,19 +100,21 @@ function initPlugin()
 end
 
 function handleIOData(type, data)
-    if type == avr.IO_UCSRA then
-        setCntrlStatRegisterA(data)
-    elseif type == avr.IO_UCSRB then
-        setCntrlStatRegisterB(data)
-    elseif type == avr.IO_UCSRC then
-        setCntrlStatRegisterC(data)
-    elseif type == avr.IO_UDR then
-        setDataRegister(data)
-    elseif type == avr.IO_UBRR then
-        setBaudRate(data)
-    elseif type == avr.IO_UBRRL then
-        setBaudRate(bit.unPack(data, UARTInfo.baudRate, 8))
-    elseif type == avr.IO_UBRRH then
-        setBaudRate(bit.unPack(UARTInfo.baudRate, data, 8))
+    if UARTInfo.enabled then
+        if type == avr.IO_UCSRA then
+            setCntrlStatRegisterA(data)
+        elseif type == avr.IO_UCSRB then
+            setCntrlStatRegisterB(data)
+        elseif type == avr.IO_UCSRC then
+            setCntrlStatRegisterC(data)
+        elseif type == avr.IO_UDR then
+            setDataRegister(data)
+        elseif type == avr.IO_UBRR then
+            setBaudRate(data)
+        elseif type == avr.IO_UBRRL then
+            setBaudRate(bit.unPack(data, UARTInfo.baudRate, 8))
+        elseif type == avr.IO_UBRRH then
+            setBaudRate(bit.unPack(UARTInfo.baudRate, data, 8))
+        end
     end
 end

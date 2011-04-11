@@ -311,6 +311,9 @@ int main()
     //TIMSK = (1 << OCIE0) | (1 << OCIE1A) | (1 << OCIE2);
     TIMSK = (1 << OCIE0) | (1 << OCIE2);
 
+    PORTA =     0b11010010;
+    DDRD =      0b11001100;
+    PINC =      0b10010111;
 
 
     for (;;)
