@@ -315,6 +315,8 @@ int main()
     DDRD =      0b11001100;
     PINC =      0b10010111;
 
+    // Enable LED 4
+    DDRB |= (1<<PINB7); PORTB |= (1 << PINB7);
 
     for (;;)
     {

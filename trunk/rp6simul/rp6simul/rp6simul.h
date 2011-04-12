@@ -78,7 +78,7 @@ class CRP6Simulator : public QMainWindow
     void terminatePluginMainThread(void);
     void initPlugin(void);
     void checkPluginThreadDelay(void);
-    QString getLogOutput(ELogType type, const QString &text) const;
+    QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
 
     // Callbacks for RP6 plugin

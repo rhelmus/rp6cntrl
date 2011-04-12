@@ -68,8 +68,8 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     vbox->addWidget(logWidget = new QPlainTextEdit);
     logWidget->setReadOnly(true);
     logWidget->setCenterOnScroll(true);
-    connect(this, SIGNAL(logTextReady(QString)), logWidget,
-            SLOT(appendHtml(QString)));
+    connect(this, SIGNAL(logTextReady(const QString &)), logWidget,
+            SLOT(appendHtml(const QString &)));
 
     initAVRClock();
     initIOHandlers();
@@ -495,8 +495,10 @@ void CRP6Simulator::checkPluginThreadDelay()
     }
 }
 
-QString CRP6Simulator::getLogOutput(ELogType type, const QString &text) const
+QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
 {
+    // Html doesn't like tabs too much
+    text = text.replace('\t', QString("&nbsp;").repeated(4));
     QString fs;
     switch (type)
     {
