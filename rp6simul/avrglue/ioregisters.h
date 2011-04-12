@@ -31,6 +31,10 @@ public:
     CIORegister &operator=(TIORegisterData d) { set(d); return *this; }
     CIORegister &operator=(CIORegister &other) { set(other); return *this; }
     operator TIORegisterData(void) { return getCallback(IOType); }
+    CIORegister &operator|=(TIORegisterData d)
+    { set(getCallback(IOType) | d); return *this; }
+    CIORegister &operator&=(TIORegisterData d)
+    { set(getCallback(IOType) & d); return *this; }
 };
 
 }

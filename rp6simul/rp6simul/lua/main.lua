@@ -61,6 +61,7 @@ function init()
     loadDriver("motor")
     loadDriver("uart")
     loadDriver("portlog")
+    loadDriver("led")
 end
 
 function initPlugin()
