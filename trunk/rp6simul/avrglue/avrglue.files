@@ -7,3 +7,4 @@ glue.cpp
 ioregisters.h
 ioregisters.cpp
 ../shared/shared.h
+itoa.cpp

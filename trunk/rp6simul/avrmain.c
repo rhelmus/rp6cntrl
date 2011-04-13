@@ -4,42 +4,6 @@
 #include <unistd.h>
 #include <stdio.h>
 
-// From: http://www.koders.com/c/fidC5846709A73E0878A830C5F27B617108633E27C5.aspx
-
-#define NUMBER_OF_DIGITS 16   /* space for NUMBER_OF_DIGITS + '\0' */
-
-void uitoa(unsigned int value, char* string, int radix)
-{
-unsigned char index, i;
-
-  index = NUMBER_OF_DIGITS;
-  i = 0;
-
-  do {
-    string[--index] = '0' + (value % radix);
-    if ( string[index] > '9') string[index] += 'A' - ':';   /* continue with A, B,.. */
-    value /= radix;
-  } while (value != 0);
-
-  do {
-    string[i++] = string[index++];
-  } while ( index < NUMBER_OF_DIGITS );
-
-  string[i] = 0; /* string terminator */
-}
-
-void itoa(int value, char* string, int radix)
-{
-  if (value < 0 && radix == 10) {
-    *string++ = '-';
-    uitoa(-value, string, radix);
-  }
-  else {
-    uitoa(value, string, radix);
-  }
-}
-// ------------------------
-
 
 #define HEX 16
 #define DEC 10
@@ -253,6 +217,73 @@ ISR (TIMER2_COMP_vect)
     }
 }
 
+
+// ---------------------------------------------------
+// PORTA A/D Convertor channels
+
+#define ADC_BAT 			7
+#define ADC_MCURRENT_L 		6
+#define ADC_MCURRENT_R 		5
+#define ADC_LS_L 			3
+#define ADC_LS_R 			2
+#define ADC_ADC1 			1
+#define ADC_ADC0 			0
+
+/**
+ * This function starts an ADC conversion - it does not return the
+ * read value! You need to poll if the conversion is complete somewhere
+ * else and then read it from the ADC result register.
+ * (s. task_ADC function below)
+ */
+void startADC(uint8_t channel)
+{
+    ADMUX = (1<<REFS0) | (0<<REFS1) | (channel<<MUX0);
+    ADCSRA = (0<<ADIE) | (1<<ADSC) | (1<<ADEN) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADIF);
+}
+
+// -----------------------
+
+uint16_t adcBat;
+uint16_t adcMotorCurrentLeft;
+uint16_t adcMotorCurrentRight;
+uint16_t adcLSL;
+uint16_t adcLSR;
+uint16_t adc0;
+uint16_t adc1;
+
+/**
+ * This functions checks all ADC channels sequentially in the Background!
+ * It can save a lot of time, if the ADC channels are checked like this, because
+ * each A/D conversion takes some time. With this function you don't need to
+ * wait until the A/D conversion is finished and you can do other things in the
+ * meanwhile.
+ * If you use this function (this is also the case if you use task_RP6System
+ * because it calls this function), you can NOT use readADC anymore!
+ *
+ * Instead you can use the seven global variables you see above to
+ * get the ADC values!
+ */
+void task_ADC(void)
+{
+    static uint8_t current_adc_channel = 0;
+    if(!(ADCSRA & (1<<ADSC))) {
+    //	ADCSRA |= (1<<ADIF);
+        switch(current_adc_channel) {
+            case 0: adcBat = ADC; startADC(ADC_MCURRENT_L); break;
+            case 1: adcMotorCurrentLeft = ADC; startADC(ADC_MCURRENT_R); break;
+            case 2: adcMotorCurrentRight = ADC; startADC(ADC_LS_L); break;
+            case 3: adcLSL = ADC; startADC(ADC_LS_R); break;
+            case 4: adcLSR = ADC; startADC(ADC_ADC0); break;
+            case 5: adc0 = ADC; startADC(ADC_ADC1); break;
+            case 6: adc1 = ADC; startADC(ADC_BAT); break;
+        }
+        if(current_adc_channel == 6)
+            current_adc_channel = 0;
+        else
+            current_adc_channel++;
+    }
+}
+
 int main()
 {
     // UART:
@@ -320,31 +351,12 @@ int main()
 
     for (;;)
     {
-//        UDR = UDR + 1;
-        if (ICR1 != 210)
-        {
-            /*printf("say what????!1?!/!\n");
-            fflush(stdout)*/;
-        }
-//        timespec start, end;
-
-//        clock_gettime(CLOCK_MONOTONIC, &start);
-//        mSleep(1000);
-////        sleep(1);
-//        clock_gettime(CLOCK_MONOTONIC, &end);
-
-//        printf("delta: %d\n", ((end.tv_sec-start.tv_sec) * 1000000) +
-//               ((end.tv_nsec-start.tv_nsec) / 1000));
-//        fflush(stdout);
-
-//        writeString("UART test :-)\n");
-//        sleep(1);
-//        while (!getBufferLength()) ;
-//        writeString("Received char: ");
-//        writeChar(readChar());
-//        writeChar('\n');
-
-
+        printf("ADC:\n\tBat: %d\n\tCurrent left: %d\n\tCurrent right: %d\n\t"
+               "LSL: %d\n\tLSR: %d\n\tadc0: %d\n\tadc1: %d\n", adcBat,
+               adcMotorCurrentLeft, adcMotorCurrentRight, adcLSL, adcLSR, adc0, adc1);
+        fflush(stdout);
+        task_ADC();
+        mSleep(500);
     }
     return 0;
 }

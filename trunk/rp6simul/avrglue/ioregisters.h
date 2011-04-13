@@ -21,12 +21,11 @@ public:
 private:
     EIORegisterTypes IOType;
 
-    CIORegister(const CIORegister &); // No copying
-
     void set(TIORegisterData d) { setCallback(IOType, d); }
 
 public:
     CIORegister(EIORegisterTypes t) : IOType(t) { }
+    CIORegister(const CIORegister &other) { set(other.getCallback(IOType)); }
 
     CIORegister &operator=(TIORegisterData d) { set(d); return *this; }
     CIORegister &operator=(CIORegister &other) { set(other); return *this; }
@@ -35,6 +34,8 @@ public:
     { set(getCallback(IOType) | d); return *this; }
     CIORegister &operator&=(TIORegisterData d)
     { set(getCallback(IOType) & d); return *this; }
+    CIORegister &operator^=(TIORegisterData d)
+    { set(getCallback(IOType) ^ d); return *this; }
 };
 
 }
@@ -83,5 +84,16 @@ extern NRP6SimulGlue::CIORegister PINA;
 extern NRP6SimulGlue::CIORegister PINB;
 extern NRP6SimulGlue::CIORegister PINC;
 extern NRP6SimulGlue::CIORegister PIND;
+
+// ADC
+extern NRP6SimulGlue::CIORegister ADMUX;
+extern NRP6SimulGlue::CIORegister ADCSRA;
+extern NRP6SimulGlue::CIORegister SFIOR;
+extern NRP6SimulGlue::CIORegister ADC;
+
+// External interrupts
+extern NRP6SimulGlue::CIORegister MCUCR;
+extern NRP6SimulGlue::CIORegister GICR;
+extern NRP6SimulGlue::CIORegister MCUCSR;
 
 #endif // RP6SIMUL_IOREGISTERS_H

@@ -15,11 +15,13 @@
 
 #include <lua.hpp>
 
+// UNDONE: Move to shared.h?
 typedef void (*TCallPluginMainFunc)(void);
-
 typedef void (*TIORegisterSetCB)(EIORegisterTypes, TIORegisterData);
 typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes);
-typedef void (*TSetIORegisterCallbacks)(TIORegisterSetCB, TIORegisterGetCB);
+typedef void (*TEnableISRsCB)(bool);
+typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
+                                        TEnableISRsCB);
 
 enum EISRTypes
 {
@@ -57,12 +59,14 @@ class CRP6Simulator : public QMainWindow
     CBaseIOHandler *IOHandlerArray[IO_END];
     QList<CBaseIOHandler *> IOHandlerList;
 
+    bool ISRsEnabled;
     typedef void (*TISR)(void);
     TISR ISRCacheArray[ISR_END];
     bool ISRFailedArray[ISR_END];
 
     QLCDNumber *clockDisplay;
     QPlainTextEdit *logWidget;
+    QPlainTextEdit *serialWidget;
 
     static CRP6Simulator *instance;
     static QReadWriteLock IORegisterReadWriteLock;
@@ -84,6 +88,7 @@ class CRP6Simulator : public QMainWindow
     // Callbacks for RP6 plugin
     static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
     static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
+    static void enableISRsCB(bool e);
 
     // Lua bindings
     static int luaAvrGetIORegister(lua_State *l);
@@ -99,7 +104,9 @@ class CRP6Simulator : public QMainWindow
     static int luaBitSet(lua_State *l);
     static int luaBitUnSet(lua_State *l);
     static int luaBitUnPack(lua_State *l);
+    static int luaBitAnd(lua_State *l);
     static int luaAppendLogOutput(lua_State *l);
+    static int luaAppendSerialOutput(lua_State *l);
 
 private slots:
     void updateClockDisplay(unsigned long hz);
@@ -118,6 +125,7 @@ public:
 
 signals:
     void logTextReady(const QString &text);
+    void serialTextReady(const QString &text);
 };
 
 inline unsigned long getUSDiff(const timespec &start, const timespec &end)

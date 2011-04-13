@@ -34,7 +34,8 @@ OTHER_FILES += \
     lua/drivers/motor.lua \
     lua/drivers/uart.lua \
     lua/drivers/portlog.lua \
-    lua/drivers/led.lua
+    lua/drivers/led.lua \
+    lua/drivers/adc.lua
 
 INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua

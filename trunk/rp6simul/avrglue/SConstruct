@@ -2,7 +2,7 @@ import os
 
 AVRSrcFiles = ['../avrmain.c']
 
-glueSrcFiles = [ 'glue.cpp', 'ioregisters.cpp' ]
+glueSrcFiles = [ 'glue.cpp', 'ioregisters.cpp', 'itoa.cpp' ]
 totalSrcFiles = AVRSrcFiles + glueSrcFiles
 libName = 'myrp6'
 
