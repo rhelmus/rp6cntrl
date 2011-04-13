@@ -56,6 +56,17 @@ enum EIORegisterTypes
     IO_PINC,
     IO_PIND,
 
+    // ADC
+    IO_ADMUX,
+    IO_ADCSRA,
+    IO_SFIOR,
+    IO_ADC,
+
+    // External interrupts
+    IO_MCUCR,
+    IO_GICR,
+    IO_MCUCSR,
+
     IO_END
 };
 
@@ -261,6 +272,50 @@ typedef uint16_t TIORegisterData;
 #define PIND1   1
 #define PIND0   0
 
+// ADCSRA
+#define ADEN    7
+#define ADSC    6
+#define ADATE   5
+#define ADIF    4
+#define ADIE    3
+#define ADPS2   2
+#define ADPS1   1
+#define ADPS0   0
 
+// ADMUX
+#define REFS1   7
+#define REFS0   6
+#define ADLAR   5
+#define MUX4    4
+#define MUX3    3
+#define MUX2    2
+#define MUX1    1
+#define MUX0    0
+
+// GICR
+#define INT1    7
+#define INT0    6
+#define INT2    5
+#define IVSEL   1
+#define IVCE    0
+
+// MCUCR
+#define SE      7
+#define SM2     6
+#define SM1     5
+#define SM0     4
+#define ISC11   3
+#define ISC10   2
+#define ISC01   1
+#define ISC00   0
+
+// MCUCSR
+#define JTD     7
+#define ISC2    6
+#define JTRF    4
+#define WDRF    3
+#define BORF    2
+#define EXTRF   1
+#define PORF    0
 
 #endif

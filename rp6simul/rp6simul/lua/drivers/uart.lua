@@ -34,6 +34,12 @@ end
 
 local function setCntrlStatRegisterA(data)
     local cond = (bit.unSet(data, avr.UDRE) == 0)
+    if cond and not bit.isSet(data, avr.UDRE) then
+        -- We're always ready
+        avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
+        log("Restored UART UDRE flag\n")
+    end
+
     return checkCond(cond, "Unsupported settings found for UCSRA.\n")
 end
 
@@ -67,13 +73,13 @@ local function setDataRegister(data)
     -- my understanding reading UDR always gives the received data and writing
     -- always transfers data. To emulate this, the register is reset back to the
     -- received data as soon as something was written to it.
-    avr.setIORegister(avr.IO_UDR, receivedData)
+    avr.setIORegister(avr.IO_UDR, UARTInfo.receivedData)
 
     if UARTInfo.transmitterEnabled then
         -- Can/want/need we to buffer this?
         local ch = string.char(data)
 
-        debug(string.format("UART transmit: %s\n", ch))
+        appendSerialOutput(ch)
     end
 
     avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))

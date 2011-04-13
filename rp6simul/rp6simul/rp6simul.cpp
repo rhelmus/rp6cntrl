@@ -54,6 +54,8 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     Q_ASSERT(!instance);
     instance = this;
 
+    resize(700, 500);
+
     QWidget *cw = new QWidget(this);
     setCentralWidget(cw);
 
@@ -65,11 +67,21 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
 
     vbox->addWidget(clockDisplay = new QLCDNumber(4));
 
-    vbox->addWidget(logWidget = new QPlainTextEdit);
+    QTabWidget *tabw = new QTabWidget;
+    tabw->setTabPosition(QTabWidget::South);
+    vbox->addWidget(tabw);
+
+    tabw->addTab(logWidget = new QPlainTextEdit, "log");
     logWidget->setReadOnly(true);
     logWidget->setCenterOnScroll(true);
     connect(this, SIGNAL(logTextReady(const QString &)), logWidget,
             SLOT(appendHtml(const QString &)));
+
+    tabw->addTab(serialWidget = new QPlainTextEdit, "serial");
+    serialWidget->setReadOnly(true);
+    serialWidget->setCenterOnScroll(true);
+    connect(this, SIGNAL(serialTextReady(const QString &)), serialWidget,
+            SLOT(appendPlainText(const QString &)));
 
     initAVRClock();
     initIOHandlers();
@@ -169,6 +181,12 @@ void CRP6Simulator::setLuaIOTypes()
     SET_LUA_IO(PINB);
     SET_LUA_IO(PINC);
     SET_LUA_IO(PIND);
+
+    // ADC
+    SET_LUA_IO(ADMUX);
+    SET_LUA_IO(ADCSRA);
+    SET_LUA_IO(SFIOR);
+    SET_LUA_IO(ADC);
 
 #undef SET_LUA_IO
 }
@@ -346,6 +364,46 @@ void CRP6Simulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(PIND1);
     SET_LUA_CONSTANT(PIND0);
 
+    // ADC
+    SET_LUA_CONSTANT(ADEN);
+    SET_LUA_CONSTANT(ADSC);
+    SET_LUA_CONSTANT(ADATE);
+    SET_LUA_CONSTANT(ADIF);
+    SET_LUA_CONSTANT(ADIE);
+    SET_LUA_CONSTANT(ADPS2);
+    SET_LUA_CONSTANT(ADPS1);
+    SET_LUA_CONSTANT(ADPS0);
+    SET_LUA_CONSTANT(REFS1);
+    SET_LUA_CONSTANT(REFS0);
+    SET_LUA_CONSTANT(ADLAR);
+    SET_LUA_CONSTANT(MUX4);
+    SET_LUA_CONSTANT(MUX3);
+    SET_LUA_CONSTANT(MUX2);
+    SET_LUA_CONSTANT(MUX1);
+    SET_LUA_CONSTANT(MUX0);
+
+    // External interrupts
+    SET_LUA_CONSTANT(INT1);
+    SET_LUA_CONSTANT(INT0);
+    SET_LUA_CONSTANT(INT2);
+    SET_LUA_CONSTANT(IVSEL);
+    SET_LUA_CONSTANT(IVCE);
+    SET_LUA_CONSTANT(SE);
+    SET_LUA_CONSTANT(SM2);
+    SET_LUA_CONSTANT(SM1);
+    SET_LUA_CONSTANT(SM0);
+    SET_LUA_CONSTANT(ISC11);
+    SET_LUA_CONSTANT(ISC10);
+    SET_LUA_CONSTANT(ISC01);
+    SET_LUA_CONSTANT(ISC00);
+    SET_LUA_CONSTANT(JTD);
+    SET_LUA_CONSTANT(ISC2);
+    SET_LUA_CONSTANT(JTRF);
+    SET_LUA_CONSTANT(WDRF);
+    SET_LUA_CONSTANT(BORF);
+    SET_LUA_CONSTANT(EXTRF);
+    SET_LUA_CONSTANT(PORF);
+
     // ISRs
     SET_LUA_CONSTANT(ISR_USART_RXC_vect);
     SET_LUA_CONSTANT(ISR_TIMER0_COMP_vect);
@@ -379,9 +437,11 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaBitSet, "set", "bit");
     NLua::registerFunction(luaBitUnSet, "unSet", "bit");
     NLua::registerFunction(luaBitUnPack, "unPack", "bit");
+    NLua::registerFunction(luaBitAnd, "bitAnd", "bit");
 
     // global
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
+    NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
 
     NLua::luaInterface.exec();
 
@@ -418,7 +478,7 @@ void CRP6Simulator::initPlugin()
 {
     // UNDONE: unload previous library (? probably only name is cached)
 
-    QLibrary lib("../avrglue/libmyrp6.so"); // UNDONE
+    QLibrary lib("../test/build/libmyrp6.so"); // UNDONE
 
     if (!lib.load())
     {
@@ -429,10 +489,10 @@ void CRP6Simulator::initPlugin()
 
     TCallPluginMainFunc mainfunc =
             getLibFunc<TCallPluginMainFunc>(lib, "callAvrMain");
-    TSetIORegisterCallbacks setiocb =
-            getLibFunc<TSetIORegisterCallbacks>(lib, "setIORegisterCallbacks");
+    TSetPluginCallbacks setplugincb =
+            getLibFunc<TSetPluginCallbacks>(lib, "setPluginCallbacks");
 
-    if (!mainfunc || !setiocb)
+    if (!mainfunc || !setplugincb)
         return; // UNDONE
 
     AVRClock->stop();
@@ -442,10 +502,12 @@ void CRP6Simulator::initPlugin()
 
     pluginMainThread = new CCallPluginMainThread(mainfunc, this);
 
-    setiocb(IORegisterSetCB, IORegisterGetCB);
+    setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB);
 
     for (int i=0; i<IO_END; ++i)
         IORegisterData[i] = 0;
+
+    ISRsEnabled = false; // UNDONE: ISRs are enabled by default?
 
     for (int i=0; i<ISR_END; ++i)
     {
@@ -540,6 +602,12 @@ TIORegisterData CRP6Simulator::IORegisterGetCB(EIORegisterTypes type)
 {
     instance->checkPluginThreadDelay();
     return instance->getIORegister(type);
+}
+
+void CRP6Simulator::enableISRsCB(bool e)
+{
+    QMutexLocker lock(&ISRExecMutex);
+    instance->ISRsEnabled = e;
 }
 
 int CRP6Simulator::luaAvrGetIORegister(lua_State *l)
@@ -694,10 +762,19 @@ int CRP6Simulator::luaBitUnPack(lua_State *l)
     const int size = luaL_checkint(l, 3);
 
     if (size == 8)
-            lua_pushinteger(l, (low & 0xFF) + ((high & 0xFF) << 8));
+        lua_pushinteger(l, (low & 0xFF) + ((high & 0xFF) << 8));
     else if (size == 16)
         lua_pushinteger(l, (low & 0xFFFF) + ((high & 0xFFFF) << 16));
 
+    return 1;
+}
+
+int CRP6Simulator::luaBitAnd(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int data = luaL_checkint(l, 1);
+    const int bits = luaL_checkint(l, 2);
+    lua_pushinteger(l, (data & bits));
     return 1;
 }
 
@@ -719,6 +796,16 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 
     // Emit: function called outside main thread
     instance->emit logTextReady(instance->getLogOutput(t, text));
+    return 0;
+}
+
+int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const char *text = luaL_checkstring(l, 1);
+
+    // Emit: function called outside main thread
+    instance->emit serialTextReady(text);
     return 0;
 }
 
@@ -752,16 +839,17 @@ void CRP6Simulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
 
 void CRP6Simulator::execISR(EISRTypes type)
 {
-    // UNDONE: Renable/disable ISR's (cli()/sei())
-
     QMutexLocker lock(&ISRExecMutex);
+
+    if (!ISRsEnabled)
+        return;
 
     if (ISRFailedArray[type])
         return;
 
     if (!ISRCacheArray[type])
     {
-        QLibrary lib("../avrglue/libmyrp6.so"); // UNDONE
+        QLibrary lib("../test/build/libmyrp6.so"); // UNDONE
         QString func = constructISRFunc(type);
         ISRCacheArray[type] = getLibFunc<TISR>(lib, getCString(func));
 
