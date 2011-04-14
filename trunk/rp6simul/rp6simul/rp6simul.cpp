@@ -1,6 +1,5 @@
 #include "rp6simul.h"
 #include "pluginthread.h"
-#include "iohandler.h"
 #include "avrtimer.h"
 #include "lua.h"
 
@@ -8,6 +7,66 @@
 #include <QLibrary>
 
 namespace {
+
+// Keep in sync with EIORegisterTypes
+const char *IORegisterStringArray[IO_END] = {
+    // UART
+    "UCSRA",
+    "UCSRB",
+    "UCSRC",
+    "UBRR",
+    "UBRRL",
+    "UBRRH",
+    "UDR",
+
+    // Timer0
+    "TCCR0",
+    "OCR0",
+
+    // Timer 1
+    "TCCR1A",
+    "TCCR1B",
+    "OCR1A",
+    "OCR1B",
+    "OCR1AL",
+    "OCR1AH",
+    "OCR1BL",
+    "OCR1BH",
+    "ICR1",
+
+    // Timer2
+    "TCCR2",
+    "OCR2",
+
+    // TIMSK
+    "TIMSK",
+
+    // General IO
+    "PORTA",
+    "PORTB",
+    "PORTC",
+    "PORTD",
+    "DDRA",
+    "DDRB",
+    "DDRC",
+    "DDRD",
+    "PINA",
+    "PINB",
+    "PINC",
+    "PIND",
+
+    // ADC
+    "ADMUX",
+    "ADCSRA",
+    "SFIOR",
+    "ADC",
+
+    // External interrupts
+    "MCUCR",
+    "GICR",
+    "MCUCSR",
+};
+
 
 template <typename TF> TF getLibFunc(QLibrary &lib, const char *f)
 {
@@ -42,11 +101,29 @@ const char *getCString(const QString &s)
     return by.data();
 }
 
+void activateDockTab(QObject *p, const QString &tab)
+{
+    // Based on http://www.qtcentre.org/threads/21362-Setting-the-active-tab-with-tabified-docking-windows
+    QList<QTabBar *> tabs = p->findChildren<QTabBar *>();
+    foreach (QTabBar *t, tabs)
+    {
+        const int count = t->count();
+        for (int i=0; i<count; ++i)
+        {
+            if (t->tabText(i) == tab)
+            {
+                t->setCurrentIndex(i);
+                return;
+            }
+        }
+    }
+
+    qDebug() << "Warning: couldn't activate dock tab" << tab << "(not found)";
+}
+
 }
 
 CRP6Simulator *CRP6Simulator::instance = 0;
-QReadWriteLock CRP6Simulator::IORegisterReadWriteLock;
-QMutex CRP6Simulator::ISRExecMutex;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     pluginMainThread(0)
@@ -54,37 +131,28 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
     Q_ASSERT(!instance);
     instance = this;
 
-    resize(700, 500);
+    resize(850, 600);
 
-    QWidget *cw = new QWidget(this);
-    setCentralWidget(cw);
+    QSplitter *splitter = new QSplitter(Qt::Vertical, this);
+    setCentralWidget(splitter);
 
-    QVBoxLayout *vbox = new QVBoxLayout(cw);
+    splitter->addWidget(createMainWidget());
+    splitter->addWidget(createLogWidgets());
+    splitter->setSizes(QList<int>() << 600 << 300);
 
-    QPushButton *button = new QPushButton("Start");
-    connect(button, SIGNAL(clicked()), this, SLOT(runPlugin()));
-    vbox->addWidget(button);
+    QDockWidget *statdock, *regdock;
+    addDockWidget(Qt::RightDockWidgetArea, statdock = createStatusDock(),
+                  Qt::Vertical);
+    addDockWidget(Qt::RightDockWidgetArea, regdock = createRegisterDock(),
+                  Qt::Vertical);
+    tabifyDockWidget(statdock, regdock);
+    activateDockTab(this, "Status");
 
-    vbox->addWidget(clockDisplay = new QLCDNumber(4));
-
-    QTabWidget *tabw = new QTabWidget;
-    tabw->setTabPosition(QTabWidget::South);
-    vbox->addWidget(tabw);
-
-    tabw->addTab(logWidget = new QPlainTextEdit, "log");
-    logWidget->setReadOnly(true);
-    logWidget->setCenterOnScroll(true);
-    connect(this, SIGNAL(logTextReady(const QString &)), logWidget,
-            SLOT(appendHtml(const QString &)));
-
-    tabw->addTab(serialWidget = new QPlainTextEdit, "serial");
-    serialWidget->setReadOnly(true);
-    serialWidget->setCenterOnScroll(true);
-    connect(this, SIGNAL(serialTextReady(const QString &)), serialWidget,
-            SLOT(appendPlainText(const QString &)));
+    pluginUpdateUITimer = new QTimer(this);
+    connect(pluginUpdateUITimer, SIGNAL(timeout()), this, SLOT(timedUpdate()));
+    pluginUpdateUITimer->setInterval(250);
 
     initAVRClock();
-    initIOHandlers();
     initLua();
     initPlugin();
 }
@@ -94,6 +162,79 @@ CRP6Simulator::~CRP6Simulator()
     terminateAVRClock();
     delete AVRClock;
     terminatePluginMainThread();
+}
+
+QWidget *CRP6Simulator::createMainWidget()
+{
+    QWidget *ret = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    QPushButton *button = new QPushButton("Start");
+    connect(button, SIGNAL(clicked()), this, SLOT(runPlugin()));
+    vbox->addWidget(button);
+
+    return ret;
+}
+
+QWidget *CRP6Simulator::createLogWidgets()
+{
+    QTabWidget *ret = new QTabWidget;
+    ret->setTabPosition(QTabWidget::South);
+
+    ret->addTab(logWidget = new QPlainTextEdit, "log");
+    logWidget->setReadOnly(true);
+    logWidget->setCenterOnScroll(true);
+    connect(this, SIGNAL(logTextReady(const QString &)), logWidget,
+            SLOT(appendHtml(const QString &)));
+
+    ret->addTab(serialOutputWidget = new QPlainTextEdit, "serial");
+    serialOutputWidget->setReadOnly(true);
+    serialOutputWidget->setCenterOnScroll(true);
+
+    return ret;
+}
+
+QDockWidget *CRP6Simulator::createStatusDock()
+{
+    QDockWidget *ret = new QDockWidget("Status", this);
+    ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    QWidget *w = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(w);
+    ret->setWidget(w);
+
+    vbox->addWidget(clockDisplay = new QLCDNumber(4));
+
+    return ret;
+}
+
+QDockWidget *CRP6Simulator::createRegisterDock()
+{
+    QDockWidget *ret = new QDockWidget("Registers", this);
+    ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    QWidget *w = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(w);
+    ret->setWidget(w);
+
+    vbox->addWidget(IORegisterTableWidget = new QTableWidget(IO_END, 3));
+    IORegisterTableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    IORegisterTableWidget->setAlternatingRowColors(true);
+    IORegisterTableWidget->setHorizontalHeaderLabels(QStringList() << "DEC" << "HEX" << "BIN");
+    QStringList rows;
+    for (int i=0; i<IO_END; ++i)
+    {
+        rows << IORegisterStringArray[i];
+        for (int j=0; j<3; ++j)
+        {
+            QTableWidgetItem *item = new QTableWidgetItem;
+            item->setTextAlignment(Qt::AlignCenter);
+            IORegisterTableWidget->setItem(i, j, item);
+        }
+    }
+    IORegisterTableWidget->setVerticalHeaderLabels(rows);
+
+    return ret;
 }
 
 void CRP6Simulator::initAVRClock()
@@ -110,85 +251,13 @@ void CRP6Simulator::initAVRClock()
     AVRClockThread->start();
 }
 
-void CRP6Simulator::addIOHandler(CBaseIOHandler *handler)
-{
-#if 0
-    IOHandlerList << handler;
-    handler->registerHandler(IOHandlerArray);
-#endif
-}
-
-void CRP6Simulator::initIOHandlers()
-{
-    for (int i=0; i<IO_END; ++i)
-        IOHandlerArray[i] = 0;
-
-#if 0
-    addIOHandler(new CUARTHandler(this));
-    addIOHandler(new CTimer0Handler(this));
-    addIOHandler(new CTimer1Handler(this));
-    addIOHandler(new CTimer2Handler(this));
-    addIOHandler(new CTimerMaskHandler(this));
-#endif
-}
-
 void CRP6Simulator::setLuaIOTypes()
 {
-    // Evil macros and stuff
-#define SET_LUA_IO(IO) NLua::setVariable(IO_##IO, "IO_"#IO, "avr")
-
-    // Timer0
-    SET_LUA_IO(TCCR0);
-    SET_LUA_IO(OCR0);
-
-    // Timer1
-    SET_LUA_IO(TCCR1A);
-    SET_LUA_IO(TCCR1B);
-    SET_LUA_IO(OCR1A);
-    SET_LUA_IO(OCR1B);
-    SET_LUA_IO(OCR1AL);
-    SET_LUA_IO(OCR1AH);
-    SET_LUA_IO(OCR1BL);
-    SET_LUA_IO(OCR1BH);
-    SET_LUA_IO(ICR1);
-
-    // Timer2
-    SET_LUA_IO(TCCR2);
-    SET_LUA_IO(OCR2);
-
-    // TIMSK
-    SET_LUA_IO(TIMSK);
-
-    // UART
-    SET_LUA_IO(UCSRA);
-    SET_LUA_IO(UCSRB);
-    SET_LUA_IO(UCSRC);
-    SET_LUA_IO(UDR);
-    SET_LUA_IO(UBRR);
-    SET_LUA_IO(UBRRL);
-    SET_LUA_IO(UBRRH);
-
-    // General IO
-    SET_LUA_IO(PORTA);
-    SET_LUA_IO(PORTB);
-    SET_LUA_IO(PORTC);
-    SET_LUA_IO(PORTD);
-    SET_LUA_IO(DDRA);
-    SET_LUA_IO(DDRB);
-    SET_LUA_IO(DDRC);
-    SET_LUA_IO(DDRD);
-    SET_LUA_IO(PINA);
-    SET_LUA_IO(PINB);
-    SET_LUA_IO(PINC);
-    SET_LUA_IO(PIND);
-
-    // ADC
-    SET_LUA_IO(ADMUX);
-    SET_LUA_IO(ADCSRA);
-    SET_LUA_IO(SFIOR);
-    SET_LUA_IO(ADC);
-
-#undef SET_LUA_IO
+    for (int i=0; i<IO_END; ++i)
+    {
+        QString io = QString("IO_%1").arg(IORegisterStringArray[i]);
+        NLua::setVariable(i, getCString(io), "avr");
+    }
 }
 
 void CRP6Simulator::setLuaAVRConstants()
@@ -518,6 +587,8 @@ void CRP6Simulator::initPlugin()
     lua_getglobal(NLua::luaInterface, "initPlugin");
     lua_call(NLua::luaInterface, 0, 0);
 
+    pluginUpdateUITimer->start();
+
 #if 0
     foreach (CBaseIOHandler *handler, IOHandlerList)
     {
@@ -606,7 +677,7 @@ TIORegisterData CRP6Simulator::IORegisterGetCB(EIORegisterTypes type)
 
 void CRP6Simulator::enableISRsCB(bool e)
 {
-    QMutexLocker lock(&ISRExecMutex);
+    QMutexLocker lock(&instance->ISRExecMutex);
     instance->ISRsEnabled = e;
 }
 
@@ -802,16 +873,41 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
-    const char *text = luaL_checkstring(l, 1);
-
-    // Emit: function called outside main thread
-    instance->emit serialTextReady(text);
+    QMutexLocker seriallocker(&instance->serialBufferMutex);
+    instance->serialTextBuffer += luaL_checkstring(l, 1);
     return 0;
 }
 
 void CRP6Simulator::updateClockDisplay(unsigned long hz)
 {
     clockDisplay->display(static_cast<double>(hz) / 1000000);
+}
+
+void CRP6Simulator::timedUpdate()
+{
+    QReadLocker iolocker(&IORegisterReadWriteLock);
+
+    for (int i=0; i<IO_END; ++i)
+    {
+        TIORegisterData d = IORegisterData[i]; // Shortcut
+        IORegisterTableWidget->item(i, 0)->setText(QString::number(d));
+        IORegisterTableWidget->item(i, 1)->setText(QString::number(d, 16));
+        IORegisterTableWidget->item(i, 2)->setText(QString::number(d, 2).rightJustified(16, '0', true));
+        IORegisterTableWidget->resizeRowToContents(i);
+    }
+
+    IORegisterTableWidget->resizeColumnsToContents();
+
+    QMutexLocker serialocker(&instance->serialBufferMutex);
+    if (!serialTextBuffer.isEmpty())
+    {
+        // Append text, without adding a new paragraph
+        QTextCursor cur = serialOutputWidget->textCursor();
+        cur.movePosition(QTextCursor::End);
+        serialOutputWidget->setTextCursor(cur);
+        serialOutputWidget->insertPlainText(serialTextBuffer);
+        serialTextBuffer.clear();
+    }
 }
 
 void CRP6Simulator::runPlugin()

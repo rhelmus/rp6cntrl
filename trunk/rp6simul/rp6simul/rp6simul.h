@@ -38,9 +38,9 @@ enum EISRTypes
 
 class QLCDNumber;
 class QPlainTextEdit;
+class QTableWidget;
 
 class CAVRClock;
-class CBaseIOHandler;
 class CCallPluginMainThread;
 
 class CRP6Simulator : public QMainWindow
@@ -56,25 +56,32 @@ class CRP6Simulator : public QMainWindow
     timespec lastPluginDelay;
 
     TIORegisterData IORegisterData[IO_END];
-    CBaseIOHandler *IOHandlerArray[IO_END];
-    QList<CBaseIOHandler *> IOHandlerList;
+    mutable QReadWriteLock IORegisterReadWriteLock;
 
     bool ISRsEnabled;
     typedef void (*TISR)(void);
     TISR ISRCacheArray[ISR_END];
     bool ISRFailedArray[ISR_END];
+    QMutex ISRExecMutex;
 
-    QLCDNumber *clockDisplay;
     QPlainTextEdit *logWidget;
-    QPlainTextEdit *serialWidget;
+    QPlainTextEdit *serialOutputWidget;
+    QLCDNumber *clockDisplay;
+    QTableWidget *IORegisterTableWidget;
+
+    QString serialTextBuffer;
+    QMutex serialBufferMutex;
+
+    QTimer *pluginUpdateUITimer;
 
     static CRP6Simulator *instance;
-    static QReadWriteLock IORegisterReadWriteLock;
-    static QMutex ISRExecMutex;
+
+    QWidget *createMainWidget(void);
+    QWidget *createLogWidgets(void);
+    QDockWidget *createStatusDock(void);
+    QDockWidget *createRegisterDock(void);
 
     void initAVRClock(void);
-    void addIOHandler(CBaseIOHandler *handler);
-    void initIOHandlers(void);
     void setLuaIOTypes(void);
     void setLuaAVRConstants(void);
     void initLua(void);
@@ -110,6 +117,7 @@ class CRP6Simulator : public QMainWindow
 
 private slots:
     void updateClockDisplay(unsigned long hz);
+    void timedUpdate(void);
     void runPlugin(void);
 
 public:
@@ -125,7 +133,6 @@ public:
 
 signals:
     void logTextReady(const QString &text);
-    void serialTextReady(const QString &text);
 };
 
 inline unsigned long getUSDiff(const timespec &start, const timespec &end)

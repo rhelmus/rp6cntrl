@@ -14,14 +14,12 @@ INCLUDEPATH += ../shared/
 SOURCES += main.cpp\
         rp6simul.cpp \
     pluginthread.cpp \
-    iohandler.cpp \
     avrtimer.cpp \
     lua.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
     ../shared/shared.h \
-    iohandler.h \
     avrtimer.h \
     lua.h
 
