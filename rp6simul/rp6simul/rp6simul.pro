@@ -15,13 +15,17 @@ SOURCES += main.cpp\
         rp6simul.cpp \
     pluginthread.cpp \
     avrtimer.cpp \
-    lua.cpp
+    lua.cpp \
+    projectwizard.cpp \
+    pathinput.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
     ../shared/shared.h \
     avrtimer.h \
-    lua.h
+    lua.h \
+    projectwizard.h \
+    pathinput.h
 
 OTHER_FILES += \
     TODO.txt \

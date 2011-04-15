@@ -2,6 +2,7 @@
 #include "pluginthread.h"
 #include "avrtimer.h"
 #include "lua.h"
+#include "projectwizard.h"
 
 #include <QtGui>
 #include <QLibrary>
@@ -133,6 +134,11 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
 
     resize(850, 600);
 
+    projectWizard = new CProjectWizard(this);
+
+    createMenus();
+    createToolbars();
+
     QSplitter *splitter = new QSplitter(Qt::Vertical, this);
     setCentralWidget(splitter);
 
@@ -162,6 +168,32 @@ CRP6Simulator::~CRP6Simulator()
     terminateAVRClock();
     delete AVRClock;
     terminatePluginMainThread();
+}
+
+void CRP6Simulator::createMenus()
+{
+    QMenu *menu = menuBar()->addMenu("&File");
+    menu->addAction("New", projectWizard, SLOT(show()), tr("ctrl+N"));
+    menu->addAction("Open");
+    menu->addMenu("Open recent...")->addAction("blah");
+    menu->addSeparator();
+    menu->addAction("Quit", this, SLOT(close()), tr("ctrl+Q"));
+
+    menu = menuBar()->addMenu("&Edit");
+    menu->addAction("Project settings");
+    menu->addSeparator();
+    menu->addAction("Preferences");
+
+    menu = menuBar()->addMenu("&Help");
+    menu->addAction("About");
+    menu->addAction("About Qt", qApp, SLOT(aboutQt()));
+}
+
+void CRP6Simulator::createToolbars()
+{
+    QToolBar *toolb = addToolBar("Run");
+    toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_ArrowRight)), "Run",
+                     this, SLOT(runPlugin()));
 }
 
 QWidget *CRP6Simulator::createMainWidget()
@@ -203,7 +235,43 @@ QDockWidget *CRP6Simulator::createStatusDock()
     QVBoxLayout *vbox = new QVBoxLayout(w);
     ret->setWidget(w);
 
-    vbox->addWidget(clockDisplay = new QLCDNumber(4));
+    QGroupBox *group = new QGroupBox("Clock");
+    vbox->addWidget(group);
+    QFormLayout *form = new QFormLayout(group);
+
+    form->addRow("RP6 clock (MHz)", clockDisplay = new QLCDNumber(4));
+    form->addRow("m32 clock (MHz)", new QLCDNumber(4)); // UNDONE
+
+    group = new QGroupBox("Robot");
+    vbox->addWidget(group);
+    QVBoxLayout *subvbox = new QVBoxLayout(group);
+
+    QTreeWidget *tree = new QTreeWidget;
+    tree->setHeaderLabels(QStringList() << "Device" << "Value");
+    QTreeWidgetItem *item = new QTreeWidgetItem(tree, QStringList() << "Motor");
+    QList<QTreeWidgetItem *> children;
+    children << new QTreeWidgetItem(QStringList() << "Power") <<
+                new QTreeWidgetItem(QStringList() << "Direction") <<
+                new QTreeWidgetItem(QStringList() << "Speed") <<
+                new QTreeWidgetItem(QStringList() << "Current");
+    item->addChildren(children);
+    subvbox->addWidget(tree);
+
+    group = new QGroupBox("Drivers");
+    vbox->addWidget(group);
+    subvbox = new QVBoxLayout(group);
+
+    tree = new QTreeWidget;
+    tree->setHeaderLabels(QStringList() << "Driver" << "Status");
+    tree->setRootIsDecorated(false);
+    QList<QTreeWidgetItem *> items;
+    items << new QTreeWidgetItem(QStringList() << "leds") <<
+             new QTreeWidgetItem(QStringList() << "timer0") <<
+             new QTreeWidgetItem(QStringList() << "timer1") <<
+             new QTreeWidgetItem(QStringList() << "timer2") <<
+             new QTreeWidgetItem(QStringList() << "motor");
+    tree->addTopLevelItems(items);
+    subvbox->addWidget(tree);
 
     return ret;
 }

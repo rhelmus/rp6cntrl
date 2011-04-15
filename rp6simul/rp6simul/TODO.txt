@@ -18,3 +18,8 @@
     - Applying these outside lua?
 - Enabling / disabling drivers during runtime
 - Handle nop and sysSleep macros
+- UI ideas
+    - Lock layout
+    - About
+    - Enable/disable dockwidgets
+- Check for modal dialogs blocking timers
