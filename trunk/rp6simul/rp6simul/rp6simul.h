@@ -42,6 +42,7 @@ class QTableWidget;
 
 class CAVRClock;
 class CCallPluginMainThread;
+class CProjectWizard;
 
 class CRP6Simulator : public QMainWindow
 {
@@ -64,6 +65,8 @@ class CRP6Simulator : public QMainWindow
     bool ISRFailedArray[ISR_END];
     QMutex ISRExecMutex;
 
+    CProjectWizard *projectWizard;
+
     QPlainTextEdit *logWidget;
     QPlainTextEdit *serialOutputWidget;
     QLCDNumber *clockDisplay;
@@ -76,6 +79,8 @@ class CRP6Simulator : public QMainWindow
 
     static CRP6Simulator *instance;
 
+    void createMenus(void);
+    void createToolbars(void);
     QWidget *createMainWidget(void);
     QWidget *createLogWidgets(void);
     QDockWidget *createStatusDock(void);
