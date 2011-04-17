@@ -92,6 +92,8 @@ class CRP6Simulator : public QMainWindow
     void initLua(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
+    void openProjectFile(const QString &file);
+    void closeProject(void);
     void initPlugin(void);
     void checkPluginThreadDelay(void);
     QString getLogOutput(ELogType type, QString text) const;
@@ -123,6 +125,8 @@ class CRP6Simulator : public QMainWindow
 private slots:
     void updateClockDisplay(unsigned long hz);
     void timedUpdate(void);
+    void newProject(void);
+    void openProject(void);
     void runPlugin(void);
 
 public:

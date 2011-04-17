@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 -- UNDONE: m32 leds support
 
@@ -63,3 +63,5 @@ function handleIOData(type, data)
     end
     updateLEDs(uport)
 end
+
+return ret

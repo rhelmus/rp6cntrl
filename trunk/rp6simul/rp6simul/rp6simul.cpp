@@ -3,6 +3,7 @@
 #include "avrtimer.h"
 #include "lua.h"
 #include "projectwizard.h"
+#include "projectsettings.h"
 
 #include <QtGui>
 #include <QLibrary>
@@ -160,7 +161,6 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
 
     initAVRClock();
     initLua();
-    initPlugin();
 }
 
 CRP6Simulator::~CRP6Simulator()
@@ -173,8 +173,8 @@ CRP6Simulator::~CRP6Simulator()
 void CRP6Simulator::createMenus()
 {
     QMenu *menu = menuBar()->addMenu("&File");
-    menu->addAction("New", projectWizard, SLOT(show()), tr("ctrl+N"));
-    menu->addAction("Open");
+    menu->addAction("New", this, SLOT(newProject()), tr("ctrl+N"));
+    menu->addAction("Open", this, SLOT(openProject()), tr("ctrl+O"));
     menu->addMenu("Open recent...")->addAction("blah");
     menu->addSeparator();
     menu->addAction("Quit", this, SLOT(close()), tr("ctrl+Q"));
@@ -611,6 +611,44 @@ void CRP6Simulator::terminatePluginMainThread()
     }
 }
 
+void CRP6Simulator::openProjectFile(const QString &file)
+{
+    CProjectSettings prsettings(file);
+    prsettings.sync();
+
+    if (prsettings.status() == QSettings::AccessError)
+        QMessageBox::critical(this, "File access error", "Unable to access project file!");
+    else if (prsettings.status() == QSettings::FormatError)
+        QMessageBox::critical(this, "File format error", "Invalid file format!");
+    else
+    {
+        closeProject();
+        initPlugin();
+    }
+}
+
+void CRP6Simulator::closeProject()
+{
+    lua_getglobal(NLua::luaInterface, "closePlugin");
+    lua_call(NLua::luaInterface, 0, 0);
+
+    AVRClock->stop();
+    AVRClock->reset();
+
+    terminatePluginMainThread();
+
+    for (int i=0; i<IO_END; ++i)
+        IORegisterData[i] = 0;
+
+    ISRsEnabled = false; // UNDONE: ISRs are enabled by default?
+
+    for (int i=0; i<ISR_END; ++i)
+    {
+        ISRCacheArray[i] = 0;
+        ISRFailedArray[i] = false;
+    }
+}
+
 void CRP6Simulator::initPlugin()
 {
     // UNDONE: unload previous library (? probably only name is cached)
@@ -656,13 +694,6 @@ void CRP6Simulator::initPlugin()
     lua_call(NLua::luaInterface, 0, 0);
 
     pluginUpdateUITimer->start();
-
-#if 0
-    foreach (CBaseIOHandler *handler, IOHandlerList)
-    {
-        handler->initPlugin();
-    }
-#endif
 }
 
 void CRP6Simulator::checkPluginThreadDelay()
@@ -700,6 +731,7 @@ QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
 {
     // Html doesn't like tabs too much
     text = text.replace('\t', QString("&nbsp;").repeated(4));
+    text = Qt::escape(text);
     QString fs;
     switch (type)
     {
@@ -731,10 +763,6 @@ void CRP6Simulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
     lualocker.unlock();
 
     instance->checkPluginThreadDelay();
-#if 0
-    if (instance->IOHandlerArray[type])
-        instance->IOHandlerArray[type]->handleIOData(type, data);
-#endif
 }
 
 TIORegisterData CRP6Simulator::IORegisterGetCB(EIORegisterTypes type)
@@ -785,9 +813,12 @@ int CRP6Simulator::luaClockEnableTimer(lua_State *l)
 
 int CRP6Simulator::luaTimerDestr(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
-    delete NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     qDebug() << "Removing timer";
+
+    NLua::CLuaLocker lualocker;
+    CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
+    instance->AVRClock->removeTimer(timer);
+    delete timer;
     return 0;
 }
 
@@ -949,6 +980,28 @@ int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
 void CRP6Simulator::updateClockDisplay(unsigned long hz)
 {
     clockDisplay->display(static_cast<double>(hz) / 1000000);
+}
+
+void CRP6Simulator::newProject()
+{
+    // UNDONE: Check if running
+
+    // According to docs this should be called auto when show is called,
+    // but it's not ...
+    projectWizard->restart();
+    if (projectWizard->exec() == QDialog::Accepted)
+        openProjectFile(projectWizard->getProjectFile());
+}
+
+void CRP6Simulator::openProject()
+{
+    QString file =
+            QFileDialog::getOpenFileName(this, "Open project file",
+                                         QDir::homePath(),
+                                         "RP6 simulator project files (*.rp6)");
+    // UNDONE: Check if running
+    if (!file.isEmpty())
+        openProjectFile(file);
 }
 
 void CRP6Simulator::timedUpdate()
