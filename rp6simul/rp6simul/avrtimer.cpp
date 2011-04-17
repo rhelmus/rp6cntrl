@@ -44,9 +44,6 @@ CAVRClock::CAVRClock(void) : initClockTime(true)
 
 CAVRClock::~CAVRClock()
 {
-    // UNDONE: Needed?
-//    foreach(CAVRTimer *timer, timerList)
-//        delete timer;
 }
 
 CAVRTimer *CAVRClock::getClosestTimer()
@@ -162,13 +159,16 @@ void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
     }
 }
 
+void CAVRClock::removeTimer(CAVRTimer *timer)
+{
+    qDebug() << "Removed timer from clock";
+    timerList.removeOne(timer);
+}
+
 void CAVRClock::reset()
 {
     currentTicks.reset();
     remainingTicks.reset();
-    // UNDONE: Needed?
-//    foreach(CAVRTimer *timer, timerList)
-//        timer->setEnabled(false);
     initClockTime = true;
 }
 

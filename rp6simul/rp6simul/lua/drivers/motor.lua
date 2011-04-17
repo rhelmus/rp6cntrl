@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 -- UNDONE: Channel B support?
 -- UNDONE: L/H OCR support (and other timers?)
@@ -118,3 +118,5 @@ function handleIOData(type, data)
         end
     end
 end
+
+return ret

@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 handledIORegisters = {
     avr.IO_PORTA,
@@ -74,3 +74,5 @@ function handleIOData(type, data)
         checkdiff("PIND", "PIND")
     end
 end
+
+return ret

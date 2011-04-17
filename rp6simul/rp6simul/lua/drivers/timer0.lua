@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 handledIORegisters = { avr.IO_TCCR0, avr.IO_OCR0, avr.IO_TIMSK }
 
@@ -85,3 +85,5 @@ function handleIOData(type, data)
 end
 
 -- UNDONE! Reset timer
+
+return ret

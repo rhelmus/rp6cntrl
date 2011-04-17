@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 -- UNDONE: Receiving (i.e. handling user input)(don't forgot receiverEnabled/enabled!)
 
@@ -124,3 +124,5 @@ function handleIOData(type, data)
         end
     end
 end
+
+return ret

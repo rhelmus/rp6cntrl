@@ -1,5 +1,7 @@
 #include "projectwizard.h"
+#include "lua.h"
 #include "pathinput.h"
+#include "projectsettings.h"
 
 #include <QDebug>
 #include <QDir>
@@ -10,16 +12,54 @@ CProjectWizard::CProjectWizard(QWidget *parent) : QWizard(parent)
 {
     setDefaultProperty("CPathInput", "path",
                        SIGNAL(pathTextChanged(const QString &)));
+    setModal(true);
     addPage(new CNewProjectDestPage);
-    addPage(new CNewProjectSettingsPage);
+    addPage(projectSettingsPage = new CNewProjectSettingsPage);
 }
 
 void CProjectWizard::accept()
 {
-    qDebug() << "Accepted:";
-    QDialog::accept();
+    const QString file = projectFilePath(field("projectDir").toString(),
+                                         field("projectName").toString());
+    if (QFileInfo(file).exists())
+    {
+        if (!QFile(file).remove())
+        {
+            QMessageBox::critical(this, "Remove file error",
+                                  "Could not remove existing file!");
+            reject();
+            return;
+        }
+    }
+
+    CProjectSettings prsettings(file);
+    prsettings.sync(); // Used for status, see docs
+
+    if (prsettings.status() == QSettings::AccessError)
+    {
+        QMessageBox::critical(this, "File access error", "Unable to access project file!");
+        reject();
+    }
+    else if (prsettings.status() == QSettings::FormatError)
+    {
+        // Hmm does this make any sense??
+        QMessageBox::critical(this, "File format error", "Invalid file format!");
+        reject();
+    }
+    else
+    {
+        prsettings.setValue("version", 1);
+        prsettings.setValue("name", field("projectName"));
+        prsettings.setValue("drivers", projectSettingsPage->getSelectedDrivers());
+        QDialog::accept();
+    }
 }
 
+QString CProjectWizard::getProjectFile() const
+{
+    return projectFilePath(field("projectDir").toString(),
+                           field("projectName").toString());
+}
 
 CNewProjectDestPage::CNewProjectDestPage(QWidget *parent) : QWizardPage(parent)
 {
@@ -59,28 +99,43 @@ bool CNewProjectDestPage::validatePage()
 
     if (!fi.isExecutable() || !fi.isReadable() || !fi.isWritable())
     {
-        QMessageBox::warning(this, "Project directory error",
+        QMessageBox::critical(this, "Project directory error",
                              "You do not have sufficient permissions for "
                              "the directory specified.");
         return false;
     }
 
-    // UNDONE: Check file also
+    fi = QFileInfo(projectFilePath(field("projectDir").toString(),
+                                   field("projectName").toString()));
+    if (fi.isFile())
+    {
+        QMessageBox::StandardButton button =
+                QMessageBox::warning(this, "Project file exists",
+                             "A project with the same name already exists in "
+                             "the directory specified. Overwrite?",
+                             QMessageBox::Yes | QMessageBox::No);
+        return (button == QMessageBox::Yes);
+    }
+
 
     return true;
 }
 
 
 CNewProjectSettingsPage::CNewProjectSettingsPage(QWidget *parent)
-    : QWizardPage(parent)
+    : QWizardPage(parent), initDriverList(true)
 {
     setTitle("Project settings");
+
+    // UNDONE: Description?
+    // UNDONE: Move to seperate reusable widget?
 
     QGridLayout *grid = new QGridLayout(this);
 
     QGroupBox *group = new QGroupBox("RP6 plugin");
     grid->addWidget(group, 0, 0);
     QVBoxLayout *vbox = new QVBoxLayout(group);
+    // UNDONE: File filter (.so/.dll)
     CPathInput *pathinput = new CPathInput("Open RP6 plugin file",
                                            CPathInput::PATH_EXISTFILE);
     vbox->addWidget(pathinput);
@@ -88,17 +143,7 @@ CNewProjectSettingsPage::CNewProjectSettingsPage(QWidget *parent)
     connect(pathinput, SIGNAL(pathTextChanged(const QString &)), this,
             SIGNAL(completeChanged()));
 
-    group = new QGroupBox("m32 plugin");
-    grid->addWidget(group, 0, 1);
-    vbox = new QVBoxLayout(group);
-    pathinput = new CPathInput("Open m32 plugin file",
-                               CPathInput::PATH_EXISTFILE);
-    vbox->addWidget(pathinput);
-    registerField("m32Plugin", pathinput);
-    connect(pathinput, SIGNAL(pathTextChanged(const QString &)), this,
-            SIGNAL(completeChanged()));
-
-    group = new QGroupBox("RP6 plugin");
+    group = new QGroupBox("Drivers");
     grid->addWidget(group, 1, 0, 1, 2);
     QHBoxLayout *hbox = new QHBoxLayout(group);
 
@@ -112,6 +157,20 @@ CNewProjectSettingsPage::CNewProjectSettingsPage(QWidget *parent)
     vbox->addWidget(new QPushButton("Reset"));
 }
 
+void CNewProjectSettingsPage::getDriverList()
+{
+    lua_getglobal(NLua::luaInterface, "getDriverList");
+    lua_call(NLua::luaInterface, 0, 1);
+
+    QMap<QString, QVariant> list = NLua::convertLuaTable(NLua::luaInterface, -1);
+    for(QMap<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
+    {
+        driverList[it.key()] = it.value().toString();
+    }
+
+    lua_pop(NLua::luaInterface, 1);
+}
+
 bool CNewProjectSettingsPage::checkPermissions(const QString &file) const
 {
     // UNDONE: Need exec?
@@ -119,21 +178,35 @@ bool CNewProjectSettingsPage::checkPermissions(const QString &file) const
     return (fi.isReadable());
 }
 
+void CNewProjectSettingsPage::resetDriverTree()
+{
+    driverTreeWidget->clear();
+
+    for (QMap<QString, QString>::iterator it=driverList.begin();
+         it!=driverList.end(); ++it)
+    {
+        QStringList l = QStringList() << it.key() << it.value();
+        new QTreeWidgetItem(driverTreeWidget, l);
+    }
+}
+
 void CNewProjectSettingsPage::initializePage()
 {
     setField("RP6Plugin", QDir::homePath());
-    setField("m32Plugin", QDir::homePath());
+
+    if (initDriverList)
+    {
+        getDriverList();
+        initDriverList = false;
+    }
+
+    resetDriverTree();
 }
 
 bool CNewProjectSettingsPage::isComplete() const
 {
-    bool ret = QWizardPage::isComplete();
-
-    if (ret)
-        ret = (QFileInfo(field("RP6Plugin").toString()).isFile() ||
-               QFileInfo(field("m32Plugin").toString()).isFile());
-
-    return ret;
+    return (QWizardPage::isComplete() &&
+            QFileInfo(field("RP6Plugin").toString()).isFile());
 }
 
 bool CNewProjectSettingsPage::validatePage()
@@ -147,14 +220,14 @@ bool CNewProjectSettingsPage::validatePage()
         return false;
     }
 
-    file = field("m32Plugin").toString();
-    if (!file.isEmpty() && !checkPermissions(file))
-    {
-        QMessageBox::warning(this, "m32 plugin error",
-                             "You do not have sufficient permissions for "
-                             "the RP6 plugin specified.");
-        return false;
-    }
-
     return true;
+}
+
+QStringList CNewProjectSettingsPage::getSelectedDrivers() const
+{
+    const int count = driverTreeWidget->topLevelItemCount();
+    QStringList ret;
+    for (int i=0; i<count; ++i)
+        ret << driverTreeWidget->topLevelItem(i)->text(0);
+    return ret;
 }

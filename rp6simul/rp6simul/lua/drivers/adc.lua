@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 -- UNDONE: m32 support
 
@@ -63,3 +63,5 @@ function handleIOData(type, data)
         end
     end
 end
+
+return ret

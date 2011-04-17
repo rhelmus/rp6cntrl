@@ -1,4 +1,4 @@
-module(..., package.seeall)
+local ret = driver(...)
 
 -- UNDONE: Channel B support?
 -- UNDONE: L/H OCR support (same for other timers?)
@@ -128,3 +128,5 @@ function handleIOData(type, data)
 end
 
 -- UNDONE! Reset timer
+
+return ret
