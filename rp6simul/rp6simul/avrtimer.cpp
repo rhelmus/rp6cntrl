@@ -165,15 +165,11 @@ void CAVRClock::removeTimer(CAVRTimer *timer)
     timerList.removeOne(timer);
 }
 
-void CAVRClock::reset()
+void CAVRClock::start()
 {
     currentTicks.reset();
     remainingTicks.reset();
     initClockTime = true;
-}
-
-void CAVRClock::start()
-{
     emit startTimer();
 }
 

@@ -194,7 +194,6 @@ public:
     CAVRTimer *createTimer(void);
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);
-    void reset(void);
     void start(void);
 
 public slots:

@@ -18,7 +18,8 @@ SOURCES += main.cpp\
     lua.cpp \
     projectwizard.cpp \
     pathinput.cpp \
-    projectsettings.cpp
+    projectsettings.cpp \
+    utils.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -27,7 +28,8 @@ HEADERS  += rp6simul.h \
     lua.h \
     projectwizard.h \
     pathinput.h \
-    projectsettings.h
+    projectsettings.h \
+    utils.h
 
 OTHER_FILES += \
     TODO.txt \

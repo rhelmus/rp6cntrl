@@ -127,6 +127,5 @@ function handleIOData(type, data)
     end
 end
 
--- UNDONE! Reset timer
 
 return ret
