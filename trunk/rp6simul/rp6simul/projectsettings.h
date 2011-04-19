@@ -15,4 +15,6 @@ inline QString projectFilePath(const QString &dir, const QString &name)
     return QDir(dir).absoluteFilePath(name + ".rp6");
 }
 
+bool checkProjectSettings(CProjectSettings &prs);
+
 #endif // PROJECTSETTINGS_H

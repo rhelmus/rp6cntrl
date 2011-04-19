@@ -2,10 +2,12 @@
 #include "lua.h"
 #include "pathinput.h"
 #include "projectsettings.h"
+#include "utils.h"
 
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QLibrary>
 #include <QtGui>
 
 CProjectWizard::CProjectWizard(QWidget *parent) : QWizard(parent)
@@ -33,26 +35,16 @@ void CProjectWizard::accept()
     }
 
     CProjectSettings prsettings(file);
-    prsettings.sync(); // Used for status, see docs
-
-    if (prsettings.status() == QSettings::AccessError)
-    {
-        QMessageBox::critical(this, "File access error", "Unable to access project file!");
-        reject();
-    }
-    else if (prsettings.status() == QSettings::FormatError)
-    {
-        // Hmm does this make any sense??
-        QMessageBox::critical(this, "File format error", "Invalid file format!");
-        reject();
-    }
-    else
+    if (checkProjectSettings(prsettings))
     {
         prsettings.setValue("version", 1);
         prsettings.setValue("name", field("projectName"));
         prsettings.setValue("drivers", projectSettingsPage->getSelectedDrivers());
+        prsettings.setValue("RP6Plugin", field("RP6Plugin"));
         QDialog::accept();
     }
+    else
+        reject();
 }
 
 QString CProjectWizard::getProjectFile() const
@@ -152,30 +144,117 @@ CNewProjectSettingsPage::CNewProjectSettingsPage(QWidget *parent)
     driverTreeWidget->setRootIsDecorated(false);
 
     hbox->addLayout(vbox = new QVBoxLayout);
-    vbox->addWidget(new QPushButton("Add driver"));
-    vbox->addWidget(new QPushButton("Remove driver"));
-    vbox->addWidget(new QPushButton("Reset"));
+
+    vbox->addWidget(addDriverButton = new QPushButton("Add driver"));
+    QMenu *menu = new QMenu(addDriverButton);
+    menu->addSeparator();
+    addCustomDriverAction = menu->addAction("Add custom driver...");
+    connect(menu, SIGNAL(triggered(QAction*)), this, SLOT(addDriver(QAction*)));
+    addDriverButton->setMenu(menu);
+
+    vbox->addWidget(delDriverButton = new QPushButton("Remove driver"));
+    connect(delDriverButton, SIGNAL(clicked()), this, SLOT(delDriver()));
+
+    QPushButton *button = new QPushButton("Reset");
+    connect(button, SIGNAL(clicked()), this, SLOT(resetDriverTree()));
+    vbox->addWidget(button);
 }
 
 void CNewProjectSettingsPage::getDriverList()
 {
     lua_getglobal(NLua::luaInterface, "getDriverList");
-    lua_call(NLua::luaInterface, 0, 1);
+    lua_call(NLua::luaInterface, 0, 2);
 
-    QMap<QString, QVariant> list = NLua::convertLuaTable(NLua::luaInterface, -1);
+    luaL_checktype(NLua::luaInterface, -2, LUA_TTABLE);
+    luaL_checktype(NLua::luaInterface, -1, LUA_TTABLE);
+
+    QMap<QString, QVariant> list = NLua::convertLuaTable(NLua::luaInterface, -2);
     for(QMap<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
     {
         driverList[it.key()] = it.value().toString();
+        QAction *a = new QAction(it.key(), addDriverButton->menu());
+        addDriverButton->menu()->insertAction(addCustomDriverAction, a);
+        a->setToolTip(it.value().toString());
     }
 
-    lua_pop(NLua::luaInterface, 1);
+    defaultDrivers = NLua::getStringList(NLua::luaInterface, -1);
+
+    lua_pop(NLua::luaInterface, 2);
+}
+
+QAction *CNewProjectSettingsPage::getAddAction(const QString &driver)
+{
+    QList<QAction *> actions = addDriverButton->menu()->actions();
+    foreach(QAction *a, actions)
+    {
+        if (a->text() == driver)
+            return a;
+    }
+
+    return 0;
 }
 
 bool CNewProjectSettingsPage::checkPermissions(const QString &file) const
 {
-    // UNDONE: Need exec?
     QFileInfo fi(file);
     return (fi.isReadable());
+}
+
+void CNewProjectSettingsPage::addDriver(QAction *action)
+{
+    // Special case: add custom driver
+    if (action == addCustomDriverAction)
+    {
+        QString file = QFileDialog::getOpenFileName(this, "Open custom driver",
+                                                    QDir::homePath(),
+                                                    "driver files (*.lua)");
+        if (!file.isEmpty())
+        {
+            lua_getglobal(NLua::luaInterface, "getDriver");
+            lua_pushstring(NLua::luaInterface, getCString(file));
+
+            lua_call(NLua::luaInterface, 1, 2);
+
+            if (lua_isnil(NLua::luaInterface, -1))
+                QMessageBox::critical(this, "Custom driver error",
+                                      "Could not load custom driver (see error log");
+            else
+            {
+                const char *name = luaL_checkstring(NLua::luaInterface, -2);
+                const char *desc = luaL_checkstring(NLua::luaInterface, -1);
+                QTreeWidgetItem *item = new QTreeWidgetItem(driverTreeWidget,
+                                                            QStringList() << name << desc);
+                item->setData(0, Qt::UserRole, file);
+            }
+
+            lua_pop(NLua::luaInterface, 2);
+        }
+    }
+    else
+    {
+        action->setVisible(false);
+        QStringList l = QStringList() << action->text() <<
+                                         driverList[action->text()];
+        new QTreeWidgetItem(driverTreeWidget, l);
+    }
+
+    if (!delDriverButton->isEnabled())
+        delDriverButton->setEnabled(true);
+}
+
+void CNewProjectSettingsPage::delDriver()
+{
+    QTreeWidgetItem *item = driverTreeWidget->currentItem();
+    Q_ASSERT(item);
+
+    QAction *a = getAddAction(item->text(0));
+    Q_ASSERT(a || !item->data(0, Qt::UserRole).isNull());
+    if (a)
+        a->setVisible(true);
+
+    delete item;
+    if (!driverTreeWidget->topLevelItemCount())
+        delDriverButton->setEnabled(false);
 }
 
 void CNewProjectSettingsPage::resetDriverTree()
@@ -183,11 +262,22 @@ void CNewProjectSettingsPage::resetDriverTree()
     driverTreeWidget->clear();
 
     for (QMap<QString, QString>::iterator it=driverList.begin();
-         it!=driverList.end(); ++it)
+         it != driverList.end(); ++it)
     {
-        QStringList l = QStringList() << it.key() << it.value();
-        new QTreeWidgetItem(driverTreeWidget, l);
+        bool def = defaultDrivers.contains(it.key());
+        if (def)
+        {
+            QStringList l = QStringList() << it.key() << it.value();
+            new QTreeWidgetItem(driverTreeWidget, l);
+        }
+
+        QAction *a = getAddAction(it.key());
+        Q_ASSERT(a);
+        a->setVisible(!def);
     }
+
+    if (!delDriverButton->isEnabled())
+        delDriverButton->setEnabled(true);
 }
 
 void CNewProjectSettingsPage::initializePage()
@@ -220,6 +310,13 @@ bool CNewProjectSettingsPage::validatePage()
         return false;
     }
 
+    if (!QLibrary::isLibrary(file))
+    {
+        QMessageBox::warning(this, "RP6 plugin error",
+                             "Incorrect file type selected.");
+        return false;
+    }
+
     return true;
 }
 
@@ -228,6 +325,15 @@ QStringList CNewProjectSettingsPage::getSelectedDrivers() const
     const int count = driverTreeWidget->topLevelItemCount();
     QStringList ret;
     for (int i=0; i<count; ++i)
-        ret << driverTreeWidget->topLevelItem(i)->text(0);
+    {
+        // Custom driver?
+        QTreeWidgetItem *item = driverTreeWidget->topLevelItem(i);
+        QVariant d = item->data(0, Qt::UserRole);
+        if (!d.isNull())
+            ret << d.toString();
+        else
+            ret << item->text(0);
+    }
+
     return ret;
 }

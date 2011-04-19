@@ -37,6 +37,8 @@ bool checkBoolean(lua_State *l, int index);
 QMap<QString, QVariant> convertLuaTable(lua_State *l, int index);
 inline int luaAbsIndex(lua_State *l, int i)
 { return ((i < 0) && (i > LUA_REGISTRYINDEX)) ? (lua_gettop(l)+1)+i : i; }
+void pushStringList(lua_State *l, const QStringList &list);
+QStringList getStringList(lua_State *l, int index);
 
 template <typename C> C *checkClassData(lua_State *l, int index, const char *type)
 {

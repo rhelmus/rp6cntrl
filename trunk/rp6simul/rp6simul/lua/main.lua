@@ -29,22 +29,39 @@ end
 
 local function loadDriver(d)
     local dir = dirname(d) or "lua/drivers/" -- UNDONE: Default path
-    local file = basename(d) .. ".lua"
+    local file = basename(d)
+
+    if not file:match("%.lua", -4) then
+        file = file .. ".lua"
+    end
 
     local chunk, stat = loadfile(dir .. file)
     if not chunk then
         errorLog(string.format("Failed to load driver %s%s (%s)\n", dir, file, stat))
-        return
+        return nil
     end
 
-    local stat, driver = pcall(chunk, basename(d))
+    local name = file:gsub(".lua", "")
+    local stat, driver = pcall(chunk, name)
     if not stat then
         errorLog(string.format("Failed to execute driver %s%s\n", dir, file))
-        return
+        return nil
     end
 
     if not driver then
         errorLog(string.format("No driver returned from %s!\n", basename(d)))
+        return nil
+    end
+
+    log(string.format("Succesfully loaded driver %s (%s)\n", name, dir .. file))
+
+    return driver
+end
+
+local function initDriver(d)
+    local driver = loadDriver(d)
+
+    if not driver then
         return
     end
 
@@ -56,6 +73,8 @@ local function loadDriver(d)
 
         table.insert(driverList, driver)
     end
+
+    callOptDriverFunc(driver, "initPlugin")
 end
 
 
@@ -83,20 +102,13 @@ function init()
     -- UNDONE: Need this?
 end
 
-function initPlugin()
-    -- Load standard drivers
-    -- UNDONE: Use project settings
-    loadDriver("timer0")
-    loadDriver("timer1")
-    loadDriver("timer2")
-    loadDriver("motor")
-    loadDriver("uart")
-    loadDriver("portlog")
-    loadDriver("led")
-    loadDriver("adc")
+function initPlugin(drivers)
+    assert(#driverList == 0 and #IOHandleMap == 0)
 
-    for _, d in ipairs(driverList) do
-        callOptDriverFunc(d, "initPlugin")
+    if drivers then
+        for _, d in ipairs(drivers) do
+            initDriver(d)
+        end
     end
 end
 
@@ -118,10 +130,32 @@ function handleIOData(type, data)
 end
 
 function getDriverList()
-    -- UNDONE
-    local ret = { }
-    ret["leds"] = "Driver for the RP6 leds."
-    return ret
+    local drivers = { "timer0", "timer1", "timer2", "motor", "adc",
+                      "led", "uart", "portlog" }
+    local default = { timer0 = true, timer2 = true, motor = true,
+                      adc = true, led = true, uart = true }
+    local ret, dret = { }, { }
+
+    for _, d in ipairs(drivers) do
+        local driver = loadDriver(d)
+        if driver then
+            ret[d] = driver.description or "No description."
+            if default[d] then
+                table.insert(dret, d)
+            end
+        end
+    end
+
+    return ret, dret
+end
+
+function getDriver(d)
+    local driver = loadDriver(d)
+    if driver then
+        local name = basename(d)
+        name = name:gsub(".lua", "")
+        return name, (driver.description or "No description")
+    end
 end
 
 

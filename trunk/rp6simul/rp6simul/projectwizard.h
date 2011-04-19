@@ -31,14 +31,22 @@ public:
 
 class CNewProjectSettingsPage: public QWizardPage
 {
+    Q_OBJECT
+
     QTreeWidget *driverTreeWidget;
     QMap<QString, QString> driverList;
+    QStringList defaultDrivers;
     bool initDriverList;
+    QPushButton *addDriverButton, *delDriverButton;
+    QAction *addCustomDriverAction;
 
     void getDriverList(void);
+    QAction *getAddAction(const QString &driver);
     bool checkPermissions(const QString &file) const;
 
 private slots:
+    void addDriver(QAction *action);
+    void delDriver(void);
     void resetDriverTree(void);
 
 public:

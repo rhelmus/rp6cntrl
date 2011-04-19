@@ -1,7 +1,9 @@
 #include "lua.h"
+#include "utils.h"
 
 #include <QDebug>
 #include <QtGlobal>
+#include <QStringList>
 
 namespace {
 
@@ -254,6 +256,37 @@ QMap<QString, QVariant> convertLuaTable(lua_State *l, int index)
         lua_pop(l, 2); // Remove duplicate key and value, keep original key
     }
 
+    return ret;
+}
+
+void pushStringList(lua_State *l, const QStringList &list)
+{
+    lua_newtable(l);
+    int i = 1;
+    foreach(QString s, list)
+    {
+        lua_pushstring(l, getCString(s));
+        lua_rawseti(l, -2, i);
+        ++i;
+    }
+
+    // New table now on lua stack
+}
+
+QStringList getStringList(lua_State *l, int index)
+{
+    const int tabind = luaAbsIndex(l, index);
+    const int size = lua_objlen(l, tabind);
+    QStringList ret;
+
+    for (int i=1; i<=size; ++i)
+    {
+        lua_rawgeti(l, tabind, i);
+        ret << luaL_checkstring(l, -1);
+        lua_pop(l, 1); // Pop value
+    }
+
+    lua_pop(l, 1); // Pop table
     return ret;
 }
 

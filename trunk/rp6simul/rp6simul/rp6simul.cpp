@@ -1,12 +1,14 @@
 #include "rp6simul.h"
-#include "pluginthread.h"
 #include "avrtimer.h"
 #include "lua.h"
+#include "pluginthread.h"
 #include "projectwizard.h"
 #include "projectsettings.h"
+#include "utils.h"
+
+#include <signal.h>
 
 #include <QtGui>
-#include <QLibrary>
 
 namespace {
 
@@ -96,13 +98,6 @@ QString constructISRFunc(EISRTypes type)
     return "ISR_" + f;
 }
 
-const char *getCString(const QString &s)
-{
-    static QByteArray by;
-    by = s.toLatin1();
-    return by.data();
-}
-
 void activateDockTab(QObject *p, const QString &tab)
 {
     // Based on http://www.qtcentre.org/threads/21362-Setting-the-active-tab-with-tabified-docking-windows
@@ -128,7 +123,7 @@ void activateDockTab(QObject *p, const QString &tab)
 CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent),
-    pluginMainThread(0)
+    pluginMainThread(0), quitPlugin(false)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -192,8 +187,15 @@ void CRP6Simulator::createMenus()
 void CRP6Simulator::createToolbars()
 {
     QToolBar *toolb = addToolBar("Run");
-    toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_ArrowRight)), "Run",
-                     this, SLOT(runPlugin()));
+    runPluginAction = toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_MediaPlay)), "Run",
+                                       this, SLOT(runPlugin()));
+    runPluginAction->setShortcut(tr("ctrl+R"));
+    runPluginAction->setEnabled(false);
+
+    stopPluginAction = toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_MediaStop)), "Run",
+                                        this, SLOT(stopPlugin()));
+    stopPluginAction->setShortcut(tr("esc"));
+    stopPluginAction->setEnabled(false);
 }
 
 QWidget *CRP6Simulator::createMainWidget()
@@ -201,8 +203,7 @@ QWidget *CRP6Simulator::createMainWidget()
     QWidget *ret = new QWidget;
     QVBoxLayout *vbox = new QVBoxLayout(ret);
 
-    QPushButton *button = new QPushButton("Start");
-    connect(button, SIGNAL(clicked()), this, SLOT(runPlugin()));
+    QPushButton *button = new QPushButton("Har!");
     vbox->addWidget(button);
 
     return ret;
@@ -239,8 +240,7 @@ QDockWidget *CRP6Simulator::createStatusDock()
     vbox->addWidget(group);
     QFormLayout *form = new QFormLayout(group);
 
-    form->addRow("RP6 clock (MHz)", clockDisplay = new QLCDNumber(4));
-    form->addRow("m32 clock (MHz)", new QLCDNumber(4)); // UNDONE
+    form->addRow("RP6 clock (MHz)", clockDisplay = new QLCDNumber(/*4*/));
 
     group = new QGroupBox("Robot");
     vbox->addWidget(group);
@@ -598,102 +598,162 @@ void CRP6Simulator::terminatePluginMainThread()
 {
     if (pluginMainThread)
     {
-        qDebug() << "Terminating plugin main thread";
-        pluginMainThread->terminate();
+        const int steptime = 1500;
+        const int steps = 3;
 
-        // UNDONE: Use terminated slot
-        // UNDONE: Thread does not always exit
-        if (!pluginMainThread->wait(250))
-            qDebug() << "Failed to terminate plugin main thread!";
+        QProgressDialog prgdialog(this, Qt::FramelessWindowHint);
+        prgdialog.setWindowTitle("Terminating RP6 plugin...");
+        prgdialog.setRange(1, steps * steptime);
+        prgdialog.setMinimumDuration(250);
+        prgdialog.setValue(0);
+        prgdialog.setCancelButton(0); // No canceling
+
+        prgdialog.setLabelText("Asking RP6 plugin nicely to quit...");
+        quitPlugin = true;
+
+        int step = 1;
+        QTime time;
+        time.start();
+        while (true)
+        {
+            if (pluginMainThread->wait(10))
+                break;
+
+            const int el = time.elapsed();
+
+            prgdialog.setValue(el + ((step-1) * steptime));
+
+            if ((el < 0) || (el > 1500))
+            {
+                ++step;
+                if (step == 2)
+                {
+                    prgdialog.setLabelText("Asking not so nicely to quit...");
+                    pluginMainThread->terminate();
+                    time.restart();
+                }
+                else if (step == 3)
+                {
+                    prgdialog.setLabelText("Plugin seems to be stuck, not asking anymore!");
+                    sigval sv;
+                    pthread_sigqueue(pluginMainThread->getThreadID(),
+                                     SIGUSR1, sv);
+                    time.restart();
+                }
+                else
+                {
+                    QMessageBox::warning(this, "Terminate plugin error",
+                                         "Failed to terminate plugin!\n"
+                                         "It's best to restart to program "
+                                         "before re-running to avoid "
+                                         "undefined behaviour.");
+                    break;
+                }
+            }
+
+            qApp->processEvents();
+        }
 
         delete pluginMainThread;
         pluginMainThread = 0;
     }
 }
 
+QString CRP6Simulator::getPluginFile() const
+{
+    CProjectSettings prsettings(currentProjectFile);
+    if (!checkProjectSettings(prsettings))
+        return QString();
+    return prsettings.value("RP6Plugin").toString();
+}
+
 void CRP6Simulator::openProjectFile(const QString &file)
 {
     CProjectSettings prsettings(file);
-    prsettings.sync();
+    if (!checkProjectSettings(prsettings))
+        return;
 
-    if (prsettings.status() == QSettings::AccessError)
-        QMessageBox::critical(this, "File access error", "Unable to access project file!");
-    else if (prsettings.status() == QSettings::FormatError)
-        QMessageBox::critical(this, "File format error", "Invalid file format!");
-    else
-    {
-        closeProject();
-        initPlugin();
-    }
+    closeProject();
+    currentProjectFile = file; // Put this after closeProject
+    runPluginAction->setEnabled(true);
 }
 
 void CRP6Simulator::closeProject()
 {
-    lua_getglobal(NLua::luaInterface, "closePlugin");
-    lua_call(NLua::luaInterface, 0, 0);
+    stopPlugin();
 
-    AVRClock->stop();
-    AVRClock->reset();
+    currentProjectFile.clear();
 
-    terminatePluginMainThread();
-
-    for (int i=0; i<IO_END; ++i)
-        IORegisterData[i] = 0;
-
-    ISRsEnabled = false; // UNDONE: ISRs are enabled by default?
-
-    for (int i=0; i<ISR_END; ++i)
-    {
-        ISRCacheArray[i] = 0;
-        ISRFailedArray[i] = false;
-    }
+    runPluginAction->setEnabled(false);
+    stopPluginAction->setEnabled(false);
 }
 
-void CRP6Simulator::initPlugin()
+bool CRP6Simulator::initPlugin()
 {
-    // UNDONE: unload previous library (? probably only name is cached)
+    // UNDONE: Reload plugin functionality?
 
-    QLibrary lib("../test/build/libmyrp6.so"); // UNDONE
-
-    if (!lib.load())
+    if (RP6Plugin.isLoaded() && !RP6Plugin.unload())
     {
-        QMessageBox::critical(this, "Error",
-                              "Failed to load library:\n" + lib.errorString());
-        return;
+        QMessageBox::critical(this, "Unload plugin error",
+                              "Could not unload plugin file!\n"
+                              "This may result in undefined behaviour"
+                              "when simulation is started. It's best"
+                              "to restart the application.");
+        return false;
+    }
+
+    if (getPluginFile().isEmpty())
+    {
+        QMessageBox::critical(this, "Plugin error", "Project has no RP6 plugin set");
+        return false;
+    }
+
+    RP6Plugin.setFileName(getPluginFile());
+
+    if (!RP6Plugin.load())
+    {
+        QMessageBox::critical(this, "Plugin error",
+                              "Failed to load plugin:\n" + RP6Plugin.errorString());
+        return false;
     }
 
     TCallPluginMainFunc mainfunc =
-            getLibFunc<TCallPluginMainFunc>(lib, "callAvrMain");
+            getLibFunc<TCallPluginMainFunc>(RP6Plugin, "callAvrMain");
     TSetPluginCallbacks setplugincb =
-            getLibFunc<TSetPluginCallbacks>(lib, "setPluginCallbacks");
+            getLibFunc<TSetPluginCallbacks>(RP6Plugin, "setPluginCallbacks");
 
     if (!mainfunc || !setplugincb)
-        return; // UNDONE
-
-    AVRClock->stop();
-    AVRClock->reset();
-
-    terminatePluginMainThread();
-
-    pluginMainThread = new CCallPluginMainThread(mainfunc, this);
+    {
+        QMessageBox::critical(this, "Plugin error",
+                              "Could not resolve mandatory symbols.\n"
+                              "Incorrect plugin specified?");
+        return false;
+    }
 
     setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB);
 
-    for (int i=0; i<IO_END; ++i)
-        IORegisterData[i] = 0;
+    lua_getglobal(NLua::luaInterface, "initPlugin");
 
-    ISRsEnabled = false; // UNDONE: ISRs are enabled by default?
-
-    for (int i=0; i<ISR_END; ++i)
+    // Push driver list
+    CProjectSettings prsettings(currentProjectFile);
+    if (checkProjectSettings(prsettings))
     {
-        ISRCacheArray[i] = 0;
-        ISRFailedArray[i] = false;
+        NLua::pushStringList(NLua::luaInterface,
+                             prsettings.value("drivers").toStringList());
+        lua_call(NLua::luaInterface, 1, 0);
+    }
+    else
+    {
+        qDebug() << "Running without any drivers!";
+        lua_call(NLua::luaInterface, 0, 0);
     }
 
-    lua_getglobal(NLua::luaInterface, "initPlugin");
-    lua_call(NLua::luaInterface, 0, 0);
+    Q_ASSERT(!pluginMainThread);
+    pluginMainThread = new CCallPluginMainThread(mainfunc, this);
 
     pluginUpdateUITimer->start();
+
+    return true;
 }
 
 void CRP6Simulator::checkPluginThreadDelay()
@@ -702,12 +762,19 @@ void CRP6Simulator::checkPluginThreadDelay()
     // from the RP6 plugin thread. It adds a small delay (nanosleep) within small
     // intervals to prevent constant CPU hammering by the plugin. This
     // obviously will only work when the RP6 program accesses IO, however this
-    // is commonly done.
+    // is commonly done. Furthermore it will also check if the user requested
+    // to stop the plugin
 
     // Plugin thread running? (ISRs may also call this function which do not
     // have to be delayed)
     if (QThread::currentThread() == pluginMainThread)
     {
+        if (quitPlugin)
+        {
+            pthread_exit(0);
+            return;
+        }
+
         // Init?
         if (!lastPluginDelay.tv_sec && !lastPluginDelay.tv_nsec)
             clock_gettime(CLOCK_MONOTONIC, &lastPluginDelay);
@@ -729,9 +796,9 @@ void CRP6Simulator::checkPluginThreadDelay()
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
 {
+    text = Qt::escape(text);
     // Html doesn't like tabs too much
     text = text.replace('\t', QString("&nbsp;").repeated(4));
-    text = Qt::escape(text);
     QString fs;
     switch (type)
     {
@@ -847,13 +914,14 @@ int CRP6Simulator::luaTimerSetTimeOut(lua_State *l)
 
     if (lua_isnumber(l, 2))
         timer->setTimeOutISR(static_cast<EISRTypes>(lua_tointeger(l, 2)));
-    else
+    else if (lua_isfunction(l, 2))
     {
         lua_pushvalue(l, 2); // Push lua function
         timer->setTimeOutLua();
     }
+    else
+        luaL_argerror(l, 2, "Wrong timeout argument: needs ISR or function");
 
-    // UNDONE: Check arg types
     return 0;
 }
 
@@ -979,7 +1047,15 @@ int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
 
 void CRP6Simulator::updateClockDisplay(unsigned long hz)
 {
-    clockDisplay->display(static_cast<double>(hz) / 1000000);
+    double mhz = static_cast<double>(hz) / 1000000.0;
+    QString s = QString::number(mhz, 'g', 3);
+    if ((s.length() < 3) && !s.contains('.'))
+    {
+        s += ".";
+        s = s.leftJustified(4, '0');
+    }
+
+    clockDisplay->display(s);
 }
 
 void CRP6Simulator::newProject()
@@ -1033,13 +1109,44 @@ void CRP6Simulator::timedUpdate()
 
 void CRP6Simulator::runPlugin()
 {
+    if (!initPlugin())
+        return;
+
     if (pluginMainThread && !pluginMainThread->isRunning())
     {
-        // NOTE: AVR clock should be stopped/reset earlier
+        // NOTE: AVR clock should be stopped earlier
         AVRClock->start();
         lastPluginDelay.tv_sec = lastPluginDelay.tv_nsec = 0;
         pluginMainThread->start();
+        runPluginAction->setEnabled(false);
+        stopPluginAction->setEnabled(true);
     }
+}
+
+void CRP6Simulator::stopPlugin()
+{
+    terminatePluginMainThread();
+
+    // Stop clock after terminating the thread: the plugin may be
+    // sleeping and thus would enter an infinite loop
+    AVRClock->stop();
+
+    lua_getglobal(NLua::luaInterface, "closePlugin");
+    lua_call(NLua::luaInterface, 0, 0);
+
+    for (int i=0; i<IO_END; ++i)
+        IORegisterData[i] = 0;
+
+    ISRsEnabled = false;
+    for (int i=0; i<ISR_END; ++i)
+    {
+        ISRCacheArray[i] = 0;
+        ISRFailedArray[i] = false;
+    }
+
+    pluginUpdateUITimer->stop();
+    runPluginAction->setEnabled(true);
+    stopPluginAction->setEnabled(false);
 }
 
 TIORegisterData CRP6Simulator::getIORegister(EIORegisterTypes type) const
@@ -1066,9 +1173,8 @@ void CRP6Simulator::execISR(EISRTypes type)
 
     if (!ISRCacheArray[type])
     {
-        QLibrary lib("../test/build/libmyrp6.so"); // UNDONE
         QString func = constructISRFunc(type);
-        ISRCacheArray[type] = getLibFunc<TISR>(lib, getCString(func));
+        ISRCacheArray[type] = getLibFunc<TISR>(RP6Plugin, getCString(func));
 
         if (!ISRCacheArray[type])
         {

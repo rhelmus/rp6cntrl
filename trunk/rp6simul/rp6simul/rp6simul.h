@@ -7,6 +7,7 @@
 
 #include <QtGui/QMainWindow>
 
+#include <QLibrary>
 #include <QList>
 #include <QMap>
 #include <QMutex>
@@ -21,7 +22,7 @@ typedef void (*TIORegisterSetCB)(EIORegisterTypes, TIORegisterData);
 typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes);
 typedef void (*TEnableISRsCB)(bool);
 typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
-                                        TEnableISRsCB);
+                                    TEnableISRsCB);
 
 enum EISRTypes
 {
@@ -55,6 +56,7 @@ class CRP6Simulator : public QMainWindow
 
     CCallPluginMainThread *pluginMainThread;
     timespec lastPluginDelay;
+    volatile bool quitPlugin; // UNDONE: Volatile OK?
 
     TIORegisterData IORegisterData[IO_END];
     mutable QReadWriteLock IORegisterReadWriteLock;
@@ -66,6 +68,7 @@ class CRP6Simulator : public QMainWindow
     QMutex ISRExecMutex;
 
     CProjectWizard *projectWizard;
+    QAction *runPluginAction, *stopPluginAction;
 
     QPlainTextEdit *logWidget;
     QPlainTextEdit *serialOutputWidget;
@@ -74,8 +77,10 @@ class CRP6Simulator : public QMainWindow
 
     QString serialTextBuffer;
     QMutex serialBufferMutex;
-
     QTimer *pluginUpdateUITimer;
+
+    QString currentProjectFile;
+    QLibrary RP6Plugin;
 
     static CRP6Simulator *instance;
 
@@ -92,9 +97,11 @@ class CRP6Simulator : public QMainWindow
     void initLua(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
+    QString getPluginFile(void) const;
     void openProjectFile(const QString &file);
     void closeProject(void);
-    void initPlugin(void);
+    bool initPlugin(void);
+    void unloadPlugin(void);
     void checkPluginThreadDelay(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
@@ -128,6 +135,7 @@ private slots:
     void newProject(void);
     void openProject(void);
     void runPlugin(void);
+    void stopPlugin(void);
 
 public:
     CRP6Simulator(QWidget *parent = 0);
