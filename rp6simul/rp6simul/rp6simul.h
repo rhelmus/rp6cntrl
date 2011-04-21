@@ -34,6 +34,10 @@ enum EISRTypes
     ISR_TIMER1_COMPA_vect,
     ISR_TIMER2_COMP_vect,
 
+    // Encoders
+    ISR_INT0_vect,
+    ISR_INT1_vect,
+
     ISR_END
 };
 
@@ -114,6 +118,7 @@ class CRP6Simulator : public QMainWindow
     // Lua bindings
     static int luaAvrGetIORegister(lua_State *l);
     static int luaAvrSetIORegister(lua_State *l);
+    static int luaAvrExecISR(lua_State *l);
     static int luaClockCreateTimer(lua_State *l);
     static int luaClockEnableTimer(lua_State *l);
     static int luaTimerDestr(lua_State *l);
@@ -125,6 +130,8 @@ class CRP6Simulator : public QMainWindow
     static int luaBitSet(lua_State *l);
     static int luaBitUnSet(lua_State *l);
     static int luaBitUnPack(lua_State *l);
+    static int luaBitLower(lua_State *l);
+    static int luaBitUpper(lua_State *l);
     static int luaBitAnd(lua_State *l);
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
