@@ -118,7 +118,7 @@ function handleIOData(type, data)
         elseif type == avr.IO_UBRR then
             setBaudRate(data)
         elseif type == avr.IO_UBRRL then
-            setBaudRate(bit.unPack(data, UARTInfo.baudRate, 8))
+            setBaudRate(bit.unPack(data, bit.upper(UARTInfo.baudRate, 8), 8))
         elseif type == avr.IO_UBRRH then
             setBaudRate(bit.unPack(UARTInfo.baudRate, data, 8))
         end

@@ -92,6 +92,8 @@ QString constructISRFunc(EISRTypes type)
     case ISR_TIMER0_COMP_vect: f = "TIMER0_COMP_vect"; break;
     case ISR_TIMER1_COMPA_vect: f = "TIMER1_COMPA_vect"; break;
     case ISR_TIMER2_COMP_vect: f = "TIMER2_COMP_vect"; break;
+    case ISR_INT0_vect: f = "INT0_vect"; break;
+    case ISR_INT1_vect: f = "INT1_vect"; break;
     default: Q_ASSERT(false); break;
     }
 
@@ -546,6 +548,8 @@ void CRP6Simulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(ISR_TIMER0_COMP_vect);
     SET_LUA_CONSTANT(ISR_TIMER1_COMPA_vect);
     SET_LUA_CONSTANT(ISR_TIMER2_COMP_vect);
+    SET_LUA_CONSTANT(ISR_INT0_vect);
+    SET_LUA_CONSTANT(ISR_INT1_vect);
 
 #undef SET_LUA_CONSTANT
 }
@@ -558,6 +562,7 @@ void CRP6Simulator::initLua()
     // avr
     NLua::registerFunction(luaAvrGetIORegister, "getIORegister", "avr");
     NLua::registerFunction(luaAvrSetIORegister, "setIORegister", "avr");
+    NLua::registerFunction(luaAvrExecISR, "execISR", "avr");
 
     // clock
     NLua::registerFunction(luaClockCreateTimer, "createTimer", "clock");
@@ -574,6 +579,8 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaBitSet, "set", "bit");
     NLua::registerFunction(luaBitUnSet, "unSet", "bit");
     NLua::registerFunction(luaBitUnPack, "unPack", "bit");
+    NLua::registerFunction(luaBitLower, "lower", "bit");
+    NLua::registerFunction(luaBitUpper, "upper", "bit");
     NLua::registerFunction(luaBitAnd, "bitAnd", "bit");
 
     // global
@@ -861,6 +868,14 @@ int CRP6Simulator::luaAvrSetIORegister(lua_State *l)
     return 0;
 }
 
+int CRP6Simulator::luaAvrExecISR(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const EISRTypes isr = static_cast<EISRTypes>(luaL_checkint(l, 1));
+    instance->execISR(isr);
+    return 0;
+}
+
 int CRP6Simulator::luaClockCreateTimer(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
@@ -1000,9 +1015,37 @@ int CRP6Simulator::luaBitUnPack(lua_State *l)
     const int size = luaL_checkint(l, 3);
 
     if (size == 8)
-        lua_pushinteger(l, (low & 0xFF) + ((high & 0xFF) << 8));
+        lua_pushinteger(l, (low & 0xFF) | ((high & 0xFF) << 8));
     else if (size == 16)
-        lua_pushinteger(l, (low & 0xFFFF) + ((high & 0xFFFF) << 16));
+        lua_pushinteger(l, (low & 0xFFFF) | ((high & 0xFFFF) << 16));
+
+    return 1;
+}
+
+int CRP6Simulator::luaBitLower(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const uint32_t value = luaL_checkint(l, 1);
+    const int size = luaL_checkint(l, 2);
+
+    if (size == 8)
+        lua_pushinteger(l, value & 0X00FF);
+    else if (size == 16)
+        lua_pushinteger(l, value & 0XFFFF);
+
+    return 1;
+}
+
+int CRP6Simulator::luaBitUpper(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const uint32_t value = luaL_checkint(l, 1);
+    const int size = luaL_checkint(l, 2);
+
+    if (size == 8)
+        lua_pushinteger(l, (value & 0XFF00) >> 8);
+    else if (size == 16)
+        lua_pushinteger(l, (value & 0XFFFF0000) >> 16);
 
     return 1;
 }

@@ -55,6 +55,26 @@ public:
         return *this;
     }
 
+    CTicks &operator-=(unsigned long t)
+    {
+        // Note: no overflow checking; other must be <
+
+        if (ticks >= t)
+            ticks -= t;
+        else
+        {
+            t -= ticks;
+            while (t > RP6_CLOCK)
+            {
+                cycles--;
+                t -= RP6_CLOCK;
+                Q_ASSERT(cycles);
+            }
+        }
+
+        return *this;
+    }
+
     CTicks operator+(const CTicks &other) const
     {
         CTicks ret(cycles + other.cycles, ticks + other.ticks);
@@ -143,7 +163,16 @@ class CAVRTimer
     uint32_t compareValue, prescaler, trueCompareValue;
 
     void updateTrueCompareValue(void)
-    { trueCompareValue = compareValue * prescaler; }
+    {
+        uint32_t v = compareValue * prescaler;
+        if (nextTick.get() < trueCompareValue)
+            nextTick.reset();
+        else
+            nextTick -= trueCompareValue;
+        nextTick += v;
+        trueCompareValue = v;
+        qDebug() << "Updated timer TCV to" << v;
+    }
     void timeOutLua(void);
 
 public:
