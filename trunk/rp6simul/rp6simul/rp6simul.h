@@ -1,53 +1,23 @@
 #ifndef RP6SIMUL_H
 #define RP6SIMUL_H
 
-#include "shared.h"
-
-#include <stdint.h>
-
 #include <QtGui/QMainWindow>
 
-#include <QLibrary>
 #include <QList>
-#include <QMap>
 #include <QMutex>
-#include <QReadWriteLock>
 #include <QString>
 
-#include <lua.hpp>
+#include "lua.h"
 
-// UNDONE: Move to shared.h?
-typedef void (*TCallPluginMainFunc)(void);
-typedef void (*TIORegisterSetCB)(EIORegisterTypes, TIORegisterData);
-typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes);
-typedef void (*TEnableISRsCB)(bool);
-typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
-                                    TEnableISRsCB);
-
-enum EISRTypes
-{
-    // UART
-    ISR_USART_RXC_vect=0,
-
-    // Timers
-    ISR_TIMER0_COMP_vect,
-    ISR_TIMER1_COMPA_vect,
-    ISR_TIMER2_COMP_vect,
-
-    // Encoders
-    ISR_INT0_vect,
-    ISR_INT1_vect,
-
-    ISR_END
-};
-
+class QPushButton;
 class QLCDNumber;
+class QLineEdit;
 class QPlainTextEdit;
 class QTableWidget;
+class QTreeWidget;
 
-class CAVRClock;
-class CCallPluginMainThread;
 class CProjectWizard;
+class CSimulator;
 
 class CRP6Simulator : public QMainWindow
 {
@@ -55,36 +25,24 @@ class CRP6Simulator : public QMainWindow
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
-    CAVRClock *AVRClock;
-    QThread *AVRClockThread;
-
-    CCallPluginMainThread *pluginMainThread;
-    timespec lastPluginDelay;
-    volatile bool quitPlugin; // UNDONE: Volatile OK?
-
-    TIORegisterData IORegisterData[IO_END];
-    mutable QReadWriteLock IORegisterReadWriteLock;
-
-    bool ISRsEnabled;
-    typedef void (*TISR)(void);
-    TISR ISRCacheArray[ISR_END];
-    bool ISRFailedArray[ISR_END];
-    QMutex ISRExecMutex;
+    CSimulator *simulator;
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
 
     QPlainTextEdit *logWidget;
     QPlainTextEdit *serialOutputWidget;
+    QLineEdit *serialInputWidget;
+    QPushButton *serialSendButton;
     QLCDNumber *clockDisplay;
+    QTreeWidget *robotStatusTreeWidget;
     QTableWidget *IORegisterTableWidget;
 
     QString serialTextBuffer;
     QMutex serialBufferMutex;
+    QList<QStringList> robotStatusUpdateBuffer;
+    QMutex robotStatusMutex;
     QTimer *pluginUpdateUITimer;
-
-    QString currentProjectFile;
-    QLibrary RP6Plugin;
 
     static CRP6Simulator *instance;
 
@@ -95,46 +53,15 @@ class CRP6Simulator : public QMainWindow
     QDockWidget *createStatusDock(void);
     QDockWidget *createRegisterDock(void);
 
-    void initAVRClock(void);
-    void setLuaIOTypes(void);
-    void setLuaAVRConstants(void);
-    void initLua(void);
-    void terminateAVRClock(void);
-    void terminatePluginMainThread(void);
-    QString getPluginFile(void) const;
     void openProjectFile(const QString &file);
-    void closeProject(void);
-    bool initPlugin(void);
-    void unloadPlugin(void);
-    void checkPluginThreadDelay(void);
+    void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
 
-    // Callbacks for RP6 plugin
-    static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
-    static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
-    static void enableISRsCB(bool e);
-
     // Lua bindings
-    static int luaAvrGetIORegister(lua_State *l);
-    static int luaAvrSetIORegister(lua_State *l);
-    static int luaAvrExecISR(lua_State *l);
-    static int luaClockCreateTimer(lua_State *l);
-    static int luaClockEnableTimer(lua_State *l);
-    static int luaTimerDestr(lua_State *l);
-    static int luaTimerSetCompareValue(lua_State *l);
-    static int luaTimerSetPrescaler(lua_State *l);
-    static int luaTimerSetTimeOut(lua_State *l);
-    static int luaTimerIsEnabled(lua_State *l);
-    static int luaBitIsSet(lua_State *l);
-    static int luaBitSet(lua_State *l);
-    static int luaBitUnSet(lua_State *l);
-    static int luaBitUnPack(lua_State *l);
-    static int luaBitLower(lua_State *l);
-    static int luaBitUpper(lua_State *l);
-    static int luaBitAnd(lua_State *l);
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
+    static int luaUpdateRobotStatus(lua_State *l);
 
 private slots:
     void updateClockDisplay(unsigned long hz);
@@ -143,27 +70,15 @@ private slots:
     void openProject(void);
     void runPlugin(void);
     void stopPlugin(void);
+    void sendSerialPressed(void);
 
 public:
     CRP6Simulator(QWidget *parent = 0);
-    ~CRP6Simulator(void);
-
-    TIORegisterData getIORegister(EIORegisterTypes type) const;
-    void setIORegister(EIORegisterTypes type, TIORegisterData data);
-    void execISR(EISRTypes type);
-    CAVRClock *getAVRClock(void) { return AVRClock; }
 
     static CRP6Simulator *getInstance(void) { return instance; }
 
 signals:
     void logTextReady(const QString &text);
 };
-
-inline unsigned long getUSDiff(const timespec &start, const timespec &end)
-{
-    return ((end.tv_sec-start.tv_sec) * 1000000) +
-            ((end.tv_nsec-start.tv_nsec) / 1000);
-}
-
 
 #endif // RP6SIMUL_H

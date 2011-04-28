@@ -2,6 +2,8 @@ local ret = driver(...)
 
 -- UNDONE: Receiving (i.e. handling user input)(don't forgot receiverEnabled/enabled!)
 
+description = "Driver for the UART (serial input/output)."
+
 handledIORegisters = {
     avr.IO_UCSRA,
     avr.IO_UCSRB,
@@ -19,6 +21,9 @@ local UARTInfo = {
     receivedData = 0, -- Last received byte
     transmitterEnabled = false,
     baudRate = 0,
+    dataSend = 0,
+    dataSendPerSec = 0,
+    dataReceived = 0
 }
 
 local function checkCond(cond, msg)
@@ -47,17 +52,18 @@ local function setCntrlStatRegisterB(data)
     local cond = (bit.unSet(data, avr.RXCIE, avr.RXEN, avr.TXEN) == 0)
 
     if cond then
-        local function update(lvar, avar)
+        local function update(lvar, avar, desc)
             if UARTInfo[lvar] ~= bit.isSet(data, avr[avar]) then
                 UARTInfo[lvar] = bit.isSet(data, avr[avar])
                 local stat = (UARTInfo[lvar] and "enabled") or "disabled"
                 log(string.format("UART setting %s %s\n", avar, stat))
+                updateRobotStatus("UART", desc, stat)
             end
         end
 
-        update("receiverISREnabled", "RXCIE")
-        update("receiverEnabled", "RXEN")
-        update("transmitterEnabled", "TXEN")
+        update("receiverISREnabled", "RXCIE", "Receiver interrupt")
+        update("receiverEnabled", "RXEN", "receiver")
+        update("transmitterEnabled", "TXEN", "transmitter")
     end
 
     return checkCond(cond, "Unsupported settings found for UCSRB.\n")
@@ -78,8 +84,9 @@ local function setDataRegister(data)
     if UARTInfo.transmitterEnabled then
         -- Can/want/need we to buffer this?
         local ch = string.char(data)
-
         appendSerialOutput(ch)
+        UARTInfo.dataSend = UARTInfo.dataSend + 1
+        updateRobotStatus("UART", "Data send", UARTInfo.dataSend)
     end
 
     avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
@@ -96,13 +103,30 @@ local function setBaudRate(data)
     local freq = 8000000 -- UNDONE
     local baud = (freq / (data + 1)) / 16
     log(string.format("Setting UART baud rate to %d (%d bps)\n", data, baud))
+    updateRobotStatus("UART", "Baudrate (bps)", string.format("%d", baud))
     UARTInfo.baudRate = data
 end
 
+local function handleInput(text)
+    if UARTInfo.receiverEnabled and UARTInfo.receiverISREnabled then
+        local lastch
+        for ch in text:gmatch(".") do
+            avr.setIORegister(avr.IO_UDR, string.byte(ch))
+            avr.execISR(avr.ISR_USART_RXC_vect)
+            lastch = ch
+        end
+        UARTInfo.receivedData = string.byte(lastch)
+    end
+end
+
+
 function initPlugin()
     -- Apply initial UART settings
+    -- UNDONE: Move out of driver
     avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
     avr.setIORegister(avr.IO_UCSRC, bit.set(0, avr.URSEL, avr.UCSZ0, avr.UCSZ1))
+
+    setSerialInputHandler(handleInput)
 end
 
 function handleIOData(type, data)

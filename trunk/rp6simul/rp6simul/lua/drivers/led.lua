@@ -10,6 +10,8 @@ local ret = driver(...)
 --      5: PORTB, pin 1
 --      6: PORTB, pin 0
 
+description = "Driver for the RP6 LEDs."
+
 handledIORegisters = {
     avr.IO_PORTB,
     avr.IO_PORTC,
@@ -31,6 +33,7 @@ local function updateLEDs(port)
         if e ~= LEDInfo.LEDStatus[l] then
             log(string.format("LED %d %s\n", l, (e and "enabled") or "disabled"))
             LEDInfo.LEDStatus[l] = e
+            updateRobotStatus("leds", tostring(l), (e and "ON") or "OFF")
         end
     end
 

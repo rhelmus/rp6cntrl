@@ -1,5 +1,6 @@
 #include "avrtimer.h"
 #include "lua.h"
+#include "utils.h"
 
 #include <QDebug>
 #include <QTimer>
@@ -171,6 +172,11 @@ void CAVRClock::start()
     remainingTicks.reset();
     initClockTime = true;
     emit startTimer();
+}
+
+bool CAVRClock::isActive() const
+{
+    return clockTimer->isActive();
 }
 
 void CAVRClock::stop()

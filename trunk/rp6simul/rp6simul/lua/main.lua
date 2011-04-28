@@ -97,6 +97,12 @@ function errorLog(s, ...)
 end
 
 
+-- Global driver functions
+local serialInputHandler
+function setSerialInputHandler(func)
+    serialInputHandler = func
+end
+
 -- Functions called by C++ code
 function init()
     -- UNDONE: Need this?
@@ -131,9 +137,9 @@ end
 
 function getDriverList()
     local drivers = { "timer0", "timer1", "timer2", "motor", "adc",
-                      "led", "uart", "portlog" }
+                      "led", "uart", "portlog", "acs" }
     local default = { timer0 = true, timer2 = true, motor = true,
-                      adc = true, led = true, uart = true }
+                      adc = true, led = true, uart = true, acs = true }
     local ret, dret = { }, { }
 
     for _, d in ipairs(drivers) do
@@ -155,6 +161,12 @@ function getDriver(d)
         local name = basename(d)
         name = name:gsub(".lua", "")
         return name, (driver.description or "No description")
+    end
+end
+
+function sendSerial(text)
+    if serialInputHandler then
+        serialInputHandler(text)
     end
 end
 
