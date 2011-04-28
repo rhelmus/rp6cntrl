@@ -2,22 +2,15 @@
 - UART/SPI: Set ready flag when ready (instead of always enabled)
 - Error handling; check UNDONE's
 - Thread safety:
-    - Lua
-    - ISRs
-    - Qt widgets
-        - Make log buffer for lua log bindings
-    - More?
+      - More?
 - IO register class: test all operators
 - Check delta for avrtimer when avr thread is running at 100%
-- Force terminate avr thread if necessary
 - Fix checkDelay for ioregister class
-    - only do within 'avr thread'
-    - tune/test when and how long should be nanosleep'd
-- Exit avr thread from register access
-- Check for initial port settings
-    - Applying these outside lua?
-- Enabling / disabling drivers during runtime
-- Handle nop and sysSleep macros
+    - Settings
+- Check for initial register settings
+    - Applying these outside lua
+- Enabling / disabling drivers during runtime?
+- Handle nop and sysSleep macros?
 - UI ideas
     - Lock layout
     - About

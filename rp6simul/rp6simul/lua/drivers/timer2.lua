@@ -1,5 +1,7 @@
 local ret = driver(...)
 
+description = "Driver for timer2."
+
 handledIORegisters = { avr.IO_TCCR2, avr.IO_OCR2, avr.IO_TIMSK }
 
 local timer
@@ -31,6 +33,11 @@ local function getPrescaler(data)
     -- return nil
 end
 
+local function setEnabled(e)
+    clock.enableTimer(timer, e)
+    updateRobotStatus("timer2", "status", (e and "enabled") or "disabled")
+end
+
 local function checkSettings()
     local tccr2 = avr.getIORegister(avr.IO_TCCR2)
     local ret = true
@@ -53,6 +60,7 @@ end
 function initPlugin()
     timer = clock.createTimer()
     timer:setTimeOut(avr.ISR_TIMER2_COMP_vect)
+    setEnabled(false)
 end
 
 function handleIOData(type, data)
@@ -62,14 +70,16 @@ function handleIOData(type, data)
             prescaler = ps
             timer:setPrescaler(ps)
             log(string.format("Changed timer2 prescaler to %d\n", ps))
+            updateRobotStatus("timer2", "prescaler", ps)
         end
 
         if timer:isEnabled() and not checkSettings() then
             warning("Disabling timer2\n")
-            clock.enableTimer(timer, false)
+            setEnabled(false)
         end
     elseif type == avr.IO_OCR2 then
         log(string.format("Setting timer2 compare to %d\n", data))
+        updateRobotStatus("timer2", "Compare value", data)
         timer:setCompareValue(data)
     elseif type == avr.IO_TIMSK then
         local e = bit.isSet(data, avr.OCIE2)
@@ -79,11 +89,11 @@ function handleIOData(type, data)
                     warning("Not enabling timer2\n")
                 else
                     log("Enabling timer2\n")
-                    clock.enableTimer(timer, e)
+                    setEnabled(true)
                 end
             else
                 log("Disabling timer2\n")
-                clock.enableTimer(timer, e)
+                setEnabled(false)
             end
         end
     end

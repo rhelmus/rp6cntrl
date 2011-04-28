@@ -1,7 +1,7 @@
 #ifndef PLUGINTHREAD_H
 #define PLUGINTHREAD_H
 
-#include "rp6simul.h"
+#include "simulator.h"
 
 #include <QThread>
 

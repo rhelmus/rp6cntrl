@@ -1,5 +1,7 @@
 local ret = driver(...)
 
+description = "Driver for the RP6 motor."
+
 handledIORegisters = {
     avr.IO_TCCR1A,
     avr.IO_TCCR1B,
@@ -98,6 +100,7 @@ local function setCompareRegisterA(data)
             clock.enableTimer(rightEncTimer, true)
         end
     end
+    updateRobotStatus("motor", "power", "right", data)
     return true
 end
 
@@ -115,6 +118,7 @@ local function setCompareRegisterB(data)
             clock.enableTimer(leftEncTimer, true)
         end
     end
+    updateRobotStatus("motor", "power", "left", data)
     return true
 end
 

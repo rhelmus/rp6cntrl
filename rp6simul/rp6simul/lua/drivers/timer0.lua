@@ -1,5 +1,7 @@
 local ret = driver(...)
 
+description = "Driver for timer0"
+
 handledIORegisters = { avr.IO_TCCR0, avr.IO_OCR0, avr.IO_TIMSK }
 
 local timer
@@ -45,9 +47,16 @@ local function checkSettings()
     return ret
 end
 
+local function setEnabled(e)
+    clock.enableTimer(timer, e)
+    updateRobotStatus("timer0", "status", (e and "enabled") or "disabled")
+end
+
+
 function initPlugin()
     timer = clock.createTimer()
     timer:setTimeOut(avr.ISR_TIMER0_COMP_vect)
+    setEnabled(false)
 end
 
 function handleIOData(type, data)
@@ -57,14 +66,16 @@ function handleIOData(type, data)
             prescaler = ps
             timer:setPrescaler(ps)
             log(string.format("Changed timer0 prescaler to %d\n", ps))
+            updateRobotStatus("timer0", "prescaler", ps)
         end
 
         if timer:isEnabled() and not checkSettings() then
             warning("Disabling timer0\n")
-            clock.enableTimer(timer, false)
+            setEnabled(false)
         end
     elseif type == avr.IO_OCR0 then
         log(string.format("Setting timer0 compare to %d\n", data))
+        updateRobotStatus("timer0", "Compare value", data)
         timer:setCompareValue(data)
     elseif type == avr.IO_TIMSK then
         local e = bit.isSet(data, avr.OCIE0)
@@ -74,11 +85,11 @@ function handleIOData(type, data)
                     warning("Not enabling timer0\n")
                 else
                     log("Enabling timer0\n")
-                    clock.enableTimer(timer, e)
+                    setEnabled(true)
                 end
             else
                 log("Disabling timer0\n")
-                clock.enableTimer(timer, e)
+                setEnabled(false)
             end
         end
     end

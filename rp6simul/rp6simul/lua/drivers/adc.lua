@@ -11,6 +11,8 @@ local ret = driver(...)
 --      6: Motor current left
 --      7: Battery
 
+description = "Driver for the RP6 ADC channels."
+
 handledIORegisters = {
     avr.IO_ADMUX,
     avr.IO_ADCSRA
@@ -32,6 +34,25 @@ local function getADCPort(data)
         end
     end
 end
+
+local function getPortString(port)
+    if port == 0 then
+        return "ADC0"
+    elseif port == 1 then
+        return "ADC1"
+    elseif port == 2 then
+        return "Right light sensor"
+    elseif port == 3 then
+        return "Left light sensor"
+    elseif port == 5 then
+        return "Right motor current"
+    elseif port == 6 then
+        return "Left motor current"
+    elseif port == 7 then
+        return "Battery"
+    end
+end
+
 
 function initPlugin()
     for i=0,7 do

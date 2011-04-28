@@ -1,5 +1,7 @@
 local ret = driver(...)
 
+description = "Driver for timer1. Note: this timer is normally used in PWM mode for the motor."
+
 -- UNDONE: Channel B support?
 -- UNDONE: L/H OCR support (same for other timers?)
 handledIORegisters = {
@@ -39,12 +41,17 @@ local function getPrescaler(data)
     -- return nil
 end
 
+local function setEnabled(e)
+    clock.enableTimer(timer, e)
+    updateRobotStatus("timer1", "status", (e and "enabled") or "disabled")
+end
+
 local function disableTimerCond(cond, reason)
     if not cond then
         warning(reason)
         if timer:isEnabled() then
             warning("Disabling timer1\n")
-            clock:setTimerEnabled(timer, false)
+            setEnabled(false)
         end
     end
 
@@ -66,6 +73,7 @@ local function setControlRegisterB(data)
             prescaler = ps
             timer:setPrescaler(ps)
             log(string.format("Changed timer1 prescaler to %d\n", ps))
+            updateRobotStatus("timer1", "prescaler", ps)
         end
 
         ret = (ps ~= nil)
@@ -80,12 +88,14 @@ end
 local function setCompareRegisterA(data)
     log(string.format("Setting timer1 compare A to %d\n", data))
     timer:setCompareValue(data)
+    updateRobotStatus("timer1", "Compare value A", data)
     return true
 end
 
 function initPlugin()
     timer = clock.createTimer()
     timer:setTimeOut(avr.ISR_TIMER1_COMPA_vect)
+    setEnabled(false)
 end
 
 function handleIOData(type, data)
@@ -107,13 +117,13 @@ function handleIOData(type, data)
 
                 if stat then
                     log("Enabling timer1\n")
-                    clock.enableTimer(timer, e)
+                    setEnabled(true)
                 else
                     warning("Not enabling timer1\n")
                 end
             else
                 log("Disabling timer1\n")
-                clock.enableTimer(timer, e)
+                setEnabled(false)
             end
         end
     elseif timer:isEnabled() then

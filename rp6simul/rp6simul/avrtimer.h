@@ -1,7 +1,7 @@
 #ifndef AVRTIMER_H
 #define AVRTIMER_H
 
-#include "rp6simul.h"
+#include "simulator.h"
 
 #include <stdint.h>
 #include <time.h>
@@ -171,7 +171,6 @@ class CAVRTimer
             nextTick -= trueCompareValue;
         nextTick += v;
         trueCompareValue = v;
-        qDebug() << "Updated timer TCV to" << v;
     }
     void timeOutLua(void);
 
@@ -192,7 +191,7 @@ public:
     void timeOut(void)
     {
         if (timeOutType == TIMEOUT_ISR)
-            CRP6Simulator::getInstance()->execISR(ISRTimeOut);
+            CSimulator::getInstance()->execISR(ISRTimeOut);
         else if (timeOutType == TIMEOUT_LUA)
             timeOutLua();
     }
@@ -224,6 +223,7 @@ public:
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);
     void start(void);
+    bool isActive(void) const;
 
 public slots:
     void stop(void);

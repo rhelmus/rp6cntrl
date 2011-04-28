@@ -1,5 +1,7 @@
 local ret = driver(...)
 
+description = "Driver that logs all port changes."
+
 handledIORegisters = {
     avr.IO_PORTA,
     avr.IO_PORTB,

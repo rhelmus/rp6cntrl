@@ -19,7 +19,8 @@ SOURCES += main.cpp\
     projectwizard.cpp \
     pathinput.cpp \
     projectsettings.cpp \
-    utils.cpp
+    utils.cpp \
+    simulator.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -29,7 +30,8 @@ HEADERS  += rp6simul.h \
     projectwizard.h \
     pathinput.h \
     projectsettings.h \
-    utils.h
+    utils.h \
+    simulator.h
 
 OTHER_FILES += \
     TODO.txt \
@@ -41,7 +43,8 @@ OTHER_FILES += \
     lua/drivers/uart.lua \
     lua/drivers/portlog.lua \
     lua/drivers/led.lua \
-    lua/drivers/adc.lua
+    lua/drivers/adc.lua \
+    lua/drivers/acs.lua
 
 INCLUDEPATH += /usr/include/lua5.1
 LIBS += -llua
