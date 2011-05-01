@@ -2,6 +2,7 @@
 #include "avrtimer.h"
 #include "lua.h"
 #include "projectwizard.h"
+#include "robotgraphicsitem.h"
 #include "simulator.h"
 #include "utils.h"
 
@@ -106,11 +107,58 @@ void CRP6Simulator::createToolbars()
 
 QWidget *CRP6Simulator::createMainWidget()
 {
-    QWidget *ret = new QWidget;
-    QVBoxLayout *vbox = new QVBoxLayout(ret);
+    QGraphicsScene *scene = new QGraphicsScene(this);
+    QRectF screct(-300.0, -300.0, 600.0, 600.0);
+    scene->setSceneRect(screct);
 
-    QPushButton *button = new QPushButton("Har!");
-    vbox->addWidget(button);
+    robotGraphicsItem = new CRobotGraphicsItem;
+    robotGraphicsItem->setPos(0, 50);
+    scene->addItem(robotGraphicsItem);
+
+    // Obstacle
+//    scene->addRect(-100, -100, 200, 50, QPen(), QBrush(Qt::red));
+    QGraphicsPixmapItem *p = scene->addPixmap(QPixmap("../resource/wooden-block.png").scaled(200.0, 100.0));
+    p->setPos(-100.0, -100.0);
+
+
+    // Edges
+    scene->addRect(screct.x(), screct.y(), screct.width(), 5, QPen(), QBrush(Qt::black));
+    scene->addRect(screct.x(), screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
+    scene->addRect(screct.x(), screct.bottom()-5, screct.width(), 5, QPen(), QBrush(Qt::black));
+    scene->addRect(screct.right()-5, screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
+
+    QWidget *ret = new QWidget;
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+
+    graphicsView = new QGraphicsView(scene);
+    graphicsView->setRenderHint(QPainter::Antialiasing);
+    graphicsView->setBackgroundBrush(QBrush(QPixmap("../resource/floor.jpg")));
+    new QShortcut(QKeySequence("+"), this, SLOT(zoomSceneIn()));
+    new QShortcut(QKeySequence("-"), this, SLOT(zoomSceneOut()));
+    hbox->addWidget(graphicsView);
+
+    QVBoxLayout *vbox = new QVBoxLayout;
+    hbox->addLayout(vbox);
+
+    QSpinBox *spinbox = new QSpinBox;
+    connect(spinbox, SIGNAL(valueChanged(int)), this,
+            SLOT(debugSetRobotLeftPower(int)));
+    spinbox->setRange(-100, 100);
+    new QShortcut(QKeySequence("Q"), spinbox, SLOT(stepDown()));
+    new QShortcut(QKeySequence("W"), spinbox, SLOT(stepUp()));
+    vbox->addWidget(spinbox);
+
+    spinbox = new QSpinBox;
+    connect(spinbox, SIGNAL(valueChanged(int)), this,
+            SLOT(debugSetRobotRightPower(int)));
+    spinbox->setRange(-100, 100);
+    new QShortcut(QKeySequence("A"), spinbox, SLOT(stepDown()));
+    new QShortcut(QKeySequence("S"), spinbox, SLOT(stepUp()));
+    vbox->addWidget(spinbox);
+
+    QTimer *timer = new QTimer(this);
+    QObject::connect(timer, SIGNAL(timeout()), scene, SLOT(advance()));
+    timer->start(1000 / 33);
 
     return ret;
 }
@@ -265,6 +313,16 @@ QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
 void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
 {
     logWidget->appendHtml(getLogOutput(type, text));
+}
+
+void CRP6Simulator::scaleGraphicsView(qreal f)
+{
+    // From Qt's elastic nodes example
+    qreal factor = graphicsView->transform().scale(f, f).mapRect(QRectF(0, 0, 1, 1)).width();
+    if (factor < 0.07 || factor > 100)
+        return;
+
+    graphicsView->scale(f, f);
 }
 
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
@@ -440,6 +498,16 @@ void CRP6Simulator::stopPlugin()
     serialSendButton->setEnabled(false);
 }
 
+void CRP6Simulator::zoomSceneIn()
+{
+    scaleGraphicsView(1.2);
+}
+
+void CRP6Simulator::zoomSceneOut()
+{
+    scaleGraphicsView(1/1.2);
+}
+
 void CRP6Simulator::sendSerialPressed()
 {
     NLua::CLuaLocker lualocker;
@@ -450,4 +518,14 @@ void CRP6Simulator::sendSerialPressed()
     serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));
 
     serialInputWidget->clear();
+}
+
+void CRP6Simulator::debugSetRobotLeftPower(int power)
+{
+    robotGraphicsItem->setLeftMotor(power);
+}
+
+void CRP6Simulator::debugSetRobotRightPower(int power)
+{
+    robotGraphicsItem->setRightMotor(power);
 }

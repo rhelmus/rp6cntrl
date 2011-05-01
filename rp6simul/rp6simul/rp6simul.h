@@ -9,6 +9,7 @@
 
 #include "lua.h"
 
+class QGraphicsView;
 class QPushButton;
 class QLCDNumber;
 class QLineEdit;
@@ -17,6 +18,7 @@ class QTableWidget;
 class QTreeWidget;
 
 class CProjectWizard;
+class CRobotGraphicsItem;
 class CSimulator;
 
 class CRP6Simulator : public QMainWindow
@@ -30,6 +32,8 @@ class CRP6Simulator : public QMainWindow
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
 
+    QGraphicsView *graphicsView;
+    CRobotGraphicsItem *robotGraphicsItem;
     QPlainTextEdit *logWidget;
     QPlainTextEdit *serialOutputWidget;
     QLineEdit *serialInputWidget;
@@ -57,6 +61,7 @@ class CRP6Simulator : public QMainWindow
     void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
+    void scaleGraphicsView(qreal f);
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
@@ -70,7 +75,11 @@ private slots:
     void openProject(void);
     void runPlugin(void);
     void stopPlugin(void);
+    void zoomSceneIn(void);
+    void zoomSceneOut(void);
     void sendSerialPressed(void);
+    void debugSetRobotLeftPower(int power);
+    void debugSetRobotRightPower(int power);
 
 public:
     CRP6Simulator(QWidget *parent = 0);
