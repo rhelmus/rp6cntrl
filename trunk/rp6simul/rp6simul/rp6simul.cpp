@@ -108,18 +108,21 @@ void CRP6Simulator::createToolbars()
 QWidget *CRP6Simulator::createMainWidget()
 {
     QGraphicsScene *scene = new QGraphicsScene(this);
-    QRectF screct(-300.0, -300.0, 600.0, 600.0);
+//    QRectF screct(-300.0, -300.0, 600.0, 600.0);
+    QRectF screct(0.0, 0.0, 900.0, 900.0);
     scene->setSceneRect(screct);
 
     robotGraphicsItem = new CRobotGraphicsItem;
-    robotGraphicsItem->setPos(0, 50);
+    robotGraphicsItem->setPos(50, 450);
     scene->addItem(robotGraphicsItem);
 
     // Obstacle
 //    scene->addRect(-100, -100, 200, 50, QPen(), QBrush(Qt::red));
-    QGraphicsPixmapItem *p = scene->addPixmap(QPixmap("../resource/wooden-block.png").scaled(200.0, 100.0));
-    p->setPos(-100.0, -100.0);
-
+    QGraphicsPixmapItem *p = scene->addPixmap(QPixmap("../resource/cardboard-box.png").scaledToWidth(200.0));
+    p->setPos(200.0, 200.0);
+    QGraphicsRectItem *shadow = new QGraphicsRectItem(p->boundingRect(), p);
+    shadow->setPen(Qt::NoPen);
+    shadow->setBrush(QColor(0, 0, 0, 100));
 
     // Edges
     scene->addRect(screct.x(), screct.y(), screct.width(), 5, QPen(), QBrush(Qt::black));
@@ -131,7 +134,7 @@ QWidget *CRP6Simulator::createMainWidget()
     QHBoxLayout *hbox = new QHBoxLayout(ret);
 
     graphicsView = new QGraphicsView(scene);
-    graphicsView->setRenderHint(QPainter::Antialiasing);
+    graphicsView->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     graphicsView->setBackgroundBrush(QBrush(QPixmap("../resource/floor.jpg")));
     new QShortcut(QKeySequence("+"), this, SLOT(zoomSceneIn()));
     new QShortcut(QKeySequence("-"), this, SLOT(zoomSceneOut()));
