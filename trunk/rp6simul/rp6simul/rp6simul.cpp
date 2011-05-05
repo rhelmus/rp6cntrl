@@ -3,6 +3,7 @@
 #include "lua.h"
 #include "projectwizard.h"
 #include "robotgraphicsitem.h"
+#include "robotscene.h"
 #include "simulator.h"
 #include "utils.h"
 
@@ -105,9 +106,20 @@ void CRP6Simulator::createToolbars()
     stopPluginAction->setEnabled(false);
 }
 
+qreal intensityAt(const QPointF &lightpos, const QPointF &pos)
+{
+    const qreal m_intensity = 750.0;
+    const qreal quadraticIntensity = 150 * m_intensity;
+    const qreal linearIntensity = 30 * m_intensity;
+    const qreal d = QLineF(lightpos, pos).length();
+    qDebug() << "Dist:" << d;
+    return quadraticIntensity / (d * d)
+            + linearIntensity / d;
+}
+
 QWidget *CRP6Simulator::createMainWidget()
 {
-    QGraphicsScene *scene = new QGraphicsScene(this);
+    CRobotScene *scene = new CRobotScene(this);
 //    QRectF screct(-300.0, -300.0, 600.0, 600.0);
     QRectF screct(0.0, 0.0, 900.0, 900.0);
     scene->setSceneRect(screct);
@@ -120,15 +132,191 @@ QWidget *CRP6Simulator::createMainWidget()
 //    scene->addRect(-100, -100, 200, 50, QPen(), QBrush(Qt::red));
     QGraphicsPixmapItem *p = scene->addPixmap(QPixmap("../resource/cardboard-box.png").scaledToWidth(200.0));
     p->setPos(200.0, 200.0);
-    QGraphicsRectItem *shadow = new QGraphicsRectItem(p->boundingRect(), p);
-    shadow->setPen(Qt::NoPen);
-    shadow->setBrush(QColor(0, 0, 0, 100));
 
     // Edges
     scene->addRect(screct.x(), screct.y(), screct.width(), 5, QPen(), QBrush(Qt::black));
     scene->addRect(screct.x(), screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
     scene->addRect(screct.x(), screct.bottom()-5, screct.width(), 5, QPen(), QBrush(Qt::black));
     scene->addRect(screct.right()-5, screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
+
+    scene->addLight(QPointF(250.0, 250.0), 500.0);
+    scene->addLight(QPointF(550.0, 350.0), 500.0);
+    scene->updateLighting();
+#if 0
+    const qreal constantIntensity = 60;
+    const qreal ssize = 50.0;
+
+    QList<QPointF> lights;
+    lights << QPointF(250.0, 250.0) << QPointF(600.0, 600.0);
+    for (float x=screct.x(); x<=screct.right(); x+=ssize)
+    {
+        for (float y=screct.y(); y<=screct.bottom(); y+=ssize)
+        {
+            QRectF srect(x, y, ssize, ssize);
+            QGraphicsRectItem *shadow = new QGraphicsRectItem(srect);
+            shadow->setPen(Qt::NoPen);
+
+            QPointF lightp;
+            qreal closestlight = -1.0;
+            foreach (QPointF l, lights)
+            {
+                const qreal dist = QLineF(l, srect.center()).length();
+                if ((closestlight < 0.0) || (dist < closestlight))
+                {
+                    lightp = l;
+                    closestlight = dist;
+                }
+            }
+
+            QLineF grline(lightp, srect.center());
+            grline.setLength(grline.length() - (ssize/2.0));
+            const QPointF grstart(grline.p2());
+//            qreal la = constantIntensity + intensityAt(grstart);
+
+            grline.setPoints(lightp, srect.center());
+            grline.setLength(grline.length() + (ssize/2.0));
+            const QPointF grend(grline.p2());
+//            qreal lb = constantIntensity + intensityAt(grend);
+
+            qreal la = constantIntensity, lb = constantIntensity;
+            foreach (QPointF l, lights)
+            {
+                la += intensityAt(l, grstart);
+                lb += intensityAt(l, grend);
+            }
+
+            QLinearGradient g(shadow->mapFromScene(grstart), shadow->mapFromScene(grend));
+
+#if 0
+            QList<QPointF> grpoints;
+            QLineF lightline;
+            QPointF st;
+            if (x <= lightp.x())
+                st.rx() = x;
+            else
+                st.rx() = srect.right();
+            if (y <= lightp.y())
+                st.ry() = y;
+            else
+                st.ry() = srect.bottom();
+
+            st = srect.center();
+            lightline.setPoints(lightp, st);
+            lightline.setLength(450.0);
+
+            QPointF intp;
+            if (lightline.intersect(QLineF(srect.topLeft(), srect.topRight()), &intp) == QLineF::BoundedIntersection)
+                grpoints << intp;
+            if (lightline.intersect(QLineF(srect.topLeft(), srect.bottomLeft()), &intp) == QLineF::BoundedIntersection)
+                grpoints << intp;
+            if (lightline.intersect(QLineF(srect.bottomLeft(), srect.bottomRight()), &intp) == QLineF::BoundedIntersection)
+                grpoints << intp;
+            if (lightline.intersect(QLineF(srect.topRight(), srect.bottomRight()), &intp) == QLineF::BoundedIntersection)
+                grpoints << intp;
+
+            qDebug() << "grpoints:" << grpoints.size() << lightline;
+//            Q_ASSERT(grpoints.size() == 2);
+            if (grpoints.size() < 2)
+                continue;
+
+            qreal la = constantIntensity + intensityAt(grpoints[0]);
+            qreal lb = constantIntensity + intensityAt(grpoints[1]);
+
+            QLinearGradient g(shadow->mapFromScene(grpoints[0]), shadow->mapFromScene(grpoints[1]));
+#endif
+
+            int va = qMax(0, 255 - int(la));
+            int vb = qMax(0, 255 - int(lb));
+
+            g.setColorAt(0, QColor(0, 0, 0, va));
+            g.setColorAt(1, QColor(0, 0, 0, vb));
+
+            shadow->setBrush(g);
+            shadow->setZValue(1);
+            scene->addItem(shadow);
+
+//            scene->addLine(QLineF(grstart, grend));
+
+#if 0
+            QGraphicsRectItem *shadow = new QGraphicsRectItem(QRectF(x, y, ssize, ssize));
+            shadow->setPen(Qt::NoPen);
+//            shadow->setPen(QPen(QColor(0, 0, 0, 0), 0.0));
+//            shadow->setBrush(QColor(0, 0, 0, 100));
+            QPointF gstart, gend;
+            const QRectF gr(shadow->boundingRect());
+            if (x <= 450.0)
+            {
+                gstart.rx() = gr.right();
+                gend.rx() = gr.left();
+            }
+            else
+            {
+                gstart.rx() = gr.left();
+                gend.rx() = gr.right();
+            }
+
+            if (y <= 450.0)
+            {
+                gstart.ry() = gr.bottom();
+                gend.ry() = gr.top();
+            }
+            else
+            {
+                gstart.ry() = gr.top();
+                gend.ry() = gr.bottom();
+            }
+
+
+            qreal la = constantIntensity + intensityAt(QPointF(x, y));
+            qreal lb = constantIntensity + intensityAt(QPointF(x+ssize, y+ssize));
+
+//            qreal la = constantIntensity + intensityAt(shadow->mapToScene(gstart));
+//            qreal lb = constantIntensity + intensityAt(shadow->mapToScene(gend));
+
+            qDebug() << "la/lb:" << la << lb;
+//            QLinearGradient g(shadow->boundingRect().topLeft(), shadow->boundingRect().topRight());
+            QLinearGradient g(gstart, gend);
+//            QRadialGradient g(shadow->mapFromScene(450.0, 450.0), 100.0);
+            int va = qMax(0, 255 - int(la));
+//            int va = 0;
+            int vb = qMax(0, 255 - int(lb));
+
+            g.setColorAt(0, QColor(0, 0, 0, va));
+            g.setColorAt(1, QColor(0, 0, 0, vb));
+//            g.setColorAt(0, QColor(0, 0, 0, 0));
+//            g.setColorAt(1, QColor(0, 0, 0, 120.0));
+
+            shadow->setBrush(g);
+            shadow->setZValue(1);
+            scene->addItem(shadow);
+#endif
+        }
+    }
+#endif
+#if 0
+    QRadialGradient g(450.0, 450.0, 600.0);
+    g.setColorAt(0, QColor(0, 0, 0, 0));
+    g.setColorAt(1, QColor(0, 0, 0, 180));
+    scene->setForegroundBrush(g);
+#endif
+
+#if 0
+    QGraphicsRectItem *r = scene->addRect(screct);
+    QRadialGradient g(250.0, 250.0, 300.0);
+    g.setColorAt(0, QColor(0, 0, 0, 0));
+    g.setColorAt(1, QColor(0, 0, 0, 90));
+    r->setBrush(g);
+    r->setPen(Qt::NoPen);
+    r->setZValue(10.0);
+
+    r = scene->addRect(screct);
+    g = QRadialGradient(750.0, 750.0, 300.0);
+    g.setColorAt(0, QColor(0, 0, 0, 0));
+    g.setColorAt(1, QColor(0, 0, 0, 90));
+    r->setBrush(g);
+    r->setPen(Qt::NoPen);
+    r->setZValue(10.0);
+#endif
 
     QWidget *ret = new QWidget;
     QHBoxLayout *hbox = new QHBoxLayout(ret);
