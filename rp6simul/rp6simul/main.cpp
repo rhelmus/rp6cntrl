@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
     sigaddset(&sset, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &sset, 0);
 
+    QApplication::setGraphicsSystem("raster"); // UNDONE
     QApplication a(argc, argv);
     CRP6Simulator w;
     w.show();
