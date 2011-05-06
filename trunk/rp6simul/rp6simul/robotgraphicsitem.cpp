@@ -152,6 +152,6 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 //        qDebug() << "intersected:" << inter;
     }
 
-    qDebug() << "len:" << line.length() << line << obstacles.isEmpty();
+//    qDebug() << "len:" << line.length() << line << obstacles.isEmpty();
     painter->drawLine(line);
 }

@@ -6,21 +6,25 @@
 class CLight
 {
     QPointF pos;
-    float intensity;
+    float radius;
 
 public:
-    CLight(const QPointF &p, float i) : pos(p), intensity(i) { }
+    CLight(const QPointF &p, float r) : pos(p), radius(r) { }
 
     float intensityAt(const QPointF &p) const;
     QPointF position(void) const { return pos; }
+    float fullRadius(void) const { return radius; }
+    float intenseRadius(void) const { return radius * 0.5; }
 };
 
 class CRobotScene : public QGraphicsScene
 {
     QList<CLight> lights;
+    QPointF mousePos;
 
 protected:
     virtual void drawForeground(QPainter *painter, const QRectF &rect);
+    virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
 
 public:
     explicit CRobotScene(QObject *parent = 0);

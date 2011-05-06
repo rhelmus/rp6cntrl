@@ -139,8 +139,8 @@ QWidget *CRP6Simulator::createMainWidget()
     scene->addRect(screct.x(), screct.bottom()-5, screct.width(), 5, QPen(), QBrush(Qt::black));
     scene->addRect(screct.right()-5, screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
 
-    scene->addLight(QPointF(250.0, 250.0), 500.0);
-    scene->addLight(QPointF(550.0, 350.0), 500.0);
+    scene->addLight(QPointF(250.0, 250.0), 200.0);
+    scene->addLight(QPointF(550.0, 250.0), 200.0);
     scene->updateLighting();
 #if 0
     const qreal constantIntensity = 60;
