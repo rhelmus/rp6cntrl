@@ -22,7 +22,8 @@ SOURCES += main.cpp\
     utils.cpp \
     simulator.cpp \
     robotgraphicsitem.cpp \
-    robotscene.cpp
+    robotscene.cpp \
+    resizablegraphicsitem.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -35,7 +36,8 @@ HEADERS  += rp6simul.h \
     utils.h \
     simulator.h \
     robotgraphicsitem.h \
-    robotscene.h
+    robotscene.h \
+    resizablegraphicsitem.h
 
 OTHER_FILES += \
     TODO.txt \

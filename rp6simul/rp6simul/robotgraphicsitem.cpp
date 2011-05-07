@@ -3,10 +3,8 @@
 #include <QtGui>
 
 CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
-    rightPower(0), skipFrames(0), robotRect(0.0, 0.0, 60.0, 100.0)
+    rightPower(0), skipFrames(0)
 {
-//    setBrush(QBrush(Qt::blue));
-//    setRect(robotRect);
     setPixmap(QPixmap("../resource/rp6-top.png"));
     setTransformOriginPoint(boundingRect().center());
     setTransformationMode(Qt::SmoothTransformation);
@@ -65,10 +63,6 @@ QList<QGraphicsItem *> CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpo
     const qreal oldrot = rotation();
 
     setRotation(rotation() + rotspeed);
-#if 0
-    setPos(pos() + dpos);
-    return QList<QGraphicsItem *>();
-#else
     QList<QGraphicsItem *> ret = collidingItems();
     if (!ret.isEmpty())
     {
@@ -85,7 +79,6 @@ QList<QGraphicsItem *> CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpo
     }
 
     return ret;
-#endif
 }
 
 void CRobotGraphicsItem::advance(int phase)
@@ -107,6 +100,7 @@ void CRobotGraphicsItem::paint(QPainter *painter,
                                QWidget *widget)
 {
     QGraphicsPixmapItem::paint(painter, option, widget);
+
     QPointF c(boundingRect().center());
     QLineF line(c.x(), 0.0, c.x(), -100.0);
 
@@ -117,7 +111,6 @@ void CRobotGraphicsItem::paint(QPainter *painter,
     {
         if (ob == this)
             continue;
-//        QPolygonF obpoly(ob->mapToScene(ob->boundingRect()));
         QPolygonF obpoly(mapFromItem(ob, ob->boundingRect()));
         for (QPolygonF::iterator it=obpoly.begin(); it!=(obpoly.end()-1); ++it)
         {
@@ -131,27 +124,7 @@ void CRobotGraphicsItem::paint(QPainter *painter,
             }
         }
 
-#if 0
-        QPolygonF inter(mapFromScene(poly.intersected(obpoly)));
-        if (!inter.isEmpty())
-        {
-            for (QPolygonF::iterator it=inter.begin(); it!=(inter.end()-1); ++it)
-            {
-                QLineF obl(*it, *(it+1));
-                QPointF interp;
-                if (line.intersect(obl, &interp) == QLineF::BoundedIntersection)
-                {
-                    QLineF tmp(line.p1(), interp);
-                    if (tmp.length() < line.length())
-                        line.setP2(interp);
-                }
-            }
-        }
-#endif
-
-//        qDebug() << "intersected:" << inter;
     }
 
-//    qDebug() << "len:" << line.length() << line << obstacles.isEmpty();
     painter->drawLine(line);
 }

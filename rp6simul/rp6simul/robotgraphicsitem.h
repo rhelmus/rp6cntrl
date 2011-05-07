@@ -7,7 +7,6 @@ class CRobotGraphicsItem : public QGraphicsPixmapItem
 {
     int leftPower, rightPower;
     int skipFrames;
-    const QRectF robotRect;
 
     QPointF mapDeltaPos(qreal x, qreal y) const;
     bool tryMove(float lpower, float rpower);
