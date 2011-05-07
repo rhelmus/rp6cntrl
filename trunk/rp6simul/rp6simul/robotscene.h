@@ -20,11 +20,9 @@ public:
 class CRobotScene : public QGraphicsScene
 {
     QList<CLight> lights;
-    QPointF mousePos;
 
 protected:
     virtual void drawForeground(QPainter *painter, const QRectF &rect);
-    virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
 
 public:
     explicit CRobotScene(QObject *parent = 0);
