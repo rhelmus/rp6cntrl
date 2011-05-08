@@ -101,6 +101,7 @@ void CResizableGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     const QGraphicsItem *handle = handles[pressedHandlePos];
     const QPointF hpos = mapFromItem(handle,
                                      handle->boundingRect().center());
+    const QRectF oldbound(boundRect);
     qreal mx = 0.0, my = 0.0;
     if (pressedHandlePos & HANDLE_LEFT)
     {
@@ -132,6 +133,30 @@ void CResizableGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
     if ((mx != 0.0) || (my != 0.0))
         moveBy(mx, my);
+
+
+    // UNDONE sub-childs?
+    QList<QGraphicsItem *> children = childItems();
+    const qreal sx = boundRect.width() / oldbound.width();
+    const qreal sy = boundRect.height() / oldbound.height();
+    foreach (QGraphicsItem *item, children)
+    {
+        bool ishandle = false;
+        foreach(QGraphicsItem *h, handles)
+        {
+            if (item == h)
+            {
+                ishandle = true;
+                break;
+            }
+        }
+
+        if (!ishandle)
+        {
+            item->setTransform(item->transform().scale(sx, sy));
+            item->setPos(item->pos().x() * sx, item->pos().y() * sy);
+        }
+    }
 
     adjustHandles();
 }

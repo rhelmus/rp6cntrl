@@ -136,6 +136,9 @@ QWidget *CRP6Simulator::createMainWidget()
     CResizableGraphicsItem *resi = new CResizableGraphicsItem;
     resi->setPos(450.0, 450.0);
     scene->addItem(resi);
+    QGraphicsRectItem *r = new QGraphicsRectItem(0.0, 0.0, 20.0, 20.0, resi);
+    r->setPos(40.0, 40.0);
+    r->setBrush(Qt::blue);
 
     // Edges
     scene->addRect(screct.x(), screct.y(), screct.width(), 5, QPen(), QBrush(Qt::black));
