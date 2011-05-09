@@ -129,16 +129,13 @@ QWidget *CRP6Simulator::createMainWidget()
     scene->addItem(robotGraphicsItem);
 
     // Obstacle
-    QGraphicsPixmapItem *p = scene->addPixmap(QPixmap("../resource/cardboard-box.png").scaledToWidth(200.0));
-    p->setPos(200.0, 200.0);
-    p->setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
-
-    CResizableGraphicsItem *resi = new CResizableGraphicsItem;
+//    QGraphicsPixmapItem *p = scene->addPixmap(QPixmap("../resource/cardboard-box.png").scaledToWidth(200.0));
+    QGraphicsPixmapItem *p = new QGraphicsPixmapItem(QPixmap("../resource/cardboard-box.png").scaledToWidth(200.0));
+//    p->setPos(200.0, 200.0);
+//    p->setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
+    CResizableGraphicsItem *resi = new CResizableGraphicsItem(p);
     resi->setPos(450.0, 450.0);
     scene->addItem(resi);
-    QGraphicsRectItem *r = new QGraphicsRectItem(0.0, 0.0, 20.0, 20.0, resi);
-    r->setPos(40.0, 40.0);
-    r->setBrush(Qt::blue);
 
     // Edges
     scene->addRect(screct.x(), screct.y(), screct.width(), 5, QPen(), QBrush(Qt::black));

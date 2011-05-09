@@ -20,10 +20,10 @@ class CResizableGraphicsItem : public QGraphicsItem
         HANDLE_BOTTOM = 0x08
     };
 
+    QGraphicsItem *containingItem;
     typedef QHash<int, QGraphicsItem *> THandleList;
     THandleList handles;
     int pressedHandlePos;
-    QRectF boundRect;
 
     void addHandle(int pos);
     void adjustHandles(void);
@@ -32,17 +32,13 @@ protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
-
-    // UNDONE
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
-    {
-        painter->drawRect(boundingRect());
-    }
+    void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) { }
 
 public:
-    CResizableGraphicsItem(QGraphicsItem *parent = 0);
+    CResizableGraphicsItem(QGraphicsItem *citem, QGraphicsItem *parent = 0);
 
-    QRectF boundingRect(void) const { return boundRect; }
+    QRectF boundingRect(void) const { return containingItem->boundingRect(); }
+//    QPainterPath shape(void) const { return containingItem->shape(); }
 };
 
 #endif // RESIZABLEGRAPHICSITEM_H
