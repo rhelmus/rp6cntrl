@@ -6,8 +6,18 @@
 #include <QGraphicsItem>
 #include <QGraphicsSceneMouseEvent>
 
-// UNDONE
-#include <QPainter>
+class CHandleGraphicsItem : public QGraphicsRectItem
+{
+protected:
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) { event->accept(); }
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) { event->accept(); }
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event) { event->accept(); }
+
+public:
+    CHandleGraphicsItem(qreal x, qreal y, qreal width, qreal height,
+                        QGraphicsItem *parent = 0)
+        : QGraphicsRectItem(x, y, width, height, parent) { }
+};
 
 class CResizableGraphicsItem : public QGraphicsItem
 {
@@ -27,18 +37,21 @@ class CResizableGraphicsItem : public QGraphicsItem
 
     void addHandle(int pos);
     void adjustHandles(void);
+    void updateGeometry(const QPointF &mousepos);
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
     void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) { }
+    bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
+    QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
 public:
     CResizableGraphicsItem(QGraphicsItem *citem, QGraphicsItem *parent = 0);
 
     QRectF boundingRect(void) const { return containingItem->boundingRect(); }
-//    QPainterPath shape(void) const { return containingItem->shape(); }
+    QPainterPath shape(void) const { return containingItem->shape(); }
 };
 
 #endif // RESIZABLEGRAPHICSITEM_H
