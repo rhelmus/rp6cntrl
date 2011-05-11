@@ -3,11 +3,47 @@
 #include <QtGui>
 
 CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
-    rightPower(0), skipFrames(0)
+    rightPower(0), skipFrames(0), pressedHandle(0)
 {
     setPixmap(QPixmap("../resource/rp6-top.png"));
     setTransformOriginPoint(boundingRect().center());
     setTransformationMode(Qt::SmoothTransformation);
+    setAcceptedMouseButtons(Qt::LeftButton);
+    setFlags(ItemIsSelectable | ItemIsMovable);
+
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT |
+              CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT |
+              CHandleGraphicsItem::HANDLE_BOTTOM);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
+              CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
+              CHandleGraphicsItem::HANDLE_BOTTOM);
+}
+
+void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
+{
+    QGraphicsRectItem *handle = new CHandleGraphicsItem(pos, this);
+    handle->hide();
+    handle->setCursor(Qt::OpenHandCursor);
+
+    QRectF hrect = handle->boundingRect();
+    const QRectF myrect(boundingRect());
+
+    hrect.moveCenter(myrect.center());
+
+    if (pos & CHandleGraphicsItem::HANDLE_LEFT)
+        hrect.moveLeft(myrect.left());
+    else if (pos & CHandleGraphicsItem::HANDLE_RIGHT)
+        hrect.moveRight(myrect.right());
+    if (pos & CHandleGraphicsItem::HANDLE_TOP)
+        hrect.moveTop(myrect.top());
+    else if (pos & CHandleGraphicsItem::HANDLE_BOTTOM)
+        hrect.moveBottom(myrect.bottom());
+
+    handle->setPos(hrect.topLeft());
+
+    handles[pos] = handle;
 }
 
 QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
@@ -95,6 +131,59 @@ void CRobotGraphicsItem::advance(int phase)
     tryMove(leftPower, rightPower);
 }
 
+void CRobotGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    setCursor(Qt::ClosedHandCursor);
+    QGraphicsItem::mousePressEvent(event);
+}
+
+void CRobotGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+{
+    setCursor(Qt::OpenHandCursor);
+    QGraphicsItem::mousePressEvent(event);
+}
+
+bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
+{
+    if (event->type() == QEvent::GraphicsSceneMousePress)
+    {
+        pressedHandle = dynamic_cast<CHandleGraphicsItem *>(watched);
+        Q_ASSERT(pressedHandle);
+    }
+    else if (event->type() == QEvent::GraphicsSceneMouseRelease)
+        pressedHandle = 0;
+    else if (event->type() == QEvent::GraphicsSceneMouseMove)
+    {
+        QGraphicsSceneMouseEvent *me =
+                static_cast<QGraphicsSceneMouseEvent*>(event);
+
+        const QPointF start(mapToScene(boundingRect().center()));
+        const QPointF end(mapToScene(mapFromItem(pressedHandle, me->pos())));
+        // 90.0 - ... : Convert from counter-clockwise + 90 to clockwise + 0
+        const qreal mangle = 90.0 - QLineF(start, end).angle();
+        setRotation(mangle);
+    }
+
+    return false; // Propegate
+}
+
+QVariant CRobotGraphicsItem::itemChange(GraphicsItemChange change,
+                                        const QVariant &value)
+{
+    if (change == ItemSceneHasChanged)
+    {
+        foreach(QGraphicsItem *h, handles)
+            h->installSceneEventFilter(this);
+    }
+    else if (change == ItemSelectedHasChanged)
+    {
+        foreach(QGraphicsItem *h, handles)
+            h->setVisible(value.toBool());
+    }
+
+    return QGraphicsItem::itemChange(change, value);
+}
+
 void CRobotGraphicsItem::paint(QPainter *painter,
                                const QStyleOptionGraphicsItem *option,
                                QWidget *widget)
@@ -127,4 +216,14 @@ void CRobotGraphicsItem::paint(QPainter *painter,
     }
 
     painter->drawLine(line);
+
+    if (option->state & QStyle::State_Selected)
+    {
+        painter->drawRect(boundingRect());
+
+        if (pressedHandle)
+        {
+//            painter->drawLine(mapFromItem(pressedHandle));
+        }
+    }
 }

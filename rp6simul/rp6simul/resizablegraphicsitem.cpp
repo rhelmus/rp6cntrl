@@ -2,45 +2,58 @@
 
 #include <QtGui>
 
+namespace {
+
+qreal scaleFactorX(const QTransform &tr)
+{
+    return tr.mapRect(QRectF(0.0, 0.0, 1.0, 1.0)).width();
+}
+
+qreal scaleFactorY(const QTransform &tr)
+{
+    return tr.mapRect(QRectF(0.0, 0.0, 1.0, 1.0)).height();
+}
+
+}
+
 CResizableGraphicsItem::CResizableGraphicsItem(QGraphicsItem *citem,
                                                QGraphicsItem *parent)
-    : QGraphicsItem(parent), containingItem(citem),
-      pressedHandlePos(HANDLE_NONE)
+    : QGraphicsItem(parent), containingItem(citem), pressedHandle(0)
 {
     citem->setParentItem(this);
 
     setFlags(ItemIsMovable | ItemIsSelectable);
     setCursor(Qt::OpenHandCursor);
+    setAcceptedMouseButtons(Qt::LeftButton);
 
-    addHandle(HANDLE_LEFT);
-    addHandle(HANDLE_RIGHT);
-    addHandle(HANDLE_TOP);
-    addHandle(HANDLE_BOTTOM);
-    addHandle(HANDLE_LEFT | HANDLE_TOP);
-    addHandle(HANDLE_LEFT | HANDLE_BOTTOM);
-    addHandle(HANDLE_RIGHT | HANDLE_TOP);
-    addHandle(HANDLE_RIGHT | HANDLE_BOTTOM);
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT);
+    addHandle(CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_BOTTOM);
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_BOTTOM);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_BOTTOM);
 
     adjustHandles();
 }
 
-void CResizableGraphicsItem::addHandle(int pos)
+void CResizableGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
 {
-    QGraphicsRectItem *handle =
-            new CHandleGraphicsItem(0.0, 0.0, 10.0, 10.0, this);
-    handle->setBrush(Qt::green);
-    handle->setPen(Qt::NoPen);
-    handle->setAcceptedMouseButtons(Qt::LeftButton);
+    QGraphicsRectItem *handle = new CHandleGraphicsItem(pos, this);
+    handle->hide();
 
-    if ((pos == HANDLE_LEFT) || (pos == HANDLE_RIGHT))
+    if ((pos == CHandleGraphicsItem::HANDLE_LEFT) ||
+        (pos == CHandleGraphicsItem::HANDLE_RIGHT))
         handle->setCursor(Qt::SizeHorCursor);
-    else if ((pos == HANDLE_TOP) || (pos == HANDLE_BOTTOM))
+    else if ((pos == CHandleGraphicsItem::HANDLE_TOP) ||
+             (pos == CHandleGraphicsItem::HANDLE_BOTTOM))
         handle->setCursor(Qt::SizeVerCursor);
-    else if ((pos == (HANDLE_LEFT | HANDLE_TOP)) ||
-             (pos == (HANDLE_RIGHT | HANDLE_BOTTOM)))
+    else if ((pos == (CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_TOP)) ||
+             (pos == (CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_BOTTOM)))
         handle->setCursor(Qt::SizeFDiagCursor);
-    else if ((pos == (HANDLE_LEFT | HANDLE_BOTTOM)) ||
-             (pos == (HANDLE_RIGHT | HANDLE_TOP)))
+    else if ((pos == (CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_BOTTOM)) ||
+             (pos == (CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_TOP)))
         handle->setCursor(Qt::SizeBDiagCursor);
 
     handles[pos] = handle;
@@ -48,44 +61,43 @@ void CResizableGraphicsItem::addHandle(int pos)
 
 void CResizableGraphicsItem::adjustHandles()
 {
-    // UNDONE: Clean
+    const QRectF myrect(boundingRect());
+    const qreal fpx = scaleFactorX(transform());
+    const qreal fpy = scaleFactorY(transform());
 
-    QRectF myrect(boundingRect());
     for (THandleList::iterator it=handles.begin(); it!= handles.end(); ++it)
     {
         QRectF hrect = it.value()->boundingRect();
+        qreal tx, ty;
 
         hrect.moveCenter(myrect.center());
-        if (it.key() & HANDLE_LEFT)
+
+        if (it.key() & CHandleGraphicsItem::HANDLE_LEFT)
+        {
             hrect.moveLeft(myrect.left());
-        if (it.key() & HANDLE_RIGHT)
+            tx = 0.0;
+        }
+        else if (it.key() & CHandleGraphicsItem::HANDLE_RIGHT)
+        {
             hrect.moveRight(myrect.right());
-        if (it.key() & HANDLE_TOP)
+            tx = it.value()->boundingRect().right();
+        }
+        if (it.key() & CHandleGraphicsItem::HANDLE_TOP)
+        {
             hrect.moveTop(myrect.top());
-        if (it.key() & HANDLE_BOTTOM)
+            ty = 0.0;
+        }
+        else if (it.key() & CHandleGraphicsItem::HANDLE_BOTTOM)
+        {
             hrect.moveBottom(myrect.bottom());
+            ty = it.value()->boundingRect().bottom();
+        }
 
         it.value()->setPos(hrect.topLeft());
-        qDebug() << "setPos:" << hrect.topLeft();
 
-        const qreal fpx = transform().mapRect(QRectF(0.0, 0.0, 1.0, 1.0)).width();
-        const qreal fpy = transform().mapRect(QRectF(0.0, 0.0, 1.0, 1.0)).height();
-        const qreal fix = it.value()->transform().mapRect(QRectF(0.0, 0.0, 1.0, 1.0)).width();
-        const qreal fiy = it.value()->transform().mapRect(QRectF(0.0, 0.0, 1.0, 1.0)).height();
-
-        qDebug() << "fpx/fpy/fix/fiy" << fpx << fpy << fix << fiy;
-
+        const qreal fix = scaleFactorX(it.value()->transform());
+        const qreal fiy = scaleFactorY(it.value()->transform());
         QTransform tr(it.value()->transform());
-
-        qreal tx, ty;
-        if (it.key() & HANDLE_LEFT)
-            tx = 0.0;
-        if (it.key() & HANDLE_RIGHT)
-            tx = it.value()->boundingRect().right();
-        if (it.key() & HANDLE_TOP)
-            ty = 0.0;
-        if (it.key() & HANDLE_BOTTOM)
-            ty = it.value()->boundingRect().bottom();
 
         tr.translate(tx, ty);
         tr.scale(1/(fpx*fix), 1/(fpy*fiy));
@@ -96,39 +108,40 @@ void CResizableGraphicsItem::adjustHandles()
 
 void CResizableGraphicsItem::updateGeometry(const QPointF &mousepos)
 {
-    Q_ASSERT(pressedHandlePos != HANDLE_NONE);
+    Q_ASSERT(pressedHandle);
 
     const qreal minsize = 20.0;
-    const QGraphicsItem *handle = handles[pressedHandlePos];
-    const QPointF hpos = mapFromItem(handle,
-                                     handle->boundingRect().center());
     const QRectF myrect(boundingRect());
+    const QPointF hpos = mapFromItem(pressedHandle,
+                                     pressedHandle->boundingRect().center());
+    const CHandleGraphicsItem::EHandlePosFlags handlepos =
+            pressedHandle->handlePosition();
     qreal sx = 1.0, sy = 1.0;
     qreal mx = 0.0, my = 0.0;
     qreal tx, ty;
 
-    if (pressedHandlePos & HANDLE_LEFT)
+    if (handlepos & CHandleGraphicsItem::HANDLE_LEFT)
     {
         tx = myrect.right();
         mx = mousepos.x() - hpos.x();
         if (mx <= (myrect.right() - minsize))
             sx = (myrect.right() - mx) / myrect.right();
     }
-    else if (pressedHandlePos & HANDLE_RIGHT)
+    else if (handlepos & CHandleGraphicsItem::HANDLE_RIGHT)
     {
         tx = 0.0;
         if (mousepos.x() > (myrect.left() + minsize))
             sx = (mousepos.x() / myrect.right());
     }
 
-    if (pressedHandlePos & HANDLE_TOP)
+    if (handlepos & CHandleGraphicsItem::HANDLE_TOP)
     {
         ty = myrect.bottom();
         my = mousepos.y() - hpos.y();
         if (my <= (myrect.bottom() - minsize))
             sy = (myrect.bottom() - my) / myrect.bottom();
     }
-    else if (pressedHandlePos & HANDLE_BOTTOM)
+    else if (handlepos & CHandleGraphicsItem::HANDLE_BOTTOM)
     {
         ty = 0.0;
         if (mousepos.y() > (myrect.top() + minsize))
@@ -137,7 +150,10 @@ void CResizableGraphicsItem::updateGeometry(const QPointF &mousepos)
 
     if ((sx != 1.0) || (sy != 1.0))
     {
-        qDebug() << "sx/sy/mx/my" << sx << sy << mx << my;
+        if (((scaleFactorX(transform()) * sx * myrect.width()) <= minsize) ||
+            ((scaleFactorY(transform()) * sy * myrect.height()) <= minsize))
+            return;
+
         QTransform tr(transform());
         tr.translate(tx, ty);
         tr.scale(sx, sy);
@@ -150,117 +166,30 @@ void CResizableGraphicsItem::updateGeometry(const QPointF &mousepos)
 
 void CResizableGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-//    if (event->button() != Qt::LeftButton)
-    {
-        QGraphicsItem::mousePressEvent(event);
-        return;
-    }
-
-    for (THandleList::iterator it=handles.begin(); it!= handles.end(); ++it)
-    {
-        if (it.value()->contains(it.value()->mapFromParent(event->pos())))
-        {
-            pressedHandlePos = it.key();
-            break;
-        }
-    }
-
-    // UNDONE
     setCursor(Qt::ClosedHandCursor);
-
-    if (pressedHandlePos == HANDLE_NONE)
-        QGraphicsItem::mousePressEvent(event);
+    QGraphicsItem::mousePressEvent(event);
 }
 
 void CResizableGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-//    pressedHandlePos = HANDLE_NONE;
-
-    if (event->button() == Qt::LeftButton)
-        setCursor(Qt::OpenHandCursor);
-
+    setCursor(Qt::OpenHandCursor);
     QGraphicsItem::mouseReleaseEvent(event);
-}
-
-void CResizableGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
-{
-//    if (pressedHandlePos == HANDLE_NONE)
-    {
-        QGraphicsItem::mouseMoveEvent(event);
-        return;
-    }
-
-    const qreal minsize = 20.0;
-    const QGraphicsItem *handle = handles[pressedHandlePos];
-    const QPointF hpos = mapFromItem(handle,
-                                     handle->boundingRect().center());
-    const QRectF myrect(boundingRect());
-    qreal sx = 1.0, sy = 1.0;
-    qreal mx = 0.0, my = 0.0;
-    qreal tx, ty;
-
-    if (pressedHandlePos & HANDLE_LEFT)
-    {
-        tx = myrect.right();
-        mx = event->pos().x() - hpos.x();
-        if (mx <= (myrect.right() - minsize))
-            sx = (myrect.right() - mx) / myrect.right();
-    }
-    else if (pressedHandlePos & HANDLE_RIGHT)
-    {
-        tx = 0.0;
-        if (event->pos().x() > (myrect.left() + minsize))
-            sx = (event->pos().x() / myrect.right());
-    }
-
-    if (pressedHandlePos & HANDLE_TOP)
-    {
-        ty = myrect.bottom();
-        my = event->pos().y() - hpos.y();
-        if (my <= (myrect.bottom() - minsize))
-            sy = (myrect.bottom() - my) / myrect.bottom();
-    }
-    else if (pressedHandlePos & HANDLE_BOTTOM)
-    {
-        ty = 0.0;
-        if (event->pos().y() > (myrect.top() + minsize))
-            sy = (event->pos().y() / myrect.bottom());
-    }
-
-    if ((sx != 1.0) || (sy != 1.0))
-    {
-        qDebug() << "sx/sy/mx/my" << sx << sy << mx << my;
-        QTransform tr(transform());
-        tr.translate(tx, ty);
-        tr.scale(sx, sy);
-        tr.translate(-tx, -ty);
-        setTransform(tr);
-    }
-
-    adjustHandles();
 }
 
 bool CResizableGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
                                               QEvent *event)
 {
-    qDebug() << "sceneEventFilter:" << event;
     if (event->type() == QEvent::GraphicsSceneMousePress)
     {
-        for (THandleList::iterator it=handles.begin(); it!=handles.end(); ++it)
-        {
-            if (it.value() == watched)
-                pressedHandlePos = it.key();
-        }
-
-        Q_ASSERT(pressedHandlePos != HANDLE_NONE);
+        pressedHandle = dynamic_cast<CHandleGraphicsItem *>(watched);
+        Q_ASSERT(pressedHandle);
     }
     else if (event->type() == QEvent::GraphicsSceneMouseRelease)
-        pressedHandlePos = HANDLE_NONE;
+        pressedHandle = 0;
     else if (event->type() == QEvent::GraphicsSceneMouseMove)
     {
         QGraphicsSceneMouseEvent *me =
                 static_cast<QGraphicsSceneMouseEvent*>(event);
-        qDebug() << "mouse move:" << me->pos();
         updateGeometry(mapFromItem(watched, me->pos()));
     }
 
@@ -270,12 +199,31 @@ bool CResizableGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
 QVariant CResizableGraphicsItem::itemChange(GraphicsItemChange change,
                                             const QVariant &value)
 {
-    qDebug() << "item change:" << change;
     if (change == ItemSceneHasChanged)
     {
-        for (THandleList::iterator it=handles.begin(); it!=handles.end(); ++it)
-            it.value()->installSceneEventFilter(this);
+        foreach(QGraphicsItem *h, handles)
+            h->installSceneEventFilter(this);
+    }
+    else if (change == ItemSelectedHasChanged)
+    {
+        foreach(QGraphicsItem *h, handles)
+            h->setVisible(value.toBool());
     }
 
     return QGraphicsItem::itemChange(change, value);
+}
+
+void CResizableGraphicsItem::setSize(qreal w, qreal h)
+{
+    const QRectF brect(boundingRect());
+    const QPointF c(brect.center());
+    QTransform tr(transform());
+
+    const qreal cursx = scaleFactorX(tr), cursy = scaleFactorY(tr);
+    const qreal sx = (w / brect.width()) / cursx;
+    const qreal sy = (h / brect.height()) / cursy;
+
+    tr.scale(sx, sy);
+    setTransform(tr);
+    adjustHandles();
 }
