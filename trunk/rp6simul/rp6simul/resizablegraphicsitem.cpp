@@ -26,9 +26,11 @@ CResizableGraphicsItem::CResizableGraphicsItem(QGraphicsItem *citem,
 
 void CResizableGraphicsItem::addHandle(int pos)
 {
-    QGraphicsRectItem *handle = new QGraphicsRectItem(0.0, 0.0, 10.0, 10.0, this);
+    QGraphicsRectItem *handle =
+            new CHandleGraphicsItem(0.0, 0.0, 10.0, 10.0, this);
     handle->setBrush(Qt::green);
     handle->setPen(Qt::NoPen);
+    handle->setAcceptedMouseButtons(Qt::LeftButton);
 
     if ((pos == HANDLE_LEFT) || (pos == HANDLE_RIGHT))
         handle->setCursor(Qt::SizeHorCursor);
@@ -92,9 +94,63 @@ void CResizableGraphicsItem::adjustHandles()
     }
 }
 
+void CResizableGraphicsItem::updateGeometry(const QPointF &mousepos)
+{
+    Q_ASSERT(pressedHandlePos != HANDLE_NONE);
+
+    const qreal minsize = 20.0;
+    const QGraphicsItem *handle = handles[pressedHandlePos];
+    const QPointF hpos = mapFromItem(handle,
+                                     handle->boundingRect().center());
+    const QRectF myrect(boundingRect());
+    qreal sx = 1.0, sy = 1.0;
+    qreal mx = 0.0, my = 0.0;
+    qreal tx, ty;
+
+    if (pressedHandlePos & HANDLE_LEFT)
+    {
+        tx = myrect.right();
+        mx = mousepos.x() - hpos.x();
+        if (mx <= (myrect.right() - minsize))
+            sx = (myrect.right() - mx) / myrect.right();
+    }
+    else if (pressedHandlePos & HANDLE_RIGHT)
+    {
+        tx = 0.0;
+        if (mousepos.x() > (myrect.left() + minsize))
+            sx = (mousepos.x() / myrect.right());
+    }
+
+    if (pressedHandlePos & HANDLE_TOP)
+    {
+        ty = myrect.bottom();
+        my = mousepos.y() - hpos.y();
+        if (my <= (myrect.bottom() - minsize))
+            sy = (myrect.bottom() - my) / myrect.bottom();
+    }
+    else if (pressedHandlePos & HANDLE_BOTTOM)
+    {
+        ty = 0.0;
+        if (mousepos.y() > (myrect.top() + minsize))
+            sy = (mousepos.y() / myrect.bottom());
+    }
+
+    if ((sx != 1.0) || (sy != 1.0))
+    {
+        qDebug() << "sx/sy/mx/my" << sx << sy << mx << my;
+        QTransform tr(transform());
+        tr.translate(tx, ty);
+        tr.scale(sx, sy);
+        tr.translate(-tx, -ty);
+        setTransform(tr);
+    }
+
+    adjustHandles();
+}
+
 void CResizableGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (event->button() != Qt::LeftButton)
+//    if (event->button() != Qt::LeftButton)
     {
         QGraphicsItem::mousePressEvent(event);
         return;
@@ -118,7 +174,7 @@ void CResizableGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void CResizableGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    pressedHandlePos = HANDLE_NONE;
+//    pressedHandlePos = HANDLE_NONE;
 
     if (event->button() == Qt::LeftButton)
         setCursor(Qt::OpenHandCursor);
@@ -128,7 +184,7 @@ void CResizableGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
 void CResizableGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (pressedHandlePos == HANDLE_NONE)
+//    if (pressedHandlePos == HANDLE_NONE)
     {
         QGraphicsItem::mouseMoveEvent(event);
         return;
@@ -178,8 +234,48 @@ void CResizableGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
         tr.translate(tx, ty);
         tr.scale(sx, sy);
         tr.translate(-tx, -ty);
-        setTransform(/*transform().scale(sx, sy)*/tr);
+        setTransform(tr);
     }
 
     adjustHandles();
+}
+
+bool CResizableGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
+                                              QEvent *event)
+{
+    qDebug() << "sceneEventFilter:" << event;
+    if (event->type() == QEvent::GraphicsSceneMousePress)
+    {
+        for (THandleList::iterator it=handles.begin(); it!=handles.end(); ++it)
+        {
+            if (it.value() == watched)
+                pressedHandlePos = it.key();
+        }
+
+        Q_ASSERT(pressedHandlePos != HANDLE_NONE);
+    }
+    else if (event->type() == QEvent::GraphicsSceneMouseRelease)
+        pressedHandlePos = HANDLE_NONE;
+    else if (event->type() == QEvent::GraphicsSceneMouseMove)
+    {
+        QGraphicsSceneMouseEvent *me =
+                static_cast<QGraphicsSceneMouseEvent*>(event);
+        qDebug() << "mouse move:" << me->pos();
+        updateGeometry(mapFromItem(watched, me->pos()));
+    }
+
+    return false; // Propegate
+}
+
+QVariant CResizableGraphicsItem::itemChange(GraphicsItemChange change,
+                                            const QVariant &value)
+{
+    qDebug() << "item change:" << change;
+    if (change == ItemSceneHasChanged)
+    {
+        for (THandleList::iterator it=handles.begin(); it!=handles.end(); ++it)
+            it.value()->installSceneEventFilter(this);
+    }
+
+    return QGraphicsItem::itemChange(change, value);
 }
