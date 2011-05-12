@@ -9,7 +9,8 @@ CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
     setTransformOriginPoint(boundingRect().center());
     setTransformationMode(Qt::SmoothTransformation);
     setAcceptedMouseButtons(Qt::LeftButton);
-    setFlags(ItemIsSelectable | ItemIsMovable);
+    // We do movable by ourselfs...gets messed up when doing rotations
+    setFlags(ItemIsSelectable);
 
     addHandle(CHandleGraphicsItem::HANDLE_LEFT |
               CHandleGraphicsItem::HANDLE_TOP);
@@ -134,7 +135,17 @@ void CRobotGraphicsItem::advance(int phase)
 void CRobotGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     setCursor(Qt::ClosedHandCursor);
+    lastMousePos = event->pos();
     QGraphicsItem::mousePressEvent(event);
+}
+
+void CRobotGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+{
+    QRectF r(boundingRect());
+    const QPointF offset(lastMousePos - r.center());
+    r.moveCenter(mapToParent(event->pos() - offset));
+    setPos(r.topLeft());
+    QGraphicsItem::mouseMoveEvent(event);
 }
 
 void CRobotGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)

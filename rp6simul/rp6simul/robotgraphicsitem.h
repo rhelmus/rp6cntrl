@@ -17,12 +17,14 @@ class CRobotGraphicsItem : public QGraphicsPixmapItem
 
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     QPointF mapDeltaPos(qreal x, qreal y) const;
+    QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
     bool tryMove(float lpower, float rpower);
     QList<QGraphicsItem *> tryDoMove(float rotspeed, QPointF dpos);
 
 protected:
     void advance(int phase);
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
     QVariant itemChange(GraphicsItemChange change, const QVariant &value);
