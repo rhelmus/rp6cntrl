@@ -93,6 +93,46 @@ void CRP6Simulator::createMenus()
     menu->addAction("About Qt", qApp, SLOT(aboutQt()));
 }
 
+QPixmap CRP6Simulator::createAddLightImage() const
+{
+    const QRectF rect(0.0, 0.0, 100.0, 100.0);
+    QPixmap ret(rect.size().toSize());
+
+    ret.fill(Qt::transparent);
+
+    QPainter painter(&ret);
+    QRadialGradient g(rect.center(), rect.width()/2);
+    g.setColorAt(0.0, QColor(255, 255, 0));
+    g.setColorAt(1.0, QColor(255, 140, 0));
+    painter.setBrush(g);
+    painter.setPen(Qt::NoPen);
+    painter.drawEllipse(rect);
+
+    return ret;
+}
+
+QPixmap CRP6Simulator::createLightSettingsImage() const
+{
+    QRectF rect(0.0, 0.0, 100.0, 100.0);
+    QPixmap ret(rect.size().toSize());
+
+    ret.fill(Qt::transparent);
+
+    QPainter painter(&ret);
+    QRadialGradient g(rect.center(), rect.width()/2);
+    g.setColorAt(0.0, QColor(255, 255, 0));
+    g.setColorAt(1.0, QColor(255, 140, 0));
+    painter.setBrush(g);
+    painter.setPen(Qt::NoPen);
+    painter.drawEllipse(rect);
+
+    rect.setTop(rect.height() / 4);
+    rect.setRight(rect.width() * 0.75);
+    painter.drawPixmap(rect.toRect(), QPixmap("../resource/configure.png"));
+
+    return ret;
+}
+
 void CRP6Simulator::createToolbars()
 {
     QToolBar *toolb = addToolBar("Run");
@@ -101,21 +141,29 @@ void CRP6Simulator::createToolbars()
     runPluginAction->setShortcut(tr("ctrl+R"));
     runPluginAction->setEnabled(false);
 
-    stopPluginAction = toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_MediaStop)), "Run",
+    stopPluginAction = toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_MediaStop)), "Stop",
                                         this, SLOT(stopPlugin()));
     stopPluginAction->setShortcut(tr("esc"));
     stopPluginAction->setEnabled(false);
-}
 
-qreal intensityAt(const QPointF &lightpos, const QPointF &pos)
-{
-    const qreal m_intensity = 750.0;
-    const qreal quadraticIntensity = 150 * m_intensity;
-    const qreal linearIntensity = 30 * m_intensity;
-    const qreal d = QLineF(lightpos, pos).length();
-    qDebug() << "Dist:" << d;
-    return quadraticIntensity / (d * d)
-            + linearIntensity / d;
+
+    addToolBar(Qt::LeftToolBarArea, toolb = new QToolBar("Edit map"));
+
+    toolb->addAction(QIcon("../resource/mouse-arrow.png"), "Selection mode");
+
+    toolb->addAction(QIcon("../resource/cardboard-box.png"), "Add box obstacle");
+
+    toolb->addAction(QIcon(createAddLightImage()), "Add light source");
+    toolb->addAction(QIcon(createLightSettingsImage()), "Edit light sources");
+
+    toolb->addAction(QIcon("../resource/remove.png"), "Remove item");
+
+    toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings");
+
+    toolb->addAction(QIcon("../resource/viewmag_.png"), "Zoom map out",
+                     this, SLOT(zoomSceneOut()));
+    toolb->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
+                     this, SLOT(zoomSceneIn()));
 }
 
 QWidget *CRP6Simulator::createMainWidget()
@@ -136,15 +184,29 @@ QWidget *CRP6Simulator::createMainWidget()
     scene->addItem(resi);
 
     // Edges
-    scene->addRect(screct.x(), screct.y(), screct.width(), 5, QPen(), QBrush(Qt::black));
-    scene->addRect(screct.x(), screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
-    scene->addRect(screct.x(), screct.bottom()-5, screct.width(), 5, QPen(), QBrush(Qt::black));
-    scene->addRect(screct.right()-5, screct.y(), 5, screct.height(), QPen(), QBrush(Qt::black));
+    const QSize blocksize(30, 30);
+    QPixmap blockpm =
+            QPixmap("../resource/wall.jpg").scaled(blocksize,
+                                                   Qt::IgnoreAspectRatio,
+                                                   Qt::SmoothTransformation);
+    // Top/bottom walls
+    for (int x=screct.x(); x<screct.width(); x+=blocksize.width())
+    {
+        scene->addPixmap(blockpm)->setPos(x, screct.y());
+        scene->addPixmap(blockpm)->setPos(x, screct.bottom()-blocksize.height());
+    }
+
+    // Left/right walls
+    for (int y=screct.y(); y<screct.width(); y+=blocksize.height())
+    {
+        scene->addPixmap(blockpm)->setPos(screct.x(), y);
+        scene->addPixmap(blockpm)->setPos(screct.right()-blocksize.width(), y);
+    }
 
     scene->addLight(QPointF(250.0, 250.0), 200.0);
     scene->addLight(QPointF(550.0, 250.0), 200.0);
-    scene->addLight(QPointF(450.0, 450.0), 200.0);
-    scene->updateLighting();
+    scene->addLight(QPointF(50.0, 50.0), 200.0);
+    scene->updateShadows();
 
     QWidget *ret = new QWidget;
     QHBoxLayout *hbox = new QHBoxLayout(ret);
@@ -336,9 +398,13 @@ void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
 
 void CRP6Simulator::scaleGraphicsView(qreal f)
 {
-    // From Qt's elastic nodes example
+    // Based on Qt's elastic nodes example
     qreal factor = graphicsView->transform().scale(f, f).mapRect(QRectF(0, 0, 1, 1)).width();
-    if (factor < 0.07 || factor > 100)
+    if (factor > 20.0)
+        return;
+
+    if ((f < 1.0) && (!graphicsView->horizontalScrollBar()->isVisible() &&
+            !graphicsView->verticalScrollBar()->isVisible()))
         return;
 
     graphicsView->scale(f, f);

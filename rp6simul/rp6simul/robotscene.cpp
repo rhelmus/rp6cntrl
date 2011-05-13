@@ -5,7 +5,7 @@
 float CLight::intensityAt(const QPointF &p) const
 {
     const float d = QLineF(pos, p).length() - intenseRadius();
-    const float maxintens = 255 - 80;
+    const float maxintens = 255 - 80; // UNDONE
 
     if (d < 0.0)
         return maxintens;
@@ -25,6 +25,8 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
     painter->save();
 
+    painter->drawImage(0, 0, shadowImage);
+
     painter->setCompositionMode(QPainter::CompositionMode_Overlay);
     painter->setPen(Qt::NoPen);
 
@@ -41,13 +43,13 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     painter->restore();
 }
 
-void CRobotScene::updateLighting()
+void CRobotScene::updateShadows()
 {
-    QImage image(sceneRect().size().toSize(), QImage::Format_ARGB32);
-    image.fill(Qt::transparent);
-    QPainter painter(&image);
+    shadowImage = QImage(sceneRect().size().toSize(), QImage::Format_ARGB32_Premultiplied);
+    shadowImage.fill(Qt::transparent);
+    QPainter painter(&shadowImage);
 
-    const int baseintensity = 255;
+    const int baseintensity = 255; // UNDONE
     for (int x=sceneRect().left(); x<=sceneRect().right(); ++x)
     {
         for (int y=sceneRect().top(); y<=sceneRect().bottom(); ++y)
@@ -63,5 +65,5 @@ void CRobotScene::updateLighting()
         }
     }
 
-    setForegroundBrush(QBrush(image));
+    update();
 }
