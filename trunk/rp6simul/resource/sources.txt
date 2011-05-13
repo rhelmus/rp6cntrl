@@ -1,1 +1,12 @@
+Floor and box textures from:
 http://zooboingreview.blogspot.com
+
+Wall texture from:
+http://www.freeseamlesstextures.com/
+
+RP6 texture:
+My camera :-) Do whatever you like with it (or send an improved version).
+
+Icons:
+- Oxygen theme
+- Mouse arrow: OpenZone (http://kde-look.org/content/show.php/OpenZone?content=111343)
