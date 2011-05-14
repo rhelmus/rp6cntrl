@@ -53,6 +53,7 @@ class CRP6Simulator : public QMainWindow
     void createMenus(void);
     QPixmap createAddLightImage(void) const;
     QPixmap createLightSettingsImage(void) const;
+    void setToolBarToolTips(void);
     void createToolbars(void);
     QWidget *createMainWidget(void);
     QWidget *createLogWidgets(void);

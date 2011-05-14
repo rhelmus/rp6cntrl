@@ -22,15 +22,22 @@ public:
 class CRobotScene : public QGraphicsScene
 {
     QList<CLight> lights;
+    QList<QGraphicsItem *> wallBlocks;
+    const QSizeF blockSize;
+    QPixmap blockPixmap;
+    QPixmap backGroundPixmap;
     QImage shadowImage;
 
 protected:
-    virtual void drawForeground(QPainter *painter, const QRectF &rect);
+    void drawBackground(QPainter *painter, const QRectF &rect);
+    void drawForeground(QPainter *painter, const QRectF &rect);
 
 public:
     explicit CRobotScene(QObject *parent = 0);
 
     void addLight(const QPointF &p, float i) { lights << CLight(p, i); }
+    void addVertWall(const QPointF &pos, float h);
+    void addHorizWall(const QPointF &pos, float w);
     void updateShadows(void);
 };
 

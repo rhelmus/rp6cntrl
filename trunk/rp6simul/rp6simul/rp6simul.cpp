@@ -133,6 +133,22 @@ QPixmap CRP6Simulator::createLightSettingsImage() const
     return ret;
 }
 
+void CRP6Simulator::setToolBarToolTips()
+{
+    QList<QToolBar *> toolbars = findChildren<QToolBar *>();
+    foreach (QToolBar *tb, toolbars)
+    {
+        QList<QAction *> acs = tb->actions();
+        foreach (QAction *a, acs)
+        {
+            QString s = a->shortcut().toString();
+            if (!s.isEmpty())
+                a->setToolTip(QString("<qt>%1<br><small>%2</small></qt>")
+                              .arg(a->toolTip()).arg(s));
+        }
+    }
+}
+
 void CRP6Simulator::createToolbars()
 {
     QToolBar *toolb = addToolBar("Run");
@@ -151,6 +167,8 @@ void CRP6Simulator::createToolbars()
 
     toolb->addAction(QIcon("../resource/mouse-arrow.png"), "Selection mode");
 
+    toolb->addAction(QIcon("../resource/wall.jpg"), "Add wall");
+
     toolb->addAction(QIcon("../resource/cardboard-box.png"), "Add box obstacle");
 
     toolb->addAction(QIcon(createAddLightImage()), "Add light source");
@@ -164,6 +182,8 @@ void CRP6Simulator::createToolbars()
                      this, SLOT(zoomSceneOut()));
     toolb->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
                      this, SLOT(zoomSceneIn()));
+
+    setToolBarToolTips();
 }
 
 QWidget *CRP6Simulator::createMainWidget()
@@ -183,25 +203,10 @@ QWidget *CRP6Simulator::createMainWidget()
     resi->setSize(300.0, 200.0);
     scene->addItem(resi);
 
-    // Edges
-    const QSize blocksize(30, 30);
-    QPixmap blockpm =
-            QPixmap("../resource/wall.jpg").scaled(blocksize,
-                                                   Qt::IgnoreAspectRatio,
-                                                   Qt::SmoothTransformation);
-    // Top/bottom walls
-    for (int x=screct.x(); x<screct.width(); x+=blocksize.width())
-    {
-        scene->addPixmap(blockpm)->setPos(x, screct.y());
-        scene->addPixmap(blockpm)->setPos(x, screct.bottom()-blocksize.height());
-    }
-
-    // Left/right walls
-    for (int y=screct.y(); y<screct.width(); y+=blocksize.height())
-    {
-        scene->addPixmap(blockpm)->setPos(screct.x(), y);
-        scene->addPixmap(blockpm)->setPos(screct.right()-blocksize.width(), y);
-    }
+    scene->addHorizWall(screct.topLeft(), screct.width());
+    scene->addHorizWall(screct.bottomLeft() - QPointF(0.0, 30.0), screct.width());
+    scene->addVertWall(screct.topLeft(), screct.height());
+    scene->addVertWall(screct.topRight() - QPointF(30.0, 0.0), screct.height());
 
     scene->addLight(QPointF(250.0, 250.0), 200.0);
     scene->addLight(QPointF(550.0, 250.0), 200.0);
@@ -213,7 +218,6 @@ QWidget *CRP6Simulator::createMainWidget()
 
     graphicsView = new QGraphicsView(scene);
     graphicsView->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-    graphicsView->setBackgroundBrush(QBrush(QPixmap("../resource/floor.jpg")));
     new QShortcut(QKeySequence("+"), this, SLOT(zoomSceneIn()));
     new QShortcut(QKeySequence("-"), this, SLOT(zoomSceneOut()));
     hbox->addWidget(graphicsView);
