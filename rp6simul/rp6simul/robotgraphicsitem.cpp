@@ -130,6 +130,17 @@ void CRobotGraphicsItem::advance(int phase)
     }
 
     tryMove(leftPower, rightPower);
+
+#if 0
+    const QPointF c(scene()->sceneRect().center());
+    QTransform tr;
+    tr.translate(c.x(), c.y());
+    tr.rotate(-rotation());
+    tr.translate(-c.x(), -c.y());
+    QGraphicsView *view = scene()->views()[0];
+    view->setTransform(tr);
+    view->centerOn(this);
+#endif
 }
 
 void CRobotGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)

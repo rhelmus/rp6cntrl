@@ -15,8 +15,23 @@ float CLight::intensityAt(const QPointF &p) const
 
 
 CRobotScene::CRobotScene(QObject *parent) :
-    QGraphicsScene(parent)
+    QGraphicsScene(parent), blockSize(30.0, 30.0),
+    blockPixmap(QPixmap("../resource/wall.jpg").scaled(blockSize.toSize(),
+                                                       Qt::IgnoreAspectRatio,
+                                                       Qt::SmoothTransformation)),
+    backGroundPixmap("../resource/floor.jpg")
 {
+    setBackgroundBrush(Qt::black);
+}
+
+void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
+{
+    QGraphicsScene::drawBackground(painter, rect);
+
+    painter->save();
+    painter->setBrush(backGroundPixmap);
+    painter->drawRect(sceneRect());
+    painter->restore();
 }
 
 void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
@@ -40,7 +55,43 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
         painter->drawEllipse(l.position(), rad, rad);
     }
 
+    painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
+
+    painter->setBrush(blockPixmap);
+    foreach (QGraphicsItem *w, wallBlocks)
+        painter->drawPolygon(w->mapToScene(w->boundingRect()));
+
     painter->restore();
+}
+
+void CRobotScene::addVertWall(const QPointF &pos, float h)
+{
+    QGraphicsRectItem *it;
+    for (float y=pos.y(); y<h; y+=blockSize.height())
+    {
+        if ((y + blockSize.height()) > h)
+            it = addRect(pos.x(), y, blockSize.width(), h);
+        else
+            it = addRect(pos.x(), y, blockSize.width(), blockSize.height());
+
+        it->setPen(Qt::NoPen);
+        wallBlocks << it;
+    }
+}
+
+void CRobotScene::addHorizWall(const QPointF &pos, float w)
+{
+    QGraphicsRectItem *it;
+    for (float x=pos.x(); x<w; x+=blockSize.width())
+    {
+        if ((x + blockSize.width()) > w)
+            it = addRect(x, pos.y(), w, blockSize.height());
+        else
+            it = addRect(x, pos.y(), blockSize.width(), blockSize.height());
+
+        it->setPen(Qt::NoPen);
+        wallBlocks << it;
+    }
 }
 
 void CRobotScene::updateShadows()

@@ -9,4 +9,4 @@ My camera :-) Do whatever you like with it (or send an improved version).
 
 Icons:
 - Oxygen theme
-- Mouse arrow: OpenZone (http://kde-look.org/content/show.php/OpenZone?content=111343)
+- Mouse arrow: DMZ (http://jimmac.musichall.cz/themes.php)
