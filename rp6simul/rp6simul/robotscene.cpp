@@ -19,9 +19,17 @@ CRobotScene::CRobotScene(QObject *parent) :
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(blockSize.toSize(),
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
-    backGroundPixmap("../resource/floor.jpg")
+    backGroundPixmap("../resource/floor.jpg"), mouseMode(MODE_WALL)
 {
     setBackgroundBrush(Qt::black);
+}
+
+QRectF CRobotScene::getDragRect() const
+{
+    QRectF ret;
+    ret.setTopLeft(mouseDragStartPos);
+    ret.setBottomRight(mousePos);
+    return ret;
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -58,40 +66,52 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
 
     painter->setBrush(blockPixmap);
-    foreach (QGraphicsItem *w, wallBlocks)
+    foreach (QGraphicsItem *w, walls.keys())
         painter->drawPolygon(w->mapToScene(w->boundingRect()));
+
+    if ((mouseMode == MODE_WALL) &&
+            (QApplication::mouseButtons() == Qt::LeftButton))
+    {
+        painter->setOpacity(0.75);
+        painter->setBrush(blockPixmap);
+        painter->drawRect(getDragRect());
+    }
 
     painter->restore();
 }
 
-void CRobotScene::addVertWall(const QPointF &pos, float h)
+void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    QGraphicsRectItem *it;
-    for (float y=pos.y(); y<h; y+=blockSize.height())
-    {
-        if ((y + blockSize.height()) > h)
-            it = addRect(pos.x(), y, blockSize.width(), h);
-        else
-            it = addRect(pos.x(), y, blockSize.width(), blockSize.height());
+    mouseDragStartPos = event->scenePos();
+    if (mouseMode == MODE_POINT)
+        QGraphicsScene::mousePressEvent(event);
+}
 
-        it->setPen(Qt::NoPen);
-        wallBlocks << it;
+void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+{
+    mousePos = event->scenePos();
+    if (mouseMode == MODE_POINT)
+        QGraphicsScene::mouseMoveEvent(event);
+    else
+        update(); // UNDONE
+}
+
+void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (mouseMode == MODE_POINT)
+        QGraphicsScene::mousePressEvent(event);
+    else if (mouseMode == MODE_WALL)
+    {
+        addWall(getDragRect(), false);
     }
 }
 
-void CRobotScene::addHorizWall(const QPointF &pos, float w)
+void CRobotScene::addWall(const QRectF &rect, bool st)
 {
     QGraphicsRectItem *it;
-    for (float x=pos.x(); x<w; x+=blockSize.width())
-    {
-        if ((x + blockSize.width()) > w)
-            it = addRect(x, pos.y(), w, blockSize.height());
-        else
-            it = addRect(x, pos.y(), blockSize.width(), blockSize.height());
-
-        it->setPen(Qt::NoPen);
-        wallBlocks << it;
-    }
+    it = addRect(rect);
+    it->setPen(Qt::NoPen);
+    walls[it] = st;
 }
 
 void CRobotScene::updateShadows()

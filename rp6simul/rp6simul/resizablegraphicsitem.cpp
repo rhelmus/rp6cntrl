@@ -22,7 +22,7 @@ CResizableGraphicsItem::CResizableGraphicsItem(QGraphicsItem *citem,
 {
     citem->setParentItem(this);
 
-    setFlags(ItemIsMovable | ItemIsSelectable);
+    setFlags(ItemIsSelectable);
     setCursor(Qt::OpenHandCursor);
     setAcceptedMouseButtons(Qt::LeftButton);
 
@@ -167,7 +167,34 @@ void CResizableGraphicsItem::updateGeometry(const QPointF &mousepos)
 void CResizableGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     setCursor(Qt::ClosedHandCursor);
+    lastMousePos = event->pos();
     QGraphicsItem::mousePressEvent(event);
+}
+
+void CResizableGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+{
+    QRectF r(mapToParent(boundingRect()).boundingRect());
+    const QPointF offset(mapToParent(lastMousePos) - r.center());
+    r.moveCenter(mapToParent(event->pos()) - offset);
+
+    // Align to grid
+    QPointF npos(r.topLeft());
+    const int gridsize = 10;
+    int rx = (int)npos.x() % gridsize, ry = (int)npos.y() % gridsize;
+
+    if (rx >= gridsize/2.0)
+        npos.rx() += (gridsize - rx);
+    else
+        npos.rx() -= rx;
+
+    if (ry >= gridsize/2.0)
+        npos.ry() += (gridsize - ry);
+    else
+        npos.ry() -= ry;
+
+    setPos(npos);
+
+    QGraphicsItem::mouseMoveEvent(event);
 }
 
 void CResizableGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)

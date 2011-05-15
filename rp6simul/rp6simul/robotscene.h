@@ -2,6 +2,7 @@
 #define ROBOTSCENE_H
 
 #include <QGraphicsScene>
+#include <QHash>
 
 class QImage;
 
@@ -22,22 +23,32 @@ public:
 class CRobotScene : public QGraphicsScene
 {
     QList<CLight> lights;
-    QList<QGraphicsItem *> wallBlocks;
+    QHash<QGraphicsItem *, bool> walls;
     const QSizeF blockSize;
     QPixmap blockPixmap;
     QPixmap backGroundPixmap;
     QImage shadowImage;
+    QPointF mousePos, mouseDragStartPos;
+
+    enum EMouseMode { MODE_POINT, MODE_WALL };
+    EMouseMode mouseMode;
+
+    QRectF getDragRect(void) const;
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
     void drawForeground(QPainter *painter, const QRectF &rect);
+    void mousePressEvent(QGraphicsSceneMouseEvent *event);
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
 
 public:
     explicit CRobotScene(QObject *parent = 0);
 
     void addLight(const QPointF &p, float i) { lights << CLight(p, i); }
-    void addVertWall(const QPointF &pos, float h);
-    void addHorizWall(const QPointF &pos, float w);
+    void addWall(const QRectF &rect, bool st);
+    void addWall(qreal x, qreal y, qreal w, qreal h, bool st)
+    { addWall(QRectF(x, y, w, h), st); }
     void updateShadows(void);
 };
 

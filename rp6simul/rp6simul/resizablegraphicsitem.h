@@ -13,6 +13,7 @@ class CResizableGraphicsItem : public QGraphicsItem
     typedef QHash<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
     THandleList handles;
     CHandleGraphicsItem *pressedHandle;
+    QPointF lastMousePos;
 
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     void adjustHandles(void);
@@ -20,6 +21,7 @@ class CResizableGraphicsItem : public QGraphicsItem
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
     void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) { }
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
