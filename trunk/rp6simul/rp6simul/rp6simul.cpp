@@ -203,10 +203,10 @@ QWidget *CRP6Simulator::createMainWidget()
     resi->setSize(300.0, 200.0);
     scene->addItem(resi);
 
-    scene->addHorizWall(screct.topLeft(), screct.width());
-    scene->addHorizWall(screct.bottomLeft() - QPointF(0.0, 30.0), screct.width());
-    scene->addVertWall(screct.topLeft(), screct.height());
-    scene->addVertWall(screct.topRight() - QPointF(30.0, 0.0), screct.height());
+    scene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
+    scene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
+    scene->addWall(screct.x(), screct.y(), 30.0, screct.height(), true);
+    scene->addWall(screct.right()-30.0, screct.y(), 30.0, screct.height(), true);
 
     scene->addLight(QPointF(250.0, 250.0), 200.0);
     scene->addLight(QPointF(550.0, 250.0), 200.0);
@@ -218,6 +218,7 @@ QWidget *CRP6Simulator::createMainWidget()
 
     graphicsView = new QGraphicsView(scene);
     graphicsView->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+    graphicsView->setMouseTracking(true);
     new QShortcut(QKeySequence("+"), this, SLOT(zoomSceneIn()));
     new QShortcut(QKeySequence("-"), this, SLOT(zoomSceneOut()));
     hbox->addWidget(graphicsView);

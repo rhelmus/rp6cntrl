@@ -54,6 +54,7 @@ void CSerialPort::onReadyRead()
 
     if (index == -1)
     {
+        qDebug() << "raw" << msgBuffer;
         // Only raw text
         textBuffer += msgBuffer;
         msgBuffer.clear();
