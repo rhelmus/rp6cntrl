@@ -34,6 +34,7 @@ public:
     QPainterPath shape(void) const { return containingItem->shape(); }
 
     void setSize(qreal w, qreal h);
+    void setSize(const QSizeF &s) { setSize(s.width(), s.height()); }
 };
 
 #endif // RESIZABLEGRAPHICSITEM_H

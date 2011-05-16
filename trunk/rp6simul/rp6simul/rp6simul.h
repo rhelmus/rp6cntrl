@@ -19,6 +19,7 @@ class QTreeWidget;
 
 class CProjectWizard;
 class CRobotGraphicsItem;
+class CRobotScene;
 class CSimulator;
 
 class CRP6Simulator : public QMainWindow
@@ -31,7 +32,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
-
+    CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     CRobotGraphicsItem *robotGraphicsItem;
     QPlainTextEdit *logWidget;
@@ -78,6 +79,7 @@ private slots:
     void openProject(void);
     void runPlugin(void);
     void stopPlugin(void);
+    void changeSceneMouseMode(QAction *a);
     void zoomSceneIn(void);
     void zoomSceneOut(void);
     void sendSerialPressed(void);

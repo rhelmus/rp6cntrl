@@ -22,15 +22,19 @@ public:
 
 class CRobotScene : public QGraphicsScene
 {
+public:
+    enum EMouseMode { MODE_POINT, MODE_WALL, MODE_BOX, MODE_LIGHT, MODE_DELETE };
+
+private:
+    Q_OBJECT
+
     QList<CLight> lights;
     QHash<QGraphicsItem *, bool> walls;
     const QSizeF blockSize;
-    QPixmap blockPixmap;
+    QPixmap blockPixmap, boxPixmap;
     QPixmap backGroundPixmap;
     QImage shadowImage;
-    QPointF mousePos, mouseDragStartPos;
-
-    enum EMouseMode { MODE_POINT, MODE_WALL };
+    QPointF mousePos, mouseDragStartPos;    
     EMouseMode mouseMode;
 
     QRectF getDragRect(void) const;
@@ -50,6 +54,9 @@ public:
     void addWall(qreal x, qreal y, qreal w, qreal h, bool st)
     { addWall(QRectF(x, y, w, h), st); }
     void updateShadows(void);
+
+public slots:
+    void setMouseMode(EMouseMode mode) { mouseMode = mode; update(); }
 };
 
 #endif // ROBOTSCENE_H

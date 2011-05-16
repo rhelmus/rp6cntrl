@@ -1,4 +1,5 @@
 #include "robotscene.h"
+#include "resizablegraphicsitem.h"
 
 #include <QtGui>
 
@@ -19,6 +20,7 @@ CRobotScene::CRobotScene(QObject *parent) :
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(blockSize.toSize(),
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
+    boxPixmap("../resource/cardboard-box.png"),
     backGroundPixmap("../resource/floor.jpg"), mouseMode(MODE_WALL)
 {
     setBackgroundBrush(Qt::black);
@@ -69,12 +71,19 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     foreach (QGraphicsItem *w, walls.keys())
         painter->drawPolygon(w->mapToScene(w->boundingRect()));
 
-    if ((mouseMode == MODE_WALL) &&
-            (QApplication::mouseButtons() == Qt::LeftButton))
+    if (QApplication::mouseButtons() == Qt::LeftButton)
     {
-        painter->setOpacity(0.75);
-        painter->setBrush(blockPixmap);
-        painter->drawRect(getDragRect());
+        if (mouseMode == MODE_WALL)
+        {
+            painter->setOpacity(0.75);
+            painter->setBrush(blockPixmap);
+            painter->drawRect(getDragRect());
+        }
+        else if (mouseMode == MODE_BOX)
+        {
+            painter->setOpacity(0.75);
+            painter->drawPixmap(getDragRect().toRect(), boxPixmap);
+        }
     }
 
     painter->restore();
@@ -92,8 +101,9 @@ void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     mousePos = event->scenePos();
     if (mouseMode == MODE_POINT)
         QGraphicsScene::mouseMoveEvent(event);
-    else
-        update(); // UNDONE
+    else if ((mouseMode == MODE_WALL) || (mouseMode == MODE_BOX) ||
+             (mouseMode == MODE_LIGHT))
+        update();
 }
 
 void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
@@ -101,8 +111,15 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     if (mouseMode == MODE_POINT)
         QGraphicsScene::mousePressEvent(event);
     else if (mouseMode == MODE_WALL)
-    {
         addWall(getDragRect(), false);
+    else if (mouseMode == MODE_BOX)
+    {
+        QGraphicsPixmapItem *p = new QGraphicsPixmapItem(boxPixmap);
+        CResizableGraphicsItem *resi = new CResizableGraphicsItem(p);
+        const QRectF r(getDragRect());
+        resi->setPos(r.topLeft());
+        resi->setSize(r.size());
+        addItem(resi);
     }
 }
 
