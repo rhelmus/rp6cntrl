@@ -14,7 +14,8 @@ class CLight
 public:
     CLight(const QPointF &p, float r) : pos(p), radius(r) { }
 
-    float intensityAt(const QPointF &p) const;
+    float intensityAt(const QPointF &p,
+                      const QList<QPolygonF> &obstacles) const;
     QPointF position(void) const { return pos; }
     float fullRadius(void) const { return radius; }
     float intenseRadius(void) const { return radius * 0.5; }
@@ -33,7 +34,7 @@ private:
     const QSizeF blockSize;
     QPixmap blockPixmap, boxPixmap;
     QPixmap backGroundPixmap;
-    QImage shadowImage;
+    QImage shadowImage, lightImage;
     QPointF mousePos, mouseDragStartPos;    
     EMouseMode mouseMode;
 
