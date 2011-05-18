@@ -36,6 +36,7 @@ private:
     QPixmap backGroundPixmap;
     QImage shadowImage, lightImage;
     QPointF mousePos, mouseDragStartPos;    
+    bool dragging;
     EMouseMode mouseMode;
 
     QRectF getDragRect(void) const;
