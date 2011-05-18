@@ -3,6 +3,7 @@
 #include "lua.h"
 #include "projectwizard.h"
 #include "resizablegraphicsitem.h"
+#include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
 #include "robotscene.h"
 #include "simulator.h"
@@ -229,6 +230,11 @@ QWidget *CRP6Simulator::createMainWidget()
     resi->setPos(450.0, 450.0);
     resi->setSize(300.0, 200.0);
     robotScene->addItem(resi);
+
+    CResizablePixmapGraphicsItem *rpi = new CResizablePixmapGraphicsItem(QPixmap("../resource/cardboard-box.png"));
+    rpi->setPos(450.0, 600.0);
+    rpi->setSize(100.0, 100.0);
+    robotScene->addItem(rpi);
 
     robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
     robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
