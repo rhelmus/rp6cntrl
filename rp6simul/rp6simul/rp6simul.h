@@ -9,6 +9,7 @@
 
 #include "lua.h"
 
+class QActionGroup;
 class QGraphicsView;
 class QPushButton;
 class QLCDNumber;
@@ -32,6 +33,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
+    QActionGroup *editMapActionGroup;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     CRobotGraphicsItem *robotGraphicsItem;
@@ -82,6 +84,7 @@ private slots:
     void changeSceneMouseMode(QAction *a);
     void zoomSceneIn(void);
     void zoomSceneOut(void);
+    void toggleEditMap(bool checked);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);

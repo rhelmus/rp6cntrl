@@ -17,3 +17,6 @@
     - Enable/disable dockwidgets
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
+- Map:
+    - Import from other project files
+    - Following robot

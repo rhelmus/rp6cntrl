@@ -3,11 +3,12 @@
 #include <QtGui>
 
 CResizablePixmapGraphicsItem::CResizablePixmapGraphicsItem(const QPixmap &pm,
+                                                           bool t,
                                                            QGraphicsItem *parent)
-    : QGraphicsItem(parent), pixmap(pm), pressedHandle(0), hasShape(false)
+    : QGraphicsItem(parent), pixmap(pm), tiled(t), isMovable(true),
+      isResizable(true), pressedHandle(0), dragging(false), hasShape(false)
 {
     setFlags(ItemIsSelectable);
-    setCursor(Qt::OpenHandCursor);
     setAcceptedMouseButtons(Qt::LeftButton);
 
     addHandle(CHandleGraphicsItem::HANDLE_LEFT);
@@ -20,6 +21,14 @@ CResizablePixmapGraphicsItem::CResizablePixmapGraphicsItem(const QPixmap &pm,
     addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_BOTTOM);
 
     adjustHandles();
+}
+
+void CResizablePixmapGraphicsItem::updateMouseCursor(bool selected)
+{
+    if (!selected || !isMovable)
+        setCursor(Qt::ArrowCursor);
+    else
+        setCursor(Qt::SizeAllCursor);
 }
 
 void CResizablePixmapGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -116,53 +125,68 @@ void CResizablePixmapGraphicsItem::updateGeometry(const QPointF &mousepos)
 
 void CResizablePixmapGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    setCursor(Qt::ClosedHandCursor);
-    lastMousePos = event->pos();
+    if (isMovable)
+    {
+        lastMousePos = event->pos();
+        dragging = true;
+    }
+
     QGraphicsItem::mousePressEvent(event);
 }
 
 void CResizablePixmapGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
-    QRectF r(boundingRect());
-    const QPointF offset(lastMousePos - r.center());
-    r.moveCenter(mapToParent(event->pos() - offset));
+    if (dragging)
+    {
+        QRectF r(boundingRect());
+        const QPointF offset(lastMousePos - r.center());
+        r.moveCenter(mapToParent(event->pos() - offset));
 
-    // Align to grid
-    QPointF npos(r.topLeft());
-    const int gridsize = 10;
-    int rx = (int)npos.x() % gridsize, ry = (int)npos.y() % gridsize;
+        // Align to grid
+        QPointF npos(r.topLeft());
+        const int gridsize = 10;
+        int rx = (int)npos.x() % gridsize, ry = (int)npos.y() % gridsize;
 
-    if (rx >= gridsize/2.0)
-        npos.rx() += (gridsize - rx);
-    else
-        npos.rx() -= rx;
+        if (rx >= gridsize/2.0)
+            npos.rx() += (gridsize - rx);
+        else
+            npos.rx() -= rx;
 
-    if (ry >= gridsize/2.0)
-        npos.ry() += (gridsize - ry);
-    else
-        npos.ry() -= ry;
+        if (ry >= gridsize/2.0)
+            npos.ry() += (gridsize - ry);
+        else
+            npos.ry() -= ry;
 
-    setPos(npos);
+        setPos(npos);
+    }
 
     QGraphicsItem::mouseMoveEvent(event);
 }
 
 void CResizablePixmapGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    setCursor(Qt::OpenHandCursor);
+    if (isMovable)
+        dragging = false;
+
     QGraphicsItem::mouseReleaseEvent(event);
 }
 
 void CResizablePixmapGraphicsItem::paint(QPainter *painter,
-                                         const QStyleOptionGraphicsItem *option,
-                                         QWidget *widget)
+                                         const QStyleOptionGraphicsItem *,
+                                         QWidget *)
 {
-    painter->drawPixmap(boundRect.toRect(), pixmap);
+    if (tiled)
+        painter->drawTiledPixmap(boundRect.toRect(), pixmap);
+    else
+        painter->drawPixmap(boundRect.toRect(), pixmap);
 }
 
 bool CResizablePixmapGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
                                                     QEvent *event)
 {
+    if (!isResizable)
+        return false;
+
     if (event->type() == QEvent::GraphicsSceneMousePress)
     {
         pressedHandle = dynamic_cast<CHandleGraphicsItem *>(watched);
@@ -190,8 +214,12 @@ QVariant CResizablePixmapGraphicsItem::itemChange(GraphicsItemChange change,
     }
     else if (change == ItemSelectedHasChanged)
     {
-        foreach(QGraphicsItem *h, handles)
-            h->setVisible(value.toBool());
+        if (isResizable)
+        {
+            updateMouseCursor(value.toBool());
+            foreach(QGraphicsItem *h, handles)
+                h->setVisible(value.toBool());
+        }
     }
 
     return QGraphicsItem::itemChange(change, value);
@@ -201,14 +229,20 @@ QPainterPath CResizablePixmapGraphicsItem::shape() const
 {
     if (!hasShape)
     {
-        hasShape = true;
+        hasShape = true;           
         pmShape = QPainterPath();
-        QBitmap mask = pixmap.scaled(boundRect.size().toSize()).mask();
-        Q_ASSERT(!mask.isNull());
-        if (!mask.isNull())
-            pmShape.addRegion(QRegion(mask));
-        else
+
+        if (tiled)
             pmShape.addRect(boundRect);
+        else
+        {
+            QBitmap mask = pixmap.scaled(boundRect.size().toSize()).mask();
+            Q_ASSERT(!mask.isNull());
+            if (!mask.isNull())
+                pmShape.addRegion(QRegion(mask));
+            else
+                pmShape.addRect(boundRect);
+        }
     }
 
     return pmShape;
@@ -220,4 +254,23 @@ void CResizablePixmapGraphicsItem::setSize(const QSizeF &s)
     boundRect.setSize(s);
     adjustHandles();
     hasShape = false;
+}
+
+void CResizablePixmapGraphicsItem::setMovable(bool m)
+{
+    isMovable = m;
+    updateMouseCursor(isSelected());
+}
+
+void CResizablePixmapGraphicsItem::setResizable(bool r)
+{
+    isResizable = r;
+    if (!r)
+        pressedHandle = 0;
+
+    if (isSelected())
+    {
+        foreach(QGraphicsItem *h, handles)
+            h->setVisible(r);
+    }
 }

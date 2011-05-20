@@ -4,8 +4,6 @@
 #include <QGraphicsScene>
 #include <QHash>
 
-class QImage;
-
 class CLight
 {
     QPointF pos;
@@ -31,13 +29,16 @@ private:
 
     QList<CLight> lights;
     QHash<QGraphicsItem *, bool> walls;
+    QHash<QGraphicsItem *, QPointF> oldWallPositions;
     const QSizeF blockSize;
     QPixmap blockPixmap, boxPixmap;
     QPixmap backGroundPixmap;
     QImage shadowImage, lightImage;
+    bool lightingDirty;
     QPointF mousePos, mouseDragStartPos;    
     bool dragging;
     EMouseMode mouseMode;
+    bool editModeEnabled;
 
     QRectF getDragRect(void) const;
 
@@ -55,10 +56,10 @@ public:
     void addWall(const QRectF &rect, bool st);
     void addWall(qreal x, qreal y, qreal w, qreal h, bool st)
     { addWall(QRectF(x, y, w, h), st); }
-    void updateShadows(void);
-
-public slots:
+    void updateLighting(void);
+    // UNDONE: Deselect items
     void setMouseMode(EMouseMode mode) { mouseMode = mode; update(); }
+    void setEditModeEnabled(bool e);
 };
 
 #endif // ROBOTSCENE_H
