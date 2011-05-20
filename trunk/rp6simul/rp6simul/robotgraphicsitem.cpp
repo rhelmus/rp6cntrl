@@ -3,7 +3,7 @@
 #include <QtGui>
 
 CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
-    rightPower(0), skipFrames(0), pressedHandle(0)
+    rightPower(0), skipFrames(0), dragging(false), pressedHandle(0)
 {
     setPixmap(QPixmap("../resource/rp6-top.png"));
     setTransformOriginPoint(boundingRect().center());
@@ -20,6 +20,14 @@ CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
               CHandleGraphicsItem::HANDLE_TOP);
     addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
               CHandleGraphicsItem::HANDLE_BOTTOM);
+}
+
+void CRobotGraphicsItem::updateMouseCursor(bool selected)
+{
+    if (!selected)
+        setCursor(Qt::ArrowCursor);
+    else
+        setCursor(Qt::OpenHandCursor);
 }
 
 void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -147,22 +155,27 @@ void CRobotGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     setCursor(Qt::ClosedHandCursor);
     lastMousePos = event->pos();
+    dragging = true;
     QGraphicsItem::mousePressEvent(event);
 }
 
 void CRobotGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
-    QRectF r(boundingRect());
-    const QPointF offset(lastMousePos - r.center());
-    r.moveCenter(mapToParent(event->pos() - offset));
-    setPos(r.topLeft());
+    if (dragging)
+    {
+        QRectF r(boundingRect());
+        const QPointF offset(lastMousePos - r.center());
+        r.moveCenter(mapToParent(event->pos() - offset));
+        setPos(r.topLeft());
+    }
     QGraphicsItem::mouseMoveEvent(event);
 }
 
 void CRobotGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    setCursor(Qt::OpenHandCursor);
-    QGraphicsItem::mousePressEvent(event);
+    updateMouseCursor(isSelected());
+    dragging = false;
+    QGraphicsItem::mouseReleaseEvent(event);
 }
 
 bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
@@ -199,6 +212,7 @@ QVariant CRobotGraphicsItem::itemChange(GraphicsItemChange change,
     }
     else if (change == ItemSelectedHasChanged)
     {
+        updateMouseCursor(value.toBool());
         foreach(QGraphicsItem *h, handles)
             h->setVisible(value.toBool());
     }

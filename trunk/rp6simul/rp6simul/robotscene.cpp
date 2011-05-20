@@ -1,5 +1,5 @@
 #include "robotscene.h"
-#include "resizablegraphicsitem.h"
+#include "resizablepixmapgraphicsitem.h"
 #include "rp6simul.h"
 
 #include <QtGui>
@@ -40,9 +40,9 @@ CRobotScene::CRobotScene(QObject *parent) :
     backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
-    dragging(false), mouseMode(MODE_POINT)
+    lightingDirty(false), dragging(false), mouseMode(MODE_POINT)
 {
-    setBackgroundBrush(Qt::black);
+    setBackgroundBrush(Qt::darkGray);
 }
 
 QRectF CRobotScene::getDragRect() const
@@ -68,17 +68,14 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
     painter->save();
 
-//    painter->setBrush(blockPixmap);
-//    painter->setPen(Qt::NoPen);
-//    foreach (QGraphicsItem *w, walls.keys())
-//        painter->drawPolygon(w->mapToScene(w->boundingRect()));
+    if (!editModeEnabled)
+    {
+        painter->drawImage(0, 0, shadowImage);
 
-    painter->drawImage(0, 0, shadowImage);
-
-    painter->setCompositionMode(QPainter::CompositionMode_Overlay);
-    painter->drawImage(0, 0, lightImage);
-
-    painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter->setCompositionMode(QPainter::CompositionMode_Overlay);
+        painter->drawImage(0, 0, lightImage);
+        painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
+    }
 
     if (dragging)
     {
@@ -100,7 +97,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
 void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {    
-    if (mouseMode == MODE_POINT)
+    if (!editModeEnabled || (mouseMode == MODE_POINT))
         QGraphicsScene::mousePressEvent(event);
     else if ((mouseMode == MODE_WALL) || (mouseMode == MODE_BOX) ||
              (mouseMode == MODE_LIGHT))
@@ -113,7 +110,7 @@ void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     mousePos = event->scenePos();
-    if (mouseMode == MODE_POINT)
+    if (!editModeEnabled || (mouseMode == MODE_POINT))
         QGraphicsScene::mouseMoveEvent(event);
     else if (dragging)
         update();
@@ -121,17 +118,17 @@ void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (mouseMode == MODE_POINT)
+    if (!editModeEnabled || (mouseMode == MODE_POINT))
         QGraphicsScene::mousePressEvent(event);
     else if (mouseMode == MODE_WALL)
     {
         addWall(getDragRect(), false);
-        updateShadows();
+        lightingDirty = true;
     }
     else if (mouseMode == MODE_BOX)
     {
-        QGraphicsPixmapItem *p = new QGraphicsPixmapItem(boxPixmap);
-        CResizableGraphicsItem *resi = new CResizableGraphicsItem(p);
+        CResizablePixmapGraphicsItem *resi =
+                new CResizablePixmapGraphicsItem(boxPixmap, false);
         const QRectF r(getDragRect());
         resi->setPos(r.topLeft());
         resi->setSize(r.size());
@@ -143,14 +140,10 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
 void CRobotScene::addWall(const QRectF &rect, bool st)
 {
-    QGraphicsRectItem *it;
-    it = new QGraphicsRectItem(0.0, 0.0, rect.width(), rect.height());
-    it->setPen(Qt::NoPen);
-    it->setBrush(blockPixmap);
-
     if (!st)
     {
-        CResizableGraphicsItem *resi = new CResizableGraphicsItem(it);
+        CResizablePixmapGraphicsItem *resi
+                = new CResizablePixmapGraphicsItem(blockPixmap, true);
         resi->setPos(rect.topLeft());
         resi->setSize(rect.size());
         addItem(resi);
@@ -158,13 +151,18 @@ void CRobotScene::addWall(const QRectF &rect, bool st)
     }
     else
     {
+        QGraphicsRectItem *it = new QGraphicsRectItem(0.0, 0.0,
+                                                      rect.width(),
+                                                      rect.height());
+        it->setPen(Qt::NoPen);
+        it->setBrush(blockPixmap);
         it->setPos(rect.topLeft());
         addItem(it);
         walls[it] = st;
     }
 }
 
-void CRobotScene::updateShadows()
+void CRobotScene::updateLighting()
 {
     shadowImage = QImage(sceneRect().size().toSize(), QImage::Format_ARGB32_Premultiplied);
     shadowImage.fill(Qt::transparent);
@@ -222,4 +220,58 @@ void CRobotScene::updateShadows()
     }
 
     update();
+}
+
+void CRobotScene::setEditModeEnabled(bool e)
+{
+    editModeEnabled = e;
+
+    if (e)
+    {
+        oldWallPositions.clear();
+        for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
+             it!=walls.end(); ++it)
+        {
+            if (!it.value())
+            {
+                oldWallPositions[it.key()] = it.key()->pos();
+
+                CResizablePixmapGraphicsItem *r =
+                        static_cast<CResizablePixmapGraphicsItem *>(it.key());
+                r->setMovable(true);
+                r->setResizable(true);
+            }
+        }
+
+        update();
+    }
+    else
+    {
+        for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
+             it!=walls.end(); ++it)
+        {
+            if (!it.value())
+            {
+                CResizablePixmapGraphicsItem *r =
+                        static_cast<CResizablePixmapGraphicsItem *>(it.key());
+                r->setMovable(false);
+                r->setResizable(false);
+
+                // New wall or position of existing changed?
+                if (!oldWallPositions.contains(r) ||
+                    (r->pos() != oldWallPositions[r]))
+                    lightingDirty = true;
+            }
+        }
+
+        if (lightingDirty)
+        {
+            updateLighting(); // calls update() too
+            lightingDirty = false;
+        }
+        else
+            update();
+
+        dragging = false;
+    }
 }

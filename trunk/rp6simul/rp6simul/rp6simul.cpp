@@ -166,50 +166,57 @@ void CRP6Simulator::createToolbars()
 
     addToolBar(Qt::LeftToolBarArea, toolb = new QToolBar("Edit map"));
 
-    QActionGroup *agroup = new QActionGroup(this);
-    connect(agroup, SIGNAL(triggered(QAction*)), this,
+    editMapActionGroup = new QActionGroup(this);
+    connect(editMapActionGroup, SIGNAL(triggered(QAction*)), this,
             SLOT(changeSceneMouseMode(QAction*)));
+    editMapActionGroup->setEnabled(false);
 
-    QAction *a = agroup->addAction(QIcon("../resource/mouse-arrow.png"),
-                                   "Selection mode");
-    a->setCheckable(true);
-    a->setData(CRobotScene::MODE_POINT);
-    toolb->addAction(a);
-
-    a = agroup->addAction(QIcon("../resource/wall.jpg"), "Add wall");
-    a->setCheckable(true);
-    a->setData(CRobotScene::MODE_WALL);
-    toolb->addAction(a);
-
-    a = agroup->addAction(QIcon("../resource/cardboard-box.png"),
-                          "Add box obstacle");
-    a->setCheckable(true);
-    a->setData(CRobotScene::MODE_BOX);
-    toolb->addAction(a);
-
-    a = agroup->addAction(QIcon(createAddLightImage()), "Add light source");
-    a->setCheckable(true);
-    a->setData(CRobotScene::MODE_LIGHT);
-    toolb->addAction(a);
-
-    a = agroup->addAction(QIcon("../resource/remove.png"), "Remove item");
-    a->setCheckable(true);
-    a->setData(CRobotScene::MODE_DELETE);
-    toolb->addAction(a);
-
-    a = toolb->addAction(QIcon(createLightSettingsImage()),
-                         "Edit light sources");
-    a->setCheckable(true);
-
-    toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings");
-
-    a = toolb->addAction(QIcon("../resource/viewmag_.png"), "Zoom map out",
-                         this, SLOT(zoomSceneOut()));
+    QAction *a = toolb->addAction(QIcon("../resource/viewmag_.png"),
+                                  "Zoom map out", this, SLOT(zoomSceneOut()));
     a->setShortcut(QKeySequence("-"));
 
     a = toolb->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
                          this, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
+
+    toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings");
+
+    toolb->addSeparator();
+
+    a = toolb->addAction(QIcon("../resource/tool.png"), "Toggle edit mode",
+                         this, SLOT(toggleEditMap(bool)));
+    a->setCheckable(true);
+    a->setShortcut(QKeySequence("Ctrl+E"));
+
+    a = editMapActionGroup->addAction(QIcon("../resource/mouse-arrow.png"),
+                                      "Selection mode");
+    a->setCheckable(true);
+    a->setChecked(true);
+    a->setData(CRobotScene::MODE_POINT);
+    toolb->addAction(a);
+
+    a = editMapActionGroup->addAction(QIcon("../resource/wall.jpg"), "Add wall");
+    a->setCheckable(true);
+    a->setData(CRobotScene::MODE_WALL);
+    toolb->addAction(a);
+
+    a = editMapActionGroup->addAction(QIcon("../resource/cardboard-box.png"),
+                                      "Add box obstacle");
+    a->setCheckable(true);
+    a->setData(CRobotScene::MODE_BOX);
+    toolb->addAction(a);
+
+    a = editMapActionGroup->addAction(QIcon(createAddLightImage()),
+                                      "Add light source");
+    a->setCheckable(true);
+    a->setData(CRobotScene::MODE_LIGHT);
+    toolb->addAction(a);
+
+    a = editMapActionGroup->addAction(QIcon("../resource/remove.png"),
+                                      "Clear map (removes all walls and items)");
+    a->setCheckable(true);
+    a->setData(CRobotScene::MODE_DELETE);
+    toolb->addAction(a);
 
     setToolBarToolTips();
 }
@@ -224,18 +231,6 @@ QWidget *CRP6Simulator::createMainWidget()
     robotGraphicsItem->setPos(50, 450);
     robotScene->addItem(robotGraphicsItem);
 
-    // Obstacle
-    QGraphicsPixmapItem *p = new QGraphicsPixmapItem(QPixmap("../resource/cardboard-box.png"));
-    CResizableGraphicsItem *resi = new CResizableGraphicsItem(p);
-    resi->setPos(450.0, 450.0);
-    resi->setSize(300.0, 200.0);
-    robotScene->addItem(resi);
-
-    CResizablePixmapGraphicsItem *rpi = new CResizablePixmapGraphicsItem(QPixmap("../resource/cardboard-box.png"));
-    rpi->setPos(450.0, 600.0);
-    rpi->setSize(100.0, 100.0);
-    robotScene->addItem(rpi);
-
     robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
     robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
     robotScene->addWall(screct.x(), screct.y(), 30.0, screct.height(), true);
@@ -244,7 +239,7 @@ QWidget *CRP6Simulator::createMainWidget()
     robotScene->addLight(QPointF(250.0, 250.0), 200.0);
     robotScene->addLight(QPointF(550.0, 250.0), 200.0);
     robotScene->addLight(QPointF(50.0, 50.0), 200.0);
-    robotScene->updateShadows();
+    robotScene->updateLighting();
 
     QWidget *ret = new QWidget;
     QHBoxLayout *hbox = new QHBoxLayout(ret);
@@ -634,6 +629,12 @@ void CRP6Simulator::zoomSceneIn()
 void CRP6Simulator::zoomSceneOut()
 {
     scaleGraphicsView(1/1.2);
+}
+
+void CRP6Simulator::toggleEditMap(bool checked)
+{
+    editMapActionGroup->setEnabled(checked);
+    robotScene->setEditModeEnabled(checked);
 }
 
 void CRP6Simulator::sendSerialPressed()

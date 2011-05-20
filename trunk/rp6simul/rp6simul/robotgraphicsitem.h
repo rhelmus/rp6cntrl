@@ -13,8 +13,10 @@ class CRobotGraphicsItem : public QGraphicsPixmapItem
     typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
     THandleList handles;
     QPointF lastMousePos;
+    bool dragging;
     CHandleGraphicsItem *pressedHandle;
 
+    void updateMouseCursor(bool selected);
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
