@@ -1,3 +1,4 @@
+#include "lightgraphicsitem.h"
 #include "robotscene.h"
 #include "resizablepixmapgraphicsitem.h"
 #include "rp6simul.h"
@@ -81,12 +82,14 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     {
         if (mouseMode == MODE_WALL)
         {
+            painter->setPen(Qt::NoPen);
             painter->setOpacity(0.75);
             painter->setBrush(blockPixmap);
             painter->drawRect(getDragRect());
         }
         else if (mouseMode == MODE_BOX)
         {
+            painter->setPen(Qt::NoPen);
             painter->setOpacity(0.75);
             painter->drawPixmap(getDragRect().toRect(), boxPixmap);
         }
@@ -136,6 +139,14 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     }
 
     dragging = false;
+}
+
+void CRobotScene::addLight(const QPointF &p, float r)
+{
+    CLightGraphicsItem *l = new CLightGraphicsItem(r);
+    l->setPos(p - QPointF(r, r));
+    addItem(l);
+    lights << l;
 }
 
 void CRobotScene::addWall(const QRectF &rect, bool st)
@@ -188,7 +199,9 @@ void CRobotScene::updateLighting()
     foreach (QGraphicsItem *w, walls.keys())
         obstacles << w->mapToScene(w->boundingRect());
 
-    for (int x=sceneRect().left(); x<=sceneRect().right(); ++x)
+    const int left = sceneRect().left(), right = sceneRect().right();
+    const int top = sceneRect().top(), bottom = sceneRect().bottom();
+    for (int x=left; x<=right; ++x)
     {        
         if (!(x % 30))
         {
@@ -196,12 +209,16 @@ void CRobotScene::updateLighting()
             qApp->processEvents();
         }
 
-        for (int y=sceneRect().top(); y<=sceneRect().bottom(); ++y)
+        for (int y=top; y<=bottom; ++y)
         {
             float intensity = baseintensity;
 
-            foreach (CLight l, lights)
-                intensity += l.intensityAt(QPointF(x, y), obstacles);
+            foreach (CLightGraphicsItem *l, lights)
+            {
+                intensity += l->intensityAt(QPointF(x, y), obstacles);
+                if (intensity >= 2.0)
+                    break;
+            }
 
             if (intensity > 1.0)
             {
@@ -217,6 +234,19 @@ void CRobotScene::updateLighting()
                 shpainter.drawPoint(x, y);
             }
         }
+    }
+
+    update();
+}
+
+void CRobotScene::setMouseMode(EMouseMode mode)
+{
+    mouseMode = mode;
+    if (mode != MODE_POINT)
+    {
+        QList<QGraphicsItem *> sitems(selectedItems());
+        foreach (QGraphicsItem *it, sitems)
+            it->setSelected(false);
     }
 
     update();
