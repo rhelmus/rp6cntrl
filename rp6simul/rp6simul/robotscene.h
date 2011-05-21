@@ -4,6 +4,8 @@
 #include <QGraphicsScene>
 #include <QHash>
 
+class CLightGraphicsItem;
+
 class CLight
 {
     QPointF pos;
@@ -15,8 +17,6 @@ public:
     float intensityAt(const QPointF &p,
                       const QList<QPolygonF> &obstacles) const;
     QPointF position(void) const { return pos; }
-    float fullRadius(void) const { return radius; }
-    float intenseRadius(void) const { return radius * 0.5; }
 };
 
 class CRobotScene : public QGraphicsScene
@@ -27,7 +27,7 @@ public:
 private:
     Q_OBJECT
 
-    QList<CLight> lights;
+    QList<CLightGraphicsItem *> lights;
     QHash<QGraphicsItem *, bool> walls;
     QHash<QGraphicsItem *, QPointF> oldWallPositions;
     const QSizeF blockSize;
@@ -52,13 +52,12 @@ protected:
 public:
     explicit CRobotScene(QObject *parent = 0);
 
-    void addLight(const QPointF &p, float i) { lights << CLight(p, i); }
+    void addLight(const QPointF &p, float r);
     void addWall(const QRectF &rect, bool st);
     void addWall(qreal x, qreal y, qreal w, qreal h, bool st)
     { addWall(QRectF(x, y, w, h), st); }
     void updateLighting(void);
-    // UNDONE: Deselect items
-    void setMouseMode(EMouseMode mode) { mouseMode = mode; update(); }
+    void setMouseMode(EMouseMode mode);
     void setEditModeEnabled(bool e);
 };
 
