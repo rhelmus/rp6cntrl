@@ -19,7 +19,6 @@ class QTableWidget;
 class QTreeWidget;
 
 class CProjectWizard;
-class CRobotGraphicsItem;
 class CRobotScene;
 class CSimulator;
 
@@ -36,7 +35,6 @@ class CRP6Simulator : public QMainWindow
     QActionGroup *editMapActionGroup;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
-    CRobotGraphicsItem *robotGraphicsItem;
     QPlainTextEdit *logWidget;
     QPlainTextEdit *serialOutputWidget;
     QLineEdit *serialInputWidget;

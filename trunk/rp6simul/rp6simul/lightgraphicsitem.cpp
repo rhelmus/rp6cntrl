@@ -1,10 +1,25 @@
+#include "handlegraphicsitem.h"
 #include "lightgraphicsitem.h"
 
 #include <QtGui>
 
 CLightGraphicsItem::CLightGraphicsItem(float r, QGraphicsItem *parent) :
-    QGraphicsItem(parent), radius(r)
+    QGraphicsItem(parent), radius(r), dragging(false), handleDragging(false)
 {
+    setFlag(ItemIsSelectable);
+
+    radiusHandle = new CHandleGraphicsItem(CHandleGraphicsItem::HANDLE_CENTER,
+                                           this);
+    radiusHandle->setVisible(false);
+    radiusHandle->setCursor(Qt::SizeVerCursor);
+    setRadiusHandlePos();
+}
+
+void CLightGraphicsItem::setRadiusHandlePos()
+{
+    const qreal w = radiusHandle->boundingRect().width();
+    const qreal h = radiusHandle->boundingRect().height();
+    radiusHandle->setPos(radius - (w / 2.0), radius - (h / 2.0));
 }
 
 float CLightGraphicsItem::intensityAt(const QPointF &p,
@@ -32,6 +47,96 @@ float CLightGraphicsItem::intensityAt(const QPointF &p,
 
     const float maxint = 2.0;
     return ((radius - d) / radius) * maxint;
+}
+
+void CLightGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    dragMousePos = event->pos();
+    dragging = true;
+    QGraphicsItem::mousePressEvent(event);
+}
+
+void CLightGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (dragging)
+    {
+        QRectF r(boundingRect());
+        const QPointF offset(dragMousePos - r.center());
+        r.moveCenter(mapToParent(event->pos() - offset));
+        setPos(r.topLeft());
+    }
+
+    QGraphicsItem::mouseMoveEvent(event);
+}
+
+void CLightGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+{
+    dragging = false;
+    QGraphicsItem::mouseReleaseEvent(event);
+}
+
+bool CLightGraphicsItem::sceneEventFilter(QGraphicsItem *, QEvent *event)
+{
+    if (event->type() == QEvent::GraphicsSceneMousePress)
+    {
+        handleDragging = true;
+        QGraphicsSceneMouseEvent *me =
+                static_cast<QGraphicsSceneMouseEvent*>(event);
+        radiusDragMousePos = mapToScene(mapFromItem(radiusHandle, me->pos()));
+    }
+    else if (event->type() == QEvent::GraphicsSceneMouseRelease)
+        handleDragging = false;
+    else if (event->type() == QEvent::GraphicsSceneMouseMove)
+    {
+        if (handleDragging)
+        {
+            QGraphicsSceneMouseEvent *me =
+                    static_cast<QGraphicsSceneMouseEvent*>(event);
+
+            const QPointF mp(mapToScene(mapFromItem(radiusHandle, me->pos())));
+            const QPointF c(mapToParent(boundingRect().center()));
+
+            prepareGeometryChange();
+
+            radius += (radiusDragMousePos.y() - mp.y());
+            if (radius < 20.0)
+                radius = 20.0;
+
+            QRectF r(boundingRect());
+            r.moveCenter(c);
+            setPos(r.topLeft());
+
+            setRadiusHandlePos();
+
+            radiusDragMousePos = mp;
+        }
+    }
+
+    return false; // Propegate
+}
+
+QVariant CLightGraphicsItem::itemChange(GraphicsItemChange change,
+                                        const QVariant &value)
+{
+    if (change == ItemSceneHasChanged)
+        radiusHandle->installSceneEventFilter(this);
+    else if (change == ItemSelectedHasChanged)
+    {
+        radiusHandle->setVisible(value.toBool());
+        if (value.toBool())
+            setCursor(Qt::SizeAllCursor);
+        else
+            setCursor(Qt::ArrowCursor);
+    }
+
+    return QGraphicsItem::itemChange(change, value);
+}
+
+QPainterPath CLightGraphicsItem::shape() const
+{
+    QPainterPath ret;
+    ret.addEllipse(boundingRect());
+    return ret;
 }
 
 void CLightGraphicsItem::paint(QPainter *painter,

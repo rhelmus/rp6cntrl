@@ -1,36 +1,10 @@
 #include "lightgraphicsitem.h"
 #include "robotscene.h"
 #include "resizablepixmapgraphicsitem.h"
+#include "robotgraphicsitem.h"
 #include "rp6simul.h"
 
 #include <QtGui>
-
-float CLight::intensityAt(const QPointF &p,
-                          const QList<QPolygonF> &obstacles) const
-{
-    const QLineF line(pos, p);
-    const float d = line.length();
-    if (d > radius)
-        return 0.0;
-
-    foreach (QPolygonF obpoly, obstacles)
-    {
-        if (obpoly.containsPoint(pos, Qt::OddEvenFill) ||
-            obpoly.containsPoint(p, Qt::OddEvenFill))
-            return 0.0;
-
-        for (QPolygonF::iterator it=obpoly.begin(); it!=(obpoly.end()-1); ++it)
-        {
-            QLineF obl(*it, *(it+1));
-            if (line.intersect(obl, 0) == QLineF::BoundedIntersection)
-                return 0.0;
-        }
-    }
-
-    const float maxint = 2.0;
-    return ((radius - d) / radius) * maxint;
-}
-
 
 CRobotScene::CRobotScene(QObject *parent) :
     QGraphicsScene(parent), blockSize(30.0, 30.0),
@@ -41,9 +15,16 @@ CRobotScene::CRobotScene(QObject *parent) :
     backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
-    lightingDirty(false), dragging(false), mouseMode(MODE_POINT)
+    lightingDirty(false), dragging(false), mouseMode(MODE_POINT),
+    editModeEnabled(false)
 {
     setBackgroundBrush(Qt::darkGray);
+    // HACK: Is there any other way?
+    connect(this, SIGNAL(selectionChanged()), this, SLOT(updateItemsZ()));
+
+    robotGraphicsItem = new CRobotGraphicsItem;
+    robotGraphicsItem->setPos(50, 450); // UNDONE
+    addItem(robotGraphicsItem);
 }
 
 QRectF CRobotScene::getDragRect() const
@@ -52,6 +33,27 @@ QRectF CRobotScene::getDragRect() const
     ret.setTopLeft(mouseDragStartPos);
     ret.setBottomRight(mousePos);
     return ret;
+}
+
+QRectF CRobotScene::getLightDragRect(void) const
+{
+    QRectF ret;
+    ret.setTopLeft(mouseDragStartPos);
+    ret.setBottom(mousePos.y());
+    ret.setWidth(ret.height());
+    return ret;
+}
+
+
+void CRobotScene::updateItemsZ()
+{
+    foreach (QGraphicsItem *it, items())
+    {
+        if (it->isSelected())
+            it->setZValue(2.0);
+        else
+            it->setZValue(1.0);
+    }
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -92,6 +94,16 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
             painter->setPen(Qt::NoPen);
             painter->setOpacity(0.75);
             painter->drawPixmap(getDragRect().toRect(), boxPixmap);
+        }
+        else if (mouseMode == MODE_LIGHT)
+        {
+            const QRectF rect(getLightDragRect());
+            const qreal radius = rect.height()/2.0;
+            QRadialGradient g(rect.center(), radius);
+            g.setColorAt(0.0, QColor(255, 255, 0, 200));
+            g.setColorAt(1.0, QColor(255, 180, 0, 50));
+            painter->setBrush(g);
+            painter->drawEllipse(rect);
         }
     }
 
@@ -137,6 +149,13 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         resi->setSize(r.size());
         addItem(resi);
     }
+    else if (mouseMode == MODE_LIGHT)
+    {
+        const QRectF rect(getLightDragRect());
+        const qreal radius = rect.height()/2.0;
+        addLight(rect.center(), radius);
+        lightingDirty = true;
+    }
 
     dragging = false;
 }
@@ -145,6 +164,7 @@ void CRobotScene::addLight(const QPointF &p, float r)
 {
     CLightGraphicsItem *l = new CLightGraphicsItem(r);
     l->setPos(p - QPointF(r, r));
+    l->setVisible(editModeEnabled);
     addItem(l);
     lights << l;
 }
@@ -258,6 +278,13 @@ void CRobotScene::setEditModeEnabled(bool e)
 
     if (e)
     {
+        oldLightSettings.clear();
+        foreach (CLightGraphicsItem *l, lights)
+        {
+            l->setVisible(true);
+            oldLightSettings[l] = SOldLightSettings(l->pos(), l->getRadius());
+        }
+
         oldWallPositions.clear();
         for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
              it!=walls.end(); ++it)
@@ -277,6 +304,16 @@ void CRobotScene::setEditModeEnabled(bool e)
     }
     else
     {
+        foreach (CLightGraphicsItem *l, lights)
+        {
+            l->setVisible(false);
+
+            if (!lightingDirty && (!oldLightSettings.contains(l) ||
+                (l->pos() != oldLightSettings[l].pos) ||
+                (l->getRadius() != oldLightSettings[l].radius)))
+                lightingDirty = true;
+        }
+
         for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
              it!=walls.end(); ++it)
         {
@@ -288,8 +325,8 @@ void CRobotScene::setEditModeEnabled(bool e)
                 r->setResizable(false);
 
                 // New wall or position of existing changed?
-                if (!oldWallPositions.contains(r) ||
-                    (r->pos() != oldWallPositions[r]))
+                if (!lightingDirty && (!oldWallPositions.contains(r) ||
+                    (r->pos() != oldWallPositions[r])))
                     lightingDirty = true;
             }
         }
@@ -304,4 +341,27 @@ void CRobotScene::setEditModeEnabled(bool e)
 
         dragging = false;
     }
+}
+
+void CRobotScene::clearMap()
+{
+    foreach (QGraphicsItem *it, items())
+    {
+        if (walls.contains(it))
+        {
+            if (walls[it])
+                continue; // Only remove non-static walls
+            walls.remove(it);
+        }
+
+        if (it == robotGraphicsItem)
+            continue;
+
+        delete it;
+    }
+
+    const bool uplights = !lights.isEmpty();
+    lights.clear();
+    if (uplights)
+        updateLighting();
 }
