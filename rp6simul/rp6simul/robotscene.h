@@ -5,19 +5,7 @@
 #include <QHash>
 
 class CLightGraphicsItem;
-
-class CLight
-{
-    QPointF pos;
-    float radius;
-
-public:
-    CLight(const QPointF &p, float r) : pos(p), radius(r) { }
-
-    float intensityAt(const QPointF &p,
-                      const QList<QPolygonF> &obstacles) const;
-    QPointF position(void) const { return pos; }
-};
+class CRobotGraphicsItem;
 
 class CRobotScene : public QGraphicsScene
 {
@@ -27,9 +15,20 @@ public:
 private:
     Q_OBJECT
 
+    struct SOldLightSettings
+    {
+        QPointF pos;
+        float radius;
+        SOldLightSettings(void) : radius(0.0) { }
+        SOldLightSettings(const QPointF &p, float r) : pos(p), radius(r) { }
+    };
+
     QList<CLightGraphicsItem *> lights;
+    typedef QHash<CLightGraphicsItem *, SOldLightSettings> TOldLightSettings;
+    TOldLightSettings oldLightSettings;
     QHash<QGraphicsItem *, bool> walls;
     QHash<QGraphicsItem *, QPointF> oldWallPositions;
+    CRobotGraphicsItem *robotGraphicsItem;
     const QSizeF blockSize;
     QPixmap blockPixmap, boxPixmap;
     QPixmap backGroundPixmap;
@@ -41,6 +40,10 @@ private:
     bool editModeEnabled;
 
     QRectF getDragRect(void) const;
+    QRectF getLightDragRect(void) const;
+
+private slots:
+    void updateItemsZ(void);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
@@ -59,6 +62,10 @@ public:
     void updateLighting(void);
     void setMouseMode(EMouseMode mode);
     void setEditModeEnabled(bool e);
+    CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
+
+public slots:
+    void clearMap(void);
 };
 
 #endif // ROBOTSCENE_H

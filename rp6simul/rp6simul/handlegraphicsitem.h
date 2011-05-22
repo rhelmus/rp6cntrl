@@ -13,7 +13,8 @@ public:
         HANDLE_LEFT = 0x01,
         HANDLE_RIGHT = 0x02,
         HANDLE_TOP = 0x04,
-        HANDLE_BOTTOM = 0x08
+        HANDLE_BOTTOM = 0x08,
+        HANDLE_CENTER = 0x16
     };
 
     Q_DECLARE_FLAGS(EHandlePosFlags, EHandlePos)

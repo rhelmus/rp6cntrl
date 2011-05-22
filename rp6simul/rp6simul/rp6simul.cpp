@@ -50,15 +50,15 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent)
 
     projectWizard = new CProjectWizard(this);
 
-    createMenus();
-    createToolbars();
-
     QSplitter *splitter = new QSplitter(Qt::Vertical, this);
     setCentralWidget(splitter);
 
     splitter->addWidget(createMainWidget());
     splitter->addWidget(createLogWidgets());
     splitter->setSizes(QList<int>() << 600 << 300);
+
+    createMenus();
+    createToolbars();
 
     QDockWidget *statdock, *regdock;
     addDockWidget(Qt::RightDockWidgetArea, statdock = createStatusDock(),
@@ -181,6 +181,10 @@ void CRP6Simulator::createToolbars()
 
     toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings");
 
+    toolb->addAction(QIcon("../resource/remove.png"),
+                     "Clear map (removes all walls and items)", robotScene,
+                     SLOT(clearMap()));
+
     toolb->addSeparator();
 
     a = toolb->addAction(QIcon("../resource/tool.png"), "Toggle edit mode",
@@ -212,12 +216,6 @@ void CRP6Simulator::createToolbars()
     a->setData(CRobotScene::MODE_LIGHT);
     toolb->addAction(a);
 
-    a = editMapActionGroup->addAction(QIcon("../resource/remove.png"),
-                                      "Clear map (removes all walls and items)");
-    a->setCheckable(true);
-    a->setData(CRobotScene::MODE_DELETE);
-    toolb->addAction(a);
-
     setToolBarToolTips();
 }
 
@@ -226,10 +224,6 @@ QWidget *CRP6Simulator::createMainWidget()
     robotScene = new CRobotScene(this);
     QRectF screct(0.0, 0.0, 900.0, 900.0);
     robotScene->setSceneRect(screct);
-
-    robotGraphicsItem = new CRobotGraphicsItem;
-    robotGraphicsItem->setPos(50, 450);
-    robotScene->addItem(robotGraphicsItem);
 
     robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
     robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
@@ -651,10 +645,10 @@ void CRP6Simulator::sendSerialPressed()
 
 void CRP6Simulator::debugSetRobotLeftPower(int power)
 {
-    robotGraphicsItem->setLeftMotor(power);
+    robotScene->getRobotItem()->setLeftMotor(power);
 }
 
 void CRP6Simulator::debugSetRobotRightPower(int power)
 {
-    robotGraphicsItem->setRightMotor(power);
+    robotScene->getRobotItem()->setRightMotor(power);
 }
