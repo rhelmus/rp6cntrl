@@ -3,33 +3,27 @@
 
 #include "handlegraphicsitem.h"
 
-#include <QGraphicsItem>
+#include "basegraphicsitem.h"
 
-class CResizablePixmapGraphicsItem : public QGraphicsItem
+class CResizablePixmapGraphicsItem : public CBaseGraphicsItem
 {
     QRectF boundRect;
     QPixmap pixmap;
     bool tiled;
-    bool isMovable, isResizable;
+    bool isResizable;
     typedef QHash<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
     THandleList handles;
     CHandleGraphicsItem *pressedHandle;
-    QPointF lastMousePos;
-    bool dragging;
     mutable QPainterPath pmShape;
     mutable bool hasShape;
 
-    void updateMouseCursor(bool selected);
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     void adjustHandles(void);
     void updateGeometry(const QPointF &mousepos);
 
 protected:
-    void mousePressEvent(QGraphicsSceneMouseEvent *event);
-    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
-    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *,
-               QWidget *);
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+               QWidget *widget);
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
     QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
@@ -42,7 +36,6 @@ public:
 
     void setSize(const QSizeF &s);
     void setSize(qreal w, qreal h) { setSize(QSizeF(w, h)); }
-    void setMovable(bool m);
     void setResizable(bool r);
 };
 

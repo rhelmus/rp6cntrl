@@ -3,20 +3,17 @@
 
 #include "handlegraphicsitem.h"
 
-#include <QGraphicsPixmapItem>
+#include "resizablepixmapgraphicsitem.h"
 
-class CRobotGraphicsItem : public QGraphicsPixmapItem
+class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 {
     int leftPower, rightPower;
     int skipFrames;
 
     typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
     THandleList handles;
-    QPointF lastMousePos;
-    bool dragging;
     CHandleGraphicsItem *pressedHandle;
 
-    void updateMouseCursor(bool selected);
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
@@ -25,14 +22,11 @@ class CRobotGraphicsItem : public QGraphicsPixmapItem
 
 protected:
     void advance(int phase);
-    void mousePressEvent(QGraphicsSceneMouseEvent *event);
-    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
-    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
     QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
 public:
-    CRobotGraphicsItem(void);
+    CRobotGraphicsItem(QGraphicsItem *parent = 0);
 
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);

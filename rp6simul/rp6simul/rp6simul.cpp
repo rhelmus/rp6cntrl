@@ -181,7 +181,7 @@ void CRP6Simulator::createToolbars()
 
     toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings");
 
-    toolb->addAction(QIcon("../resource/remove.png"),
+    toolb->addAction(QIcon("../resource/clear.png"),
                      "Clear map (removes all walls and items)", robotScene,
                      SLOT(clearMap()));
 

@@ -44,6 +44,8 @@ private:
 
 private slots:
     void updateItemsZ(void);
+    void removeLight(QObject *o);
+    void removeWall(QObject *o);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
