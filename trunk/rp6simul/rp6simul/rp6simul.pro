@@ -26,7 +26,8 @@ SOURCES += main.cpp\
     resizablegraphicsitem.cpp \
     handlegraphicsitem.cpp \
     resizablepixmapgraphicsitem.cpp \
-    lightgraphicsitem.cpp
+    lightgraphicsitem.cpp \
+    basegraphicsitem.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -43,7 +44,8 @@ HEADERS  += rp6simul.h \
     resizablegraphicsitem.h \
     handlegraphicsitem.h \
     resizablepixmapgraphicsitem.h \
-    lightgraphicsitem.h
+    lightgraphicsitem.h \
+    basegraphicsitem.h
 
 OTHER_FILES += \
     TODO.txt \

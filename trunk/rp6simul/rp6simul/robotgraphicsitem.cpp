@@ -2,15 +2,12 @@
 
 #include <QtGui>
 
-CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
-    rightPower(0), skipFrames(0), dragging(false), pressedHandle(0)
+CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
+    : CResizablePixmapGraphicsItem(QPixmap("../resource/rp6-top.png"), false, parent),
+      leftPower(0), rightPower(0), skipFrames(0), pressedHandle(0)
 {
-    setPixmap(QPixmap("../resource/rp6-top.png"));
     setTransformOriginPoint(boundingRect().center());
-    setTransformationMode(Qt::SmoothTransformation);
-    setAcceptedMouseButtons(Qt::LeftButton);
-    // We do movable by ourselfs...gets messed up when doing rotations
-    setFlags(ItemIsSelectable);
+    setResizable(false);
 
     addHandle(CHandleGraphicsItem::HANDLE_LEFT |
               CHandleGraphicsItem::HANDLE_TOP);
@@ -20,14 +17,6 @@ CRobotGraphicsItem::CRobotGraphicsItem() : leftPower(0),
               CHandleGraphicsItem::HANDLE_TOP);
     addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
               CHandleGraphicsItem::HANDLE_BOTTOM);
-}
-
-void CRobotGraphicsItem::updateMouseCursor(bool selected)
-{
-    if (!selected)
-        setCursor(Qt::ArrowCursor);
-    else
-        setCursor(Qt::OpenHandCursor);
 }
 
 void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -151,33 +140,6 @@ void CRobotGraphicsItem::advance(int phase)
 #endif
 }
 
-void CRobotGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
-{
-    setCursor(Qt::ClosedHandCursor);
-    lastMousePos = event->pos();
-    dragging = true;
-    QGraphicsItem::mousePressEvent(event);
-}
-
-void CRobotGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
-{
-    if (dragging)
-    {
-        QRectF r(boundingRect());
-        const QPointF offset(lastMousePos - r.center());
-        r.moveCenter(mapToParent(event->pos() - offset));
-        setPos(r.topLeft());
-    }
-    QGraphicsItem::mouseMoveEvent(event);
-}
-
-void CRobotGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
-{
-    updateMouseCursor(isSelected());
-    dragging = false;
-    QGraphicsItem::mouseReleaseEvent(event);
-}
-
 bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
 {
     if (event->type() == QEvent::GraphicsSceneMousePress)
@@ -212,19 +174,18 @@ QVariant CRobotGraphicsItem::itemChange(GraphicsItemChange change,
     }
     else if (change == ItemSelectedHasChanged)
     {
-        updateMouseCursor(value.toBool());
         foreach(QGraphicsItem *h, handles)
             h->setVisible(value.toBool());
     }
 
-    return QGraphicsItem::itemChange(change, value);
+    return CResizablePixmapGraphicsItem::itemChange(change, value);
 }
 
 void CRobotGraphicsItem::paint(QPainter *painter,
                                const QStyleOptionGraphicsItem *option,
                                QWidget *widget)
 {
-    QGraphicsPixmapItem::paint(painter, option, widget);
+    CResizablePixmapGraphicsItem::paint(painter, option, widget);
 
     QPointF c(boundingRect().center());
     QLineF line(c.x(), 0.0, c.x(), -100.0);
@@ -252,14 +213,4 @@ void CRobotGraphicsItem::paint(QPainter *painter,
     }
 
     painter->drawLine(line);
-
-    if (option->state & QStyle::State_Selected)
-    {
-        painter->drawRect(boundingRect());
-
-        if (pressedHandle)
-        {
-//            painter->drawLine(mapFromItem(pressedHandle));
-        }
-    }
 }

@@ -50,10 +50,28 @@ void CRobotScene::updateItemsZ()
     foreach (QGraphicsItem *it, items())
     {
         if (it->isSelected())
-            it->setZValue(2.0);
-        else
             it->setZValue(1.0);
+        else
+            it->setZValue(0.0);
     }
+}
+
+void CRobotScene::removeLight(QObject *o)
+{
+    qDebug() << "Removing light";
+    CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
+    oldLightSettings.remove(l);
+    lights.removeOne(l);
+    lightingDirty = true;
+}
+
+void CRobotScene::removeWall(QObject *o)
+{
+    qDebug() << "Removing wall";
+    CResizablePixmapGraphicsItem *w = static_cast<CResizablePixmapGraphicsItem *>(o);
+    oldWallPositions.remove(w);
+    walls.remove(w);
+    lightingDirty = true;
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -166,6 +184,7 @@ void CRobotScene::addLight(const QPointF &p, float r)
     l->setPos(p - QPointF(r, r));
     l->setVisible(editModeEnabled);
     addItem(l);
+    connect(l, SIGNAL(destroyed(QObject*)), this, SLOT(removeLight(QObject*)));
     lights << l;
 }
 
@@ -178,6 +197,8 @@ void CRobotScene::addWall(const QRectF &rect, bool st)
         resi->setPos(rect.topLeft());
         resi->setSize(rect.size());
         addItem(resi);
+        connect(resi, SIGNAL(destroyed(QObject*)), this,
+                SLOT(removeWall(QObject*)));
         walls[resi] = st;
     }
     else

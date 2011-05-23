@@ -4,7 +4,7 @@
 #include <QtGui>
 
 CLightGraphicsItem::CLightGraphicsItem(float r, QGraphicsItem *parent) :
-    QGraphicsItem(parent), radius(r), dragging(false), handleDragging(false)
+    CBaseGraphicsItem(parent), radius(r), handleDragging(false)
 {
     setFlag(ItemIsSelectable);
 
@@ -47,32 +47,6 @@ float CLightGraphicsItem::intensityAt(const QPointF &p,
 
     const float maxint = 2.0;
     return ((radius - d) / radius) * maxint;
-}
-
-void CLightGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
-{
-    dragMousePos = event->pos();
-    dragging = true;
-    QGraphicsItem::mousePressEvent(event);
-}
-
-void CLightGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
-{
-    if (dragging)
-    {
-        QRectF r(boundingRect());
-        const QPointF offset(dragMousePos - r.center());
-        r.moveCenter(mapToParent(event->pos() - offset));
-        setPos(r.topLeft());
-    }
-
-    QGraphicsItem::mouseMoveEvent(event);
-}
-
-void CLightGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
-{
-    dragging = false;
-    QGraphicsItem::mouseReleaseEvent(event);
 }
 
 bool CLightGraphicsItem::sceneEventFilter(QGraphicsItem *, QEvent *event)
@@ -121,15 +95,9 @@ QVariant CLightGraphicsItem::itemChange(GraphicsItemChange change,
     if (change == ItemSceneHasChanged)
         radiusHandle->installSceneEventFilter(this);
     else if (change == ItemSelectedHasChanged)
-    {
         radiusHandle->setVisible(value.toBool());
-        if (value.toBool())
-            setCursor(Qt::SizeAllCursor);
-        else
-            setCursor(Qt::ArrowCursor);
-    }
 
-    return QGraphicsItem::itemChange(change, value);
+    return CBaseGraphicsItem::itemChange(change, value);
 }
 
 QPainterPath CLightGraphicsItem::shape() const
@@ -140,9 +108,11 @@ QPainterPath CLightGraphicsItem::shape() const
 }
 
 void CLightGraphicsItem::paint(QPainter *painter,
-                               const QStyleOptionGraphicsItem *,
-                               QWidget *)
+                               const QStyleOptionGraphicsItem *option,
+                               QWidget *widget)
 {
+    CBaseGraphicsItem::paint(painter, option, widget);
+
     QRadialGradient g(radius, radius, radius);
     g.setColorAt(0.0, QColor(255, 255, 0, 200));
     g.setColorAt(1.0, QColor(255, 180, 0, 50));
