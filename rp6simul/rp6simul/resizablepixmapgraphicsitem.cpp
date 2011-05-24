@@ -140,9 +140,17 @@ bool CResizablePixmapGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
     {
         pressedHandle = dynamic_cast<CHandleGraphicsItem *>(watched);
         Q_ASSERT(pressedHandle);
+        oldBoundRect = mapToScene(boundRect);
     }
     else if (event->type() == QEvent::GraphicsSceneMouseRelease)
-        pressedHandle = 0;
+    {
+        if (pressedHandle)
+        {
+            pressedHandle = 0;
+            if (oldBoundRect != mapToScene(boundRect))
+                emit sizeChanged();
+        }
+    }
     else if (event->type() == QEvent::GraphicsSceneMouseMove)
     {
         QGraphicsSceneMouseEvent *me =
@@ -184,7 +192,6 @@ QPainterPath CResizablePixmapGraphicsItem::shape() const
             pmShape.addRect(boundRect);
         else
         {
-            Q_ASSERT(!boundRect.isNull());
             QBitmap mask = pixmap.scaled(boundRect.size().toSize()).mask();
             Q_ASSERT(!mask.isNull());
             if (!mask.isNull())

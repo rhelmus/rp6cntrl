@@ -24,10 +24,7 @@ private:
     };
 
     QList<CLightGraphicsItem *> lights;
-    typedef QHash<CLightGraphicsItem *, SOldLightSettings> TOldLightSettings;
-    TOldLightSettings oldLightSettings;
     QHash<QGraphicsItem *, bool> walls;
-    QHash<QGraphicsItem *, QPointF> oldWallPositions;
     CRobotGraphicsItem *robotGraphicsItem;
     const QSizeF blockSize;
     QPixmap blockPixmap, boxPixmap;
@@ -43,9 +40,9 @@ private:
     QRectF getLightDragRect(void) const;
 
 private slots:
-    void updateItemsZ(void);
     void removeLight(QObject *o);
     void removeWall(QObject *o);
+    void markLightingDirty(void) { if (editModeEnabled) lightingDirty = true; }
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);

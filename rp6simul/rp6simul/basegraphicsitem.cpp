@@ -43,6 +43,7 @@ void CBaseGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
     if (isMovable)
     {
         mouseDragPos = event->pos();
+        oldPos = pos();
         dragging = true;
     }
 
@@ -64,8 +65,12 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void CBaseGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (isMovable)
+    if (isMovable && dragging)
+    {
         dragging = false;
+        if (pos() != oldPos)
+            emit posChanged();
+    }
 
     QGraphicsItem::mouseReleaseEvent(event);
 }
@@ -87,7 +92,11 @@ QVariant CBaseGraphicsItem::itemChange(GraphicsItemChange change,
                                        const QVariant &value)
 {
     if (change == ItemSelectedHasChanged)
-        updateMouseCursor(value.toBool());
+    {
+        const bool s = value.toBool();
+        updateMouseCursor(s);
+        setZValue(s ? 1.0 : 0.0);
+    }
 
     return QGraphicsItem::itemChange(change, value);
 }

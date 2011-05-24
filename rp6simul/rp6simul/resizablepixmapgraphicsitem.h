@@ -7,6 +7,8 @@
 
 class CResizablePixmapGraphicsItem : public CBaseGraphicsItem
 {
+    Q_OBJECT
+
     QRectF boundRect;
     QPixmap pixmap;
     bool tiled;
@@ -14,6 +16,7 @@ class CResizablePixmapGraphicsItem : public CBaseGraphicsItem
     typedef QHash<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
     THandleList handles;
     CHandleGraphicsItem *pressedHandle;
+    QPolygonF oldBoundRect;
     mutable QPainterPath pmShape;
     mutable bool hasShape;
 
@@ -37,6 +40,9 @@ public:
     void setSize(const QSizeF &s);
     void setSize(qreal w, qreal h) { setSize(QSizeF(w, h)); }
     void setResizable(bool r);
+
+signals:
+    void sizeChanged(void);
 };
 
 #endif // RESIZABLEPIXMAPGRAPHICSITEM_H
