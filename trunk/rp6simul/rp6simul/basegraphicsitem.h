@@ -11,8 +11,8 @@ class CBaseGraphicsItem : public QGraphicsObject
     Q_OBJECT
 
     bool isMovable;
-    bool dragging;
-    QPointF mouseDragPos;
+    bool dragging;    
+    QPointF mouseDragPos, oldPos;
 
     void updateMouseCursor(bool selected);
     void alignToGrid(QPointF pos);
@@ -31,6 +31,9 @@ public:
                QWidget *);
 
     void setMovable(bool m) { isMovable = m; updateMouseCursor(m); }
+
+signals:
+    void posChanged(void);
 };
 
 #endif // BASEGRAPHICSITEM_H

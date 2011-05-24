@@ -57,9 +57,17 @@ bool CLightGraphicsItem::sceneEventFilter(QGraphicsItem *, QEvent *event)
         QGraphicsSceneMouseEvent *me =
                 static_cast<QGraphicsSceneMouseEvent*>(event);
         radiusDragMousePos = mapToScene(mapFromItem(radiusHandle, me->pos()));
+        oldRadius = radius;
     }
     else if (event->type() == QEvent::GraphicsSceneMouseRelease)
-        handleDragging = false;
+    {
+        if (handleDragging)
+        {
+            handleDragging = false;
+            if (oldRadius != radius)
+                emit radiusChanged();
+        }
+    }
     else if (event->type() == QEvent::GraphicsSceneMouseMove)
     {
         if (handleDragging)

@@ -7,7 +7,9 @@ class CHandleGraphicsItem;
 
 class CLightGraphicsItem : public CBaseGraphicsItem
 {
-    float radius;
+    Q_OBJECT
+
+    float radius, oldRadius;
     bool handleDragging;
     QPointF radiusDragMousePos;
     CHandleGraphicsItem *radiusHandle;
@@ -30,6 +32,9 @@ public:
     float getRadius(void) const { return radius; }
     float intensityAt(const QPointF &p,
                       const QList<QPolygonF> &obstacles) const;
+
+signals:
+    void radiusChanged(void);
 };
 
 #endif // LIGHTGRAPHICSITEM_H

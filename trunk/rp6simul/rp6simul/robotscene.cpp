@@ -19,8 +19,6 @@ CRobotScene::CRobotScene(QObject *parent) :
     editModeEnabled(false)
 {
     setBackgroundBrush(Qt::darkGray);
-    // HACK: Is there any other way?
-    connect(this, SIGNAL(selectionChanged()), this, SLOT(updateItemsZ()));
 
     robotGraphicsItem = new CRobotGraphicsItem;
     robotGraphicsItem->setPos(50, 450); // UNDONE
@@ -44,34 +42,20 @@ QRectF CRobotScene::getLightDragRect(void) const
     return ret;
 }
 
-
-void CRobotScene::updateItemsZ()
-{
-    foreach (QGraphicsItem *it, items())
-    {
-        if (it->isSelected())
-            it->setZValue(1.0);
-        else
-            it->setZValue(0.0);
-    }
-}
-
 void CRobotScene::removeLight(QObject *o)
 {
     qDebug() << "Removing light";
     CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
-    oldLightSettings.remove(l);
     lights.removeOne(l);
-    lightingDirty = true;
+    markLightingDirty();
 }
 
 void CRobotScene::removeWall(QObject *o)
 {
     qDebug() << "Removing wall";
     CResizablePixmapGraphicsItem *w = static_cast<CResizablePixmapGraphicsItem *>(o);
-    oldWallPositions.remove(w);
     walls.remove(w);
-    lightingDirty = true;
+    markLightingDirty();
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -170,7 +154,7 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     else if (mouseMode == MODE_LIGHT)
     {
         const QRectF rect(getLightDragRect());
-        const qreal radius = rect.height()/2.0;
+        const float radius = rect.height()/2.0;
         addLight(rect.center(), radius);
         lightingDirty = true;
     }
@@ -185,6 +169,8 @@ void CRobotScene::addLight(const QPointF &p, float r)
     l->setVisible(editModeEnabled);
     addItem(l);
     connect(l, SIGNAL(destroyed(QObject*)), this, SLOT(removeLight(QObject*)));
+    connect(l, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
+    connect(l, SIGNAL(radiusChanged()), this, SLOT(markLightingDirty()));
     lights << l;
 }
 
@@ -199,6 +185,8 @@ void CRobotScene::addWall(const QRectF &rect, bool st)
         addItem(resi);
         connect(resi, SIGNAL(destroyed(QObject*)), this,
                 SLOT(removeWall(QObject*)));
+        connect(resi, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
+        connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
         walls[resi] = st;
     }
     else
@@ -295,25 +283,21 @@ void CRobotScene::setMouseMode(EMouseMode mode)
 
 void CRobotScene::setEditModeEnabled(bool e)
 {
+    if (e == editModeEnabled)
+        return;
+
     editModeEnabled = e;
 
     if (e)
     {
-        oldLightSettings.clear();
         foreach (CLightGraphicsItem *l, lights)
-        {
             l->setVisible(true);
-            oldLightSettings[l] = SOldLightSettings(l->pos(), l->getRadius());
-        }
 
-        oldWallPositions.clear();
         for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
              it!=walls.end(); ++it)
         {
             if (!it.value())
             {
-                oldWallPositions[it.key()] = it.key()->pos();
-
                 CResizablePixmapGraphicsItem *r =
                         static_cast<CResizablePixmapGraphicsItem *>(it.key());
                 r->setMovable(true);
@@ -321,19 +305,12 @@ void CRobotScene::setEditModeEnabled(bool e)
             }
         }
 
-        update();
+        setMouseMode(mouseMode); // Update mode, calls update() too
     }
     else
     {
         foreach (CLightGraphicsItem *l, lights)
-        {
             l->setVisible(false);
-
-            if (!lightingDirty && (!oldLightSettings.contains(l) ||
-                (l->pos() != oldLightSettings[l].pos) ||
-                (l->getRadius() != oldLightSettings[l].radius)))
-                lightingDirty = true;
-        }
 
         for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
              it!=walls.end(); ++it)
@@ -344,24 +321,18 @@ void CRobotScene::setEditModeEnabled(bool e)
                         static_cast<CResizablePixmapGraphicsItem *>(it.key());
                 r->setMovable(false);
                 r->setResizable(false);
-
-                // New wall or position of existing changed?
-                if (!lightingDirty && (!oldWallPositions.contains(r) ||
-                    (r->pos() != oldWallPositions[r])))
-                    lightingDirty = true;
             }
         }
 
         if (lightingDirty)
-        {
             updateLighting(); // calls update() too
-            lightingDirty = false;
-        }
         else
             update();
 
         dragging = false;
     }
+
+    lightingDirty = false;
 }
 
 void CRobotScene::clearMap()
