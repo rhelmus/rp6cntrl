@@ -4,9 +4,11 @@ http://zooboingreview.blogspot.com
 Wall texture from:
 http://www.freeseamlesstextures.com/
 
-RP6 texture:
-My camera :-) Do whatever you like with it (or send an improved version).
-
 Icons:
 - Oxygen theme
 - Mouse arrow: DMZ (http://jimmac.musichall.cz/themes.php)
+
+Self:
+- RP6 texture
+- Grid icon
+Do whatever you like with it (or send an improved version).

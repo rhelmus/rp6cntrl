@@ -1,11 +1,14 @@
 #include "basegraphicsitem.h"
+#include "robotscene.h"
 
 #include <QtGui>
 
 CBaseGraphicsItem::CBaseGraphicsItem(QGraphicsItem *parent)
-    : QGraphicsObject(parent), isMovable(true), dragging(false)
+    : QGraphicsObject(parent), isMovable(true), snapsToGrid(true),
+      isDeletable(true), dragging(false)
 {
     setFlag(ItemIsSelectable);
+    setFlag(ItemIsFocusable);
     setAcceptedMouseButtons(Qt::LeftButton);
     updateMouseCursor(false);
 }
@@ -16,26 +19,6 @@ void CBaseGraphicsItem::updateMouseCursor(bool selected)
         setCursor(Qt::ArrowCursor);
     else
         setCursor(Qt::SizeAllCursor);
-}
-
-void CBaseGraphicsItem::alignToGrid(QPointF pos)
-{
-    // UNDONE: Grid settings
-    // UNDONE: Optional for robot item
-    const int gridsize = 10;
-    int rx = (int)pos.x() % gridsize, ry = (int)pos.y() % gridsize;
-
-    if (rx >= gridsize/2.0)
-        pos.rx() += (gridsize - rx);
-    else
-        pos.rx() -= rx;
-
-    if (ry >= gridsize/2.0)
-        pos.ry() += (gridsize - ry);
-    else
-        pos.ry() -= ry;
-
-    setPos(pos);
 }
 
 void CBaseGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -57,7 +40,20 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
         QRectF r(boundingRect());
         const QPointF offset(mouseDragPos - r.center());
         r.moveCenter(mapToParent(event->pos() - offset));
-        alignToGrid(r.topLeft());
+
+        QPointF newp;
+        if (snapsToGrid)
+        {
+            CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+            Q_ASSERT(rscene);
+            if (rscene->autoGrid())
+                newp = rscene->alignPosToGrid(r.topLeft());
+        }
+
+        if (newp.isNull())
+            newp = r.topLeft();
+
+        setPos(newp);
     }
 
     QGraphicsItem::mouseMoveEvent(event);
@@ -72,20 +68,56 @@ void CBaseGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             emit posChanged();
     }
 
+    setFocus(Qt::MouseFocusReason);
+
     QGraphicsItem::mouseReleaseEvent(event);
+}
+
+void CBaseGraphicsItem::keyReleaseEvent(QKeyEvent *event)
+{
+    qDebug() << "Key release:" << event;
+
+    if (isDeletable && (event->key() == Qt::Key_Delete))
+    {
+        deleteLater();
+        event->accept();
+    }
+    else
+        event->ignore();
+
+    QGraphicsItem::keyReleaseEvent(event);
 }
 
 void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 {
     QMenu menu;
-    QAction *aligna = menu.addAction("Align to grid");
-    QAction *dela = menu.addAction(QIcon("../resource/delete.png"), "Delete");
-    QAction *a =menu.exec(event->screenPos());
+    QAction *aligna = 0, *dela = 0;
 
-    if (a == aligna)
-        alignToGrid(pos());
-    else if (a == dela)
-        deleteLater();
+    if (isMovable)
+        aligna = menu.addAction(QIcon("../resource/grid-icon.png"),
+                                "Align to grid");
+
+    if (isDeletable)
+        dela = menu.addAction(QIcon("../resource/delete.png"), "Delete");
+
+    if (menu.isEmpty())
+        return;
+
+    QAction *a = menu.exec(event->screenPos());
+
+    if (a) // Need to check as variables may 0 as well.
+    {
+        if (a == aligna)
+        {
+            CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+            Q_ASSERT(rscene);
+            setPos(rscene->alignPosToGrid(pos()));
+        }
+        else if (a == dela)
+            deleteLater();
+    }
+
+    QGraphicsItem::contextMenuEvent(event);
 }
 
 QVariant CBaseGraphicsItem::itemChange(GraphicsItemChange change,

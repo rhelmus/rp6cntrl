@@ -8,6 +8,7 @@
 #include <QString>
 
 #include "lua.h"
+#include "robotscene.h"
 
 class QActionGroup;
 class QGraphicsView;
@@ -19,7 +20,6 @@ class QTableWidget;
 class QTreeWidget;
 
 class CProjectWizard;
-class CRobotScene;
 class CSimulator;
 
 class CRP6Simulator : public QMainWindow
@@ -32,6 +32,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
+    QAction *toggleGridAction;
     QActionGroup *editMapActionGroup;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
@@ -80,6 +81,7 @@ private slots:
     void runPlugin(void);
     void stopPlugin(void);
     void changeSceneMouseMode(QAction *a);
+    void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void zoomSceneIn(void);
     void zoomSceneOut(void);
     void toggleEditMap(bool checked);

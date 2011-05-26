@@ -10,17 +10,18 @@ class CBaseGraphicsItem : public QGraphicsObject
 {
     Q_OBJECT
 
-    bool isMovable;
+    bool isMovable, snapsToGrid;
+    bool isDeletable;
     bool dragging;    
     QPointF mouseDragPos, oldPos;
 
     void updateMouseCursor(bool selected);
-    void alignToGrid(QPointF pos);
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
+    void keyReleaseEvent(QKeyEvent *event);
     void contextMenuEvent(QGraphicsSceneContextMenuEvent *event);
     QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
@@ -31,6 +32,8 @@ public:
                QWidget *);
 
     void setMovable(bool m) { isMovable = m; updateMouseCursor(m); }
+    void setSnapsToGrid(bool s) { snapsToGrid = s; }
+    void setDeletable(bool d) { isDeletable = d; }
 
 signals:
     void posChanged(void);

@@ -35,11 +35,15 @@ private:
     bool dragging;
     EMouseMode mouseMode;
     bool editModeEnabled;
+    float gridSize;
+    bool autoGridEnabled, gridVisible;
+    QImage gridImage;
 
     QRectF getDragRect(void) const;
     QRectF getLightDragRect(void) const;
 
 private slots:
+    void updateGrid(void);
     void removeLight(QObject *o);
     void removeWall(QObject *o);
     void markLightingDirty(void) { if (editModeEnabled) lightingDirty = true; }
@@ -59,12 +63,19 @@ public:
     void addWall(qreal x, qreal y, qreal w, qreal h, bool st)
     { addWall(QRectF(x, y, w, h), st); }
     void updateLighting(void);
-    void setMouseMode(EMouseMode mode);
+    void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
+    bool autoGrid(void) const { return autoGridEnabled; }
+    QPointF alignPosToGrid(QPointF pos) const;
 
 public slots:
     void clearMap(void);
+    void setGridVisible(bool v)
+    { if (v != gridVisible) { gridVisible = v; update(); } }
+
+signals:
+    void mouseModeChanged(CRobotScene::EMouseMode);
 };
 
 #endif // ROBOTSCENE_H

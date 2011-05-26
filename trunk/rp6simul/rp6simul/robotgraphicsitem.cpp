@@ -8,6 +8,8 @@ CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
 {
     setTransformOriginPoint(boundingRect().center());
     setResizable(false);
+    setDeletable(false);
+    setSnapsToGrid(false);
 
     addHandle(CHandleGraphicsItem::HANDLE_LEFT |
               CHandleGraphicsItem::HANDLE_TOP);
