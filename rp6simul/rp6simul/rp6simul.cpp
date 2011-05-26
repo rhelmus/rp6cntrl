@@ -5,7 +5,6 @@
 #include "resizablegraphicsitem.h"
 #include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
-#include "robotscene.h"
 #include "simulator.h"
 #include "utils.h"
 
@@ -216,6 +215,12 @@ void CRP6Simulator::createToolbars()
     a->setData(CRobotScene::MODE_LIGHT);
     toolb->addAction(a);
 
+    toggleGridAction = toolb->addAction(QIcon("../resource/grid-icon.png"),
+                                        "Toggle grid visibility",
+                                        robotScene, SLOT(setGridVisible(bool)));
+    toggleGridAction->setCheckable(true);
+
+
     setToolBarToolTips();
 }
 
@@ -224,6 +229,8 @@ QWidget *CRP6Simulator::createMainWidget()
     robotScene = new CRobotScene(this);
     QRectF screct(0.0, 0.0, 900.0, 900.0);
     robotScene->setSceneRect(screct);
+    connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
+            SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
 
     robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
     robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
@@ -615,6 +622,13 @@ void CRP6Simulator::changeSceneMouseMode(QAction *a)
     robotScene->setMouseMode(mode);
 }
 
+void CRP6Simulator::sceneMouseModeChanged(CRobotScene::EMouseMode mode)
+{
+    QList<QAction *> actions = editMapActionGroup->actions();
+    foreach (QAction *a, actions)
+        a->setChecked((a->data().toInt() == static_cast<int>(mode)));
+}
+
 void CRP6Simulator::zoomSceneIn()
 {
     scaleGraphicsView(1.2);
@@ -628,6 +642,7 @@ void CRP6Simulator::zoomSceneOut()
 void CRP6Simulator::toggleEditMap(bool checked)
 {
     editMapActionGroup->setEnabled(checked);
+    toggleGridAction->setEnabled(checked);
     robotScene->setEditModeEnabled(checked);
 }
 

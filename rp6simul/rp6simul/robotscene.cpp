@@ -16,13 +16,16 @@ CRobotScene::CRobotScene(QObject *parent) :
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
     lightingDirty(false), dragging(false), mouseMode(MODE_POINT),
-    editModeEnabled(false)
+    editModeEnabled(false), gridSize(15.0), autoGridEnabled(true),
+    gridVisible(false)
 {
     setBackgroundBrush(Qt::darkGray);
 
     robotGraphicsItem = new CRobotGraphicsItem;
     robotGraphicsItem->setPos(50, 450); // UNDONE
     addItem(robotGraphicsItem);
+
+    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(updateGrid()));
 }
 
 QRectF CRobotScene::getDragRect() const
@@ -40,6 +43,25 @@ QRectF CRobotScene::getLightDragRect(void) const
     ret.setBottom(mousePos.y());
     ret.setWidth(ret.height());
     return ret;
+}
+
+void CRobotScene::updateGrid()
+{
+    gridImage = QImage(sceneRect().size().toSize(),
+                       QImage::Format_ARGB32_Premultiplied);
+    gridImage.fill(Qt::transparent);
+    QPainter painter(&gridImage);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(Qt::blue, 0.25));
+
+    const float startx = sceneRect().left(), endx = sceneRect().right();
+    const float starty = sceneRect().top(), endy = sceneRect().bottom();
+
+    for (float x=startx; x<=endx; x+=gridSize)
+        painter.drawLine(x, starty, x, endy);
+
+    for (float y=starty; y<=endy; y+=gridSize)
+        painter.drawLine(startx, y, endx, y);
 }
 
 void CRobotScene::removeLight(QObject *o)
@@ -109,12 +131,16 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
         }
     }
 
+    if (editModeEnabled && gridVisible)
+        painter->drawImage(0, 0, gridImage);
+
     painter->restore();
 }
 
 void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {    
-    if (!editModeEnabled || (mouseMode == MODE_POINT))
+    if (!editModeEnabled || (mouseMode == MODE_POINT) ||
+        (event->button() != Qt::LeftButton))
         QGraphicsScene::mousePressEvent(event);
     else if ((mouseMode == MODE_WALL) || (mouseMode == MODE_BOX) ||
              (mouseMode == MODE_LIGHT))
@@ -135,7 +161,11 @@ void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (!editModeEnabled || (mouseMode == MODE_POINT))
+    if ((event->button() == Qt::RightButton))
+        setMouseMode(MODE_POINT, true);
+
+    if (!editModeEnabled || (mouseMode == MODE_POINT) ||
+        (event->button() != Qt::LeftButton))
         QGraphicsScene::mousePressEvent(event);
     else if (mouseMode == MODE_WALL)
     {
@@ -268,7 +298,7 @@ void CRobotScene::updateLighting()
     update();
 }
 
-void CRobotScene::setMouseMode(EMouseMode mode)
+void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
 {
     mouseMode = mode;
     if (mode != MODE_POINT)
@@ -279,6 +309,9 @@ void CRobotScene::setMouseMode(EMouseMode mode)
     }
 
     update();
+
+    if (sign)
+        emit mouseModeChanged(mode);
 }
 
 void CRobotScene::setEditModeEnabled(bool e)
@@ -333,6 +366,23 @@ void CRobotScene::setEditModeEnabled(bool e)
     }
 
     lightingDirty = false;
+}
+
+QPointF CRobotScene::alignPosToGrid(QPointF pos) const
+{
+    int rx = (int)pos.x() % (int)gridSize, ry = (int)pos.y() % (int)gridSize;
+
+    if (rx >= gridSize/2.0)
+        pos.rx() += (gridSize - rx);
+    else
+        pos.rx() -= rx;
+
+    if (ry >= gridSize/2.0)
+        pos.ry() += (gridSize - ry);
+    else
+        pos.ry() -= ry;
+
+    return pos;
 }
 
 void CRobotScene::clearMap()
