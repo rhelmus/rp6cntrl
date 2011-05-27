@@ -23,11 +23,11 @@ SOURCES += main.cpp\
     simulator.cpp \
     robotgraphicsitem.cpp \
     robotscene.cpp \
-    resizablegraphicsitem.cpp \
     handlegraphicsitem.cpp \
     resizablepixmapgraphicsitem.cpp \
     lightgraphicsitem.cpp \
-    basegraphicsitem.cpp
+    basegraphicsitem.cpp \
+    mapsettingsdialog.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -41,11 +41,11 @@ HEADERS  += rp6simul.h \
     simulator.h \
     robotgraphicsitem.h \
     robotscene.h \
-    resizablegraphicsitem.h \
     handlegraphicsitem.h \
     resizablepixmapgraphicsitem.h \
     lightgraphicsitem.h \
-    basegraphicsitem.h
+    basegraphicsitem.h \
+    mapsettingsdialog.h
 
 OTHER_FILES += \
     TODO.txt \

@@ -32,7 +32,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
-    QAction *toggleGridAction;
+    QAction *toggleGridAction, *toggleLightsAction;
     QActionGroup *editMapActionGroup;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
@@ -53,8 +53,6 @@ class CRP6Simulator : public QMainWindow
     static CRP6Simulator *instance;
 
     void createMenus(void);
-    QPixmap createAddLightImage(void) const;
-    QPixmap createLightSettingsImage(void) const;
     void setToolBarToolTips(void);
     void createToolbars(void);
     QWidget *createMainWidget(void);
@@ -84,6 +82,7 @@ private slots:
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void zoomSceneIn(void);
     void zoomSceneOut(void);
+    void editMapSettings(void);
     void toggleEditMap(bool checked);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);

@@ -8,9 +8,6 @@ CResizablePixmapGraphicsItem::CResizablePixmapGraphicsItem(const QPixmap &pm,
     : CBaseGraphicsItem(parent), pixmap(pm), tiled(t), isResizable(true),
       pressedHandle(0), hasShape(false)
 {
-    setFlags(ItemIsSelectable);
-    setAcceptedMouseButtons(Qt::LeftButton);
-
     addHandle(CHandleGraphicsItem::HANDLE_LEFT);
     addHandle(CHandleGraphicsItem::HANDLE_RIGHT);
     addHandle(CHandleGraphicsItem::HANDLE_TOP);
@@ -71,7 +68,7 @@ void CResizablePixmapGraphicsItem::updateGeometry(const QPointF &mousepos)
 
     const CHandleGraphicsItem::EHandlePosFlags handlepos =
             pressedHandle->handlePosition();
-    const qreal minsize = 20.0;
+    const qreal minsize = 15.0;
     qreal mvx = 0.0, mvy = 0.0, expx = 0.0, expy = 0.0;
 
     if (handlepos & CHandleGraphicsItem::HANDLE_LEFT)

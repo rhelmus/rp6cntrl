@@ -16,7 +16,7 @@ CBaseGraphicsItem::CBaseGraphicsItem(QGraphicsItem *parent)
 void CBaseGraphicsItem::updateMouseCursor(bool selected)
 {
     if (!selected || !isMovable)
-        setCursor(Qt::ArrowCursor);
+        unsetCursor();
     else
         setCursor(Qt::SizeAllCursor);
 }
@@ -46,7 +46,7 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
         {
             CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
             Q_ASSERT(rscene);
-            if (rscene->autoGrid())
+            if (rscene->getAutoGrid())
                 newp = rscene->alignPosToGrid(r.topLeft());
         }
 
@@ -68,15 +68,11 @@ void CBaseGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             emit posChanged();
     }
 
-    setFocus(Qt::MouseFocusReason);
-
     QGraphicsItem::mouseReleaseEvent(event);
 }
 
 void CBaseGraphicsItem::keyReleaseEvent(QKeyEvent *event)
 {
-    qDebug() << "Key release:" << event;
-
     if (isDeletable && (event->key() == Qt::Key_Delete))
     {
         deleteLater();
@@ -98,7 +94,12 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
                                 "Align to grid");
 
     if (isDeletable)
+    {
         dela = menu.addAction(QIcon("../resource/delete.png"), "Delete");
+        // NOTE: Although the shortcut is set here, real key presses are
+        // handled in keyReleaseEvent()
+        dela->setShortcut(Qt::Key_Delete);
+    }
 
     if (menu.isEmpty())
         return;
