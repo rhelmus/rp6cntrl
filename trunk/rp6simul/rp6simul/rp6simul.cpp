@@ -1,8 +1,8 @@
 #include "rp6simul.h"
 #include "avrtimer.h"
 #include "lua.h"
+#include "mapsettingsdialog.h"
 #include "projectwizard.h"
-#include "resizablegraphicsitem.h"
 #include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
 #include "simulator.h"
@@ -93,46 +93,6 @@ void CRP6Simulator::createMenus()
     menu->addAction("About Qt", qApp, SLOT(aboutQt()));
 }
 
-QPixmap CRP6Simulator::createAddLightImage() const
-{
-    const QRectF rect(0.0, 0.0, 100.0, 100.0);
-    QPixmap ret(rect.size().toSize());
-
-    ret.fill(Qt::transparent);
-
-    QPainter painter(&ret);
-    QRadialGradient g(rect.center(), rect.width()/2);
-    g.setColorAt(0.0, QColor(255, 255, 0));
-    g.setColorAt(1.0, QColor(255, 140, 0));
-    painter.setBrush(g);
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(rect);
-
-    return ret;
-}
-
-QPixmap CRP6Simulator::createLightSettingsImage() const
-{
-    QRectF rect(0.0, 0.0, 100.0, 100.0);
-    QPixmap ret(rect.size().toSize());
-
-    ret.fill(Qt::transparent);
-
-    QPainter painter(&ret);
-    QRadialGradient g(rect.center(), rect.width()/2);
-    g.setColorAt(0.0, QColor(255, 255, 0));
-    g.setColorAt(1.0, QColor(255, 140, 0));
-    painter.setBrush(g);
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(rect);
-
-    rect.setTop(rect.height() / 4);
-    rect.setRight(rect.width() * 0.75);
-    painter.drawPixmap(rect.toRect(), QPixmap("../resource/configure.png"));
-
-    return ret;
-}
-
 void CRP6Simulator::setToolBarToolTips()
 {
     QList<QToolBar *> toolbars = findChildren<QToolBar *>();
@@ -178,7 +138,8 @@ void CRP6Simulator::createToolbars()
                          this, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
 
-    toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings");
+    toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
+                     this, SLOT(editMapSettings()));
 
     toolb->addAction(QIcon("../resource/clear.png"),
                      "Clear map (removes all walls and items)", robotScene,
@@ -209,16 +170,23 @@ void CRP6Simulator::createToolbars()
     a->setData(CRobotScene::MODE_BOX);
     toolb->addAction(a);
 
-    a = editMapActionGroup->addAction(QIcon(createAddLightImage()),
+    a = editMapActionGroup->addAction(QIcon("../resource/light-add.png"),
                                       "Add light source");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_LIGHT);
     toolb->addAction(a);
 
+    toggleLightsAction = toolb->addAction(QIcon("../resource/light-icon.png"),
+                                        "Toggle light item visibility",
+                                        robotScene, SLOT(setLightItemsVisible(bool)));
+    toggleLightsAction->setCheckable(true);
+    toggleLightsAction->setEnabled(false);
+
     toggleGridAction = toolb->addAction(QIcon("../resource/grid-icon.png"),
                                         "Toggle grid visibility",
                                         robotScene, SLOT(setGridVisible(bool)));
     toggleGridAction->setCheckable(true);
+    toggleGridAction->setEnabled(false);
 
 
     setToolBarToolTips();
@@ -639,9 +607,33 @@ void CRP6Simulator::zoomSceneOut()
     scaleGraphicsView(1/1.2);
 }
 
+void CRP6Simulator::editMapSettings()
+{
+    CMapSettingsDialog dialog;
+
+    dialog.setMapSize(robotScene->sceneRect().size());
+    dialog.setAutoRefreshLight(true); // UNDONE
+    dialog.setAmbientLight(robotScene->getAmbientLight());
+    dialog.setGridSize(robotScene->getGridSize());
+    dialog.setAutoGridSnap(robotScene->getAutoGrid());
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        QRectF r(robotScene->sceneRect());
+        r.setSize(dialog.getMapSize());
+        robotScene->setSceneRect(r);
+//        robotScene->setAutoRefreshLight(dialog.getAutoRefreshLight()); UNDONE
+        robotScene->setAmbientLight(dialog.getAmbientLight());
+        robotScene->updateLighting(); // UNDONE
+        robotScene->setGridSize(dialog.getGridSize());
+        robotScene->setAutoGrid(dialog.getAutoGridSnap());
+    }
+}
+
 void CRP6Simulator::toggleEditMap(bool checked)
 {
     editMapActionGroup->setEnabled(checked);
+    toggleLightsAction->setEnabled(checked);
     toggleGridAction->setEnabled(checked);
     robotScene->setEditModeEnabled(checked);
 }

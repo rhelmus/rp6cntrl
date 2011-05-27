@@ -6,16 +6,30 @@
 
 #include <QtGui>
 
+namespace {
+
+QRectF getMinRect(QRectF r, qreal minw, qreal minh)
+{
+    if (r.width() < minw)
+        r.setWidth(minw);
+    if (r.height() < minh)
+        r.setHeight(minh);
+    return r;
+}
+
+}
+
 CRobotScene::CRobotScene(QObject *parent) :
-    QGraphicsScene(parent), blockSize(30.0, 30.0),
-    blockPixmap(QPixmap("../resource/wall.jpg").scaled(blockSize.toSize(),
-                                                       Qt::IgnoreAspectRatio,
-                                                       Qt::SmoothTransformation)),
-    boxPixmap("../resource/cardboard-box.png"),
+    QGraphicsScene(parent),
     backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
-    lightingDirty(false), dragging(false), mouseMode(MODE_POINT),
+    lightingDirty(false), lightItemsVisible(false), ambientLight(0.35),
+    blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
+                                                       Qt::IgnoreAspectRatio,
+                                                       Qt::SmoothTransformation)),
+    boxPixmap("../resource/cardboard-box.png"),
+    dragging(false), draggedEnough(false), mouseMode(MODE_POINT),
     editModeEnabled(false), gridSize(15.0), autoGridEnabled(true),
     gridVisible(false)
 {
@@ -33,7 +47,7 @@ QRectF CRobotScene::getDragRect() const
     QRectF ret;
     ret.setTopLeft(mouseDragStartPos);
     ret.setBottomRight(mousePos);
-    return ret;
+    return getMinRect(ret, 0.0, 0.0);
 }
 
 QRectF CRobotScene::getLightDragRect(void) const
@@ -42,7 +56,18 @@ QRectF CRobotScene::getLightDragRect(void) const
     ret.setTopLeft(mouseDragStartPos);
     ret.setBottom(mousePos.y());
     ret.setWidth(ret.height());
-    return ret;
+    return getMinRect(ret, 0.0, 0.0);
+}
+
+void CRobotScene::updateMouseCursor()
+{
+    QWidget *vp = views()[0]->viewport();
+    Q_ASSERT(vp);
+
+    if (!editModeEnabled || (mouseMode == MODE_POINT))
+        vp->unsetCursor();
+    else
+        vp->setCursor(Qt::CrossCursor);
 }
 
 void CRobotScene::updateGrid()
@@ -104,7 +129,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
     }
 
-    if (dragging)
+    if (dragging && draggedEnough)
     {
         if (mouseMode == MODE_WALL)
         {
@@ -147,6 +172,7 @@ void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
     {
         mouseDragStartPos = event->scenePos();
         dragging = true;
+        draggedEnough = false;
     }
 }
 
@@ -156,7 +182,17 @@ void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     if (!editModeEnabled || (mouseMode == MODE_POINT))
         QGraphicsScene::mouseMoveEvent(event);
     else if (dragging)
-        update();
+    {
+        if (!draggedEnough)
+        {
+            const QSizeF s(getDragRect().size());
+            const qreal minsize = 7.5;
+            draggedEnough = ((s.width() >= minsize) && (s.height() >= minsize));
+        }
+
+        if (draggedEnough)
+            update();
+    }
 }
 
 void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
@@ -166,30 +202,35 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
     if (!editModeEnabled || (mouseMode == MODE_POINT) ||
         (event->button() != Qt::LeftButton))
-        QGraphicsScene::mousePressEvent(event);
-    else if (mouseMode == MODE_WALL)
+        QGraphicsScene::mouseReleaseEvent(event);
+    else if (draggedEnough)
     {
-        addWall(getDragRect(), false);
-        lightingDirty = true;
-    }
-    else if (mouseMode == MODE_BOX)
-    {
-        CResizablePixmapGraphicsItem *resi =
-                new CResizablePixmapGraphicsItem(boxPixmap, false);
-        const QRectF r(getDragRect());
-        resi->setPos(r.topLeft());
-        resi->setSize(r.size());
-        addItem(resi);
-    }
-    else if (mouseMode == MODE_LIGHT)
-    {
-        const QRectF rect(getLightDragRect());
-        const float radius = rect.height()/2.0;
-        addLight(rect.center(), radius);
-        lightingDirty = true;
+        const qreal minsize = 15.0;
+
+        if (mouseMode == MODE_WALL)
+        {
+            addWall(getMinRect(getDragRect(), minsize, minsize), false);
+            lightingDirty = true;
+        }
+        else if (mouseMode == MODE_BOX)
+        {
+            const QRectF r(getMinRect(getDragRect(), minsize, minsize));
+            CResizablePixmapGraphicsItem *resi =
+                    new CResizablePixmapGraphicsItem(boxPixmap, false);
+            resi->setPos(r.topLeft());
+            resi->setSize(r.size());
+            addItem(resi);
+        }
+        else if (mouseMode == MODE_LIGHT)
+        {
+            const QRectF r(getMinRect(getLightDragRect(), minsize, minsize));
+            const float radius = r.height()/2.0;
+            addLight(r.center(), radius);
+            lightingDirty = true;
+        }
     }
 
-    dragging = false;
+    dragging = draggedEnough = false;
 }
 
 void CRobotScene::addLight(const QPointF &p, float r)
@@ -244,8 +285,6 @@ void CRobotScene::updateLighting()
     QPainter lipainter(&lightImage);
     lipainter.setRenderHint(QPainter::Antialiasing);
 
-    const float baseintensity = 0.35; // UNDONE
-
     QProgressDialog prgdialog(CRP6Simulator::getInstance(),
                               Qt::FramelessWindowHint);
     prgdialog.setLabelText("Calculating light map...");
@@ -270,7 +309,7 @@ void CRobotScene::updateLighting()
 
         for (int y=top; y<=bottom; ++y)
         {
-            float intensity = baseintensity;
+            float intensity = ambientLight;
 
             foreach (CLightGraphicsItem *l, lights)
             {
@@ -312,6 +351,8 @@ void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
 
     if (sign)
         emit mouseModeChanged(mode);
+
+    updateMouseCursor();
 }
 
 void CRobotScene::setEditModeEnabled(bool e)
@@ -323,8 +364,11 @@ void CRobotScene::setEditModeEnabled(bool e)
 
     if (e)
     {
-        foreach (CLightGraphicsItem *l, lights)
-            l->setVisible(true);
+        if (lightItemsVisible)
+        {
+            foreach (CLightGraphicsItem *l, lights)
+                l->setVisible(true);
+        }
 
         for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
              it!=walls.end(); ++it)
@@ -363,6 +407,7 @@ void CRobotScene::setEditModeEnabled(bool e)
             update();
 
         dragging = false;
+        updateMouseCursor();
     }
 
     lightingDirty = false;
@@ -406,4 +451,14 @@ void CRobotScene::clearMap()
     lights.clear();
     if (uplights)
         updateLighting();
+}
+
+void CRobotScene::setLightItemsVisible(bool v)
+{
+    lightItemsVisible = v;
+    if (editModeEnabled)
+    {
+        foreach (CLightGraphicsItem *l, lights)
+            l->setVisible(v);
+    }
 }

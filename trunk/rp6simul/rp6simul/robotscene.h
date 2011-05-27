@@ -24,15 +24,15 @@ private:
     };
 
     QList<CLightGraphicsItem *> lights;
-    QHash<QGraphicsItem *, bool> walls;
-    CRobotGraphicsItem *robotGraphicsItem;
-    const QSizeF blockSize;
-    QPixmap blockPixmap, boxPixmap;
     QPixmap backGroundPixmap;
     QImage shadowImage, lightImage;
-    bool lightingDirty;
+    bool lightingDirty, lightItemsVisible;
+    float ambientLight;
+    QHash<QGraphicsItem *, bool> walls;
+    QPixmap blockPixmap, boxPixmap;
+    CRobotGraphicsItem *robotGraphicsItem;
     QPointF mousePos, mouseDragStartPos;    
-    bool dragging;
+    bool dragging, draggedEnough;
     EMouseMode mouseMode;
     bool editModeEnabled;
     float gridSize;
@@ -41,6 +41,7 @@ private:
 
     QRectF getDragRect(void) const;
     QRectF getLightDragRect(void) const;
+    void updateMouseCursor(void);
 
 private slots:
     void updateGrid(void);
@@ -66,13 +67,19 @@ public:
     void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
-    bool autoGrid(void) const { return autoGridEnabled; }
+    float getAmbientLight(void) const { return ambientLight; }
+    void setAmbientLight(float l) { ambientLight = l; }
+    float getGridSize(void) const { return gridSize; }
+    void setGridSize(float s) { gridSize = s; updateGrid(); update(); }
+    bool getAutoGrid(void) const { return autoGridEnabled; }
+    void setAutoGrid(bool a) { autoGridEnabled = a; }
     QPointF alignPosToGrid(QPointF pos) const;
 
 public slots:
     void clearMap(void);
     void setGridVisible(bool v)
     { if (v != gridVisible) { gridVisible = v; update(); } }
+    void setLightItemsVisible(bool v);
 
 signals:
     void mouseModeChanged(CRobotScene::EMouseMode);

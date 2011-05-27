@@ -20,3 +20,6 @@
 - Map:
     - Import from other project files
     - Following robot
+    - Don't collide with lights, handles etc
+    - Map settings
+ - Robot widget
