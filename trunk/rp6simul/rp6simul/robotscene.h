@@ -5,6 +5,7 @@
 #include <QHash>
 
 class CLightGraphicsItem;
+class CResizablePixmapGraphicsItem;
 class CRobotGraphicsItem;
 
 class CRobotScene : public QGraphicsScene
@@ -15,20 +16,16 @@ public:
 private:
     Q_OBJECT
 
-    struct SOldLightSettings
-    {
-        QPointF pos;
-        float radius;
-        SOldLightSettings(void) : radius(0.0) { }
-        SOldLightSettings(const QPointF &p, float r) : pos(p), radius(r) { }
-    };
+    enum EStaticWall { WALL_LEFT, WALL_RIGHT, WALL_TOP, WALL_BOTTOM };
 
     QList<CLightGraphicsItem *> lights;
     QPixmap backGroundPixmap;
     QImage shadowImage, lightImage;
-    bool lightingDirty, lightItemsVisible;
+    bool lightingDirty, autoRefreshLighting;
+    bool lightItemsVisible;
     float ambientLight;
-    QHash<QGraphicsItem *, bool> walls;
+    QHash<EStaticWall, QGraphicsRectItem *> staticWalls;
+    QList<CResizablePixmapGraphicsItem *> dynamicWalls;
     QPixmap blockPixmap, boxPixmap;
     CRobotGraphicsItem *robotGraphicsItem;
     QPointF mousePos, mouseDragStartPos;    
@@ -42,12 +39,15 @@ private:
     QRectF getDragRect(void) const;
     QRectF getLightDragRect(void) const;
     void updateMouseCursor(void);
+    void updateGrid(void);
+    QGraphicsRectItem *createStaticWall(void) const;
+    void updateStaticWalls(void);
 
 private slots:
-    void updateGrid(void);
+    void updateMapSize(void);
     void removeLight(QObject *o);
     void removeWall(QObject *o);
-    void markLightingDirty(void) { if (editModeEnabled) lightingDirty = true; }
+    void markLightingDirty(void) { lightingDirty = true; }
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
@@ -60,15 +60,18 @@ public:
     explicit CRobotScene(QObject *parent = 0);
 
     void addLight(const QPointF &p, float r);
-    void addWall(const QRectF &rect, bool st);
-    void addWall(qreal x, qreal y, qreal w, qreal h, bool st)
-    { addWall(QRectF(x, y, w, h), st); }
+    void addWall(const QRectF &rect);
+    void addWall(qreal x, qreal y, qreal w, qreal h)
+    { addWall(QRectF(x, y, w, h)); }
     void updateLighting(void);
     void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
+    bool getAutoRefreshLighting(void) const { return autoRefreshLighting; }
+    void setAutoRefreshLighting(bool a) { autoRefreshLighting = a; }
     float getAmbientLight(void) const { return ambientLight; }
-    void setAmbientLight(float l) { ambientLight = l; }
+    void setAmbientLight(float l)
+    { if (l != ambientLight) { ambientLight = l; lightingDirty = true; } }
     float getGridSize(void) const { return gridSize; }
     void setGridSize(float s) { gridSize = s; updateGrid(); update(); }
     bool getAutoGrid(void) const { return autoGridEnabled; }
