@@ -6,6 +6,11 @@
 #include "utils.h"
 
 #include <signal.h>
+#include <unistd.h>
+
+#ifdef Q_OS_WIN32
+#include <windows.h>
+#endif
 
 #include <QApplication>
 #include <QMessageBox>
@@ -413,9 +418,12 @@ void CSimulator::terminatePluginMainThread()
                 else if (step == 3)
                 {
                     prgdialog.setLabelText("Plugin seems to be stuck, not asking anymore!");
+                    // UNDONE: Winies support
+#ifndef Q_OS_WIN32
                     sigval sv;
                     pthread_sigqueue(pluginMainThread->getThreadID(),
                                      SIGUSR1, sv);
+#endif
                     time.restart();
                 }
                 else
@@ -524,7 +532,11 @@ void CSimulator::checkPluginThreadDelay()
     {
         if (quitPlugin)
         {
+#ifdef Q_OS_WIN32
+            ExitThread(0);
+#else
             pthread_exit(0);
+#endif
             return;
         }
 
@@ -540,8 +552,12 @@ void CSimulator::checkPluginThreadDelay()
             if (delta > 50) // Delay every 50 us
             {
                 lastPluginDelay = ts;
+#ifdef Q_OS_WIN32
+                usleep(1);
+#else
                 ts.tv_sec = 0; ts.tv_nsec = 1000;
                 nanosleep(&ts, 0);
+#endif
             }
         }
     }

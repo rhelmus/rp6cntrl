@@ -1,6 +1,7 @@
 #ifndef SIMULATOR_H
 #define SIMULATOR_H
 
+#include "clock.h"
 #include "lua.h"
 #include "shared.h"
 

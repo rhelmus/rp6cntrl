@@ -2,6 +2,8 @@
 #include "lua.h"
 #include "utils.h"
 
+#include <unistd.h>
+
 #include <QDebug>
 #include <QTimer>
 
@@ -139,8 +141,13 @@ void CAVRClock::run()
 
     // Relieve CPU a bit
     // UNDONE: Make optional (same reasoning as above: get more accurate MHz for fast timers)
+
+#ifdef Q_OS_WIN32
+    usleep(1);
+#else
     timespec ts = { 0, 1000 };
     nanosleep(&ts, 0);
+#endif
 }
 
 CAVRTimer *CAVRClock::createTimer()

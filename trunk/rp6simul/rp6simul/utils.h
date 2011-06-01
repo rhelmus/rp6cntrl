@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "clock.h"
+
 #include <time.h>
 
 class QString;
