@@ -32,7 +32,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
-    QAction *toggleGridAction, *toggleLightsAction;
+    QList<QAction *> editMapActionList;
     QActionGroup *editMapActionGroup;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;

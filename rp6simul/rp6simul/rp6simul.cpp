@@ -128,7 +128,6 @@ void CRP6Simulator::createToolbars()
     editMapActionGroup = new QActionGroup(this);
     connect(editMapActionGroup, SIGNAL(triggered(QAction*)), this,
             SLOT(changeSceneMouseMode(QAction*)));
-    editMapActionGroup->setEnabled(false);
 
     QAction *a = toolb->addAction(QIcon("../resource/viewmag_.png"),
                                   "Zoom map out", this, SLOT(zoomSceneOut()));
@@ -138,13 +137,6 @@ void CRP6Simulator::createToolbars()
                          this, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
 
-    toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
-                     this, SLOT(editMapSettings()));
-
-    toolb->addAction(QIcon("../resource/clear.png"),
-                     "Clear map (removes all walls and items)", robotScene,
-                     SLOT(clearMap()));
-
     toolb->addSeparator();
 
     a = toolb->addAction(QIcon("../resource/tool.png"), "Toggle edit mode",
@@ -152,42 +144,57 @@ void CRP6Simulator::createToolbars()
     a->setCheckable(true);
     a->setShortcut(QKeySequence("Ctrl+E"));
 
+    a = toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
+                         this, SLOT(editMapSettings()));
+    editMapActionList << a;
+
+    a = toolb->addAction(QIcon("../resource/clear.png"),
+                         "Clear map (removes all walls and items)", robotScene,
+                         SLOT(clearMap()));
+    editMapActionList << a;
+
     a = editMapActionGroup->addAction(QIcon("../resource/mouse-arrow.png"),
                                       "Selection mode");
     a->setCheckable(true);
     a->setChecked(true);
     a->setData(CRobotScene::MODE_POINT);
     toolb->addAction(a);
+    editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/wall.jpg"), "Add wall");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_WALL);
     toolb->addAction(a);
+    editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/cardboard-box.png"),
                                       "Add box obstacle");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_BOX);
     toolb->addAction(a);
+    editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/light-add.png"),
                                       "Add light source");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_LIGHT);
     toolb->addAction(a);
+    editMapActionList << a;
 
-    toggleLightsAction = toolb->addAction(QIcon("../resource/light-icon.png"),
-                                        "Toggle light item visibility",
-                                        robotScene, SLOT(setLightItemsVisible(bool)));
-    toggleLightsAction->setCheckable(true);
-    toggleLightsAction->setEnabled(false);
+    a = toolb->addAction(QIcon("../resource/light-icon.png"),
+                         "Toggle light item visibility",
+                         robotScene, SLOT(setLightItemsVisible(bool)));
+    a->setCheckable(true);
+    editMapActionList << a;
 
-    toggleGridAction = toolb->addAction(QIcon("../resource/grid-icon.png"),
-                                        "Toggle grid visibility",
-                                        robotScene, SLOT(setGridVisible(bool)));
-    toggleGridAction->setCheckable(true);
-    toggleGridAction->setEnabled(false);
+    a = toolb->addAction(QIcon("../resource/grid-icon.png"),
+                         "Toggle grid visibility",
+                         robotScene, SLOT(setGridVisible(bool)));
+    a->setCheckable(true);
+    editMapActionList << a;
 
+    foreach (QAction *a, editMapActionList)
+        a->setEnabled(false);
 
     setToolBarToolTips();
 }
@@ -200,10 +207,10 @@ QWidget *CRP6Simulator::createMainWidget()
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
 
-    robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
-    robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
-    robotScene->addWall(screct.x(), screct.y(), 30.0, screct.height(), true);
-    robotScene->addWall(screct.right()-30.0, screct.y(), 30.0, screct.height(), true);
+//    robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
+//    robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
+//    robotScene->addWall(screct.x(), screct.y(), 30.0, screct.height(), true);
+//    robotScene->addWall(screct.right()-30.0, screct.y(), 30.0, screct.height(), true);
 
     robotScene->addLight(QPointF(250.0, 250.0), 200.0);
     robotScene->addLight(QPointF(550.0, 250.0), 200.0);
@@ -612,19 +619,18 @@ void CRP6Simulator::editMapSettings()
     CMapSettingsDialog dialog;
 
     dialog.setMapSize(robotScene->sceneRect().size());
-    dialog.setAutoRefreshLight(true); // UNDONE
+    dialog.setAutoRefreshLight(robotScene->getAutoRefreshLighting());
     dialog.setAmbientLight(robotScene->getAmbientLight());
     dialog.setGridSize(robotScene->getGridSize());
     dialog.setAutoGridSnap(robotScene->getAutoGrid());
 
     if (dialog.exec() == QDialog::Accepted)
     {
+        robotScene->setAutoRefreshLighting(dialog.getAutoRefreshLight());
         QRectF r(robotScene->sceneRect());
         r.setSize(dialog.getMapSize());
         robotScene->setSceneRect(r);
-//        robotScene->setAutoRefreshLight(dialog.getAutoRefreshLight()); UNDONE
         robotScene->setAmbientLight(dialog.getAmbientLight());
-        robotScene->updateLighting(); // UNDONE
         robotScene->setGridSize(dialog.getGridSize());
         robotScene->setAutoGrid(dialog.getAutoGridSnap());
     }
@@ -632,9 +638,8 @@ void CRP6Simulator::editMapSettings()
 
 void CRP6Simulator::toggleEditMap(bool checked)
 {
-    editMapActionGroup->setEnabled(checked);
-    toggleLightsAction->setEnabled(checked);
-    toggleGridAction->setEnabled(checked);
+    foreach (QAction *a, editMapActionList)
+        a->setEnabled(checked);
     robotScene->setEditModeEnabled(checked);
 }
 

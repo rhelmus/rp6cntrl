@@ -16,7 +16,7 @@ CPathInput::CPathInput(const QString &desc, EPathInputMode mode,
             SIGNAL(pathTextEdited(const QString &)));
 
     QCompleter *comp = new QCompleter(pathEdit);
-    QDirModel *dm = new QDirModel;
+    QDirModel *dm = new QDirModel(comp);
     if (mode == PATH_EXISTDIR)
         dm->setFilter(dm->filter() & ~QDir::Files);
     comp->setModel(dm);

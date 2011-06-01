@@ -24,7 +24,8 @@ CRobotScene::CRobotScene(QObject *parent) :
     backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
-    lightingDirty(false), lightItemsVisible(false), ambientLight(0.35),
+    lightingDirty(false), autoRefreshLighting(true),
+    lightItemsVisible(false), ambientLight(0.35),
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
@@ -39,7 +40,7 @@ CRobotScene::CRobotScene(QObject *parent) :
     robotGraphicsItem->setPos(50, 450); // UNDONE
     addItem(robotGraphicsItem);
 
-    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(updateGrid()));
+    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(updateMapSize()));
 }
 
 QRectF CRobotScene::getDragRect() const
@@ -89,20 +90,60 @@ void CRobotScene::updateGrid()
         painter.drawLine(startx, y, endx, y);
 }
 
+QGraphicsRectItem *CRobotScene::createStaticWall() const
+{
+    QGraphicsRectItem *ret = new QGraphicsRectItem;
+    ret->setPen(Qt::NoPen);
+    ret->setBrush(blockPixmap);
+    return ret;
+}
+
+void CRobotScene::updateStaticWalls()
+{
+    const QRectF sr(sceneRect());
+
+    if (staticWalls.isEmpty())
+    {
+        addItem(staticWalls[WALL_LEFT] = createStaticWall());
+        addItem(staticWalls[WALL_RIGHT] = createStaticWall());
+        addItem(staticWalls[WALL_TOP] = createStaticWall());
+        addItem(staticWalls[WALL_BOTTOM] = createStaticWall());
+    }
+
+    staticWalls[WALL_LEFT]->setPos(sr.x(), sr.y());
+    staticWalls[WALL_LEFT]->setRect(0.0, 0.0, 30.0, sr.height());
+
+    staticWalls[WALL_RIGHT]->setPos(sr.right()-30.0, sr.y());
+    staticWalls[WALL_RIGHT]->setRect(0.0, 0.0, 30.0, sr.height());
+
+    staticWalls[WALL_TOP]->setPos(sr.x(), sr.y());
+    staticWalls[WALL_TOP]->setRect(0.0, 0.0, sr.width(), 30.0);
+
+    staticWalls[WALL_BOTTOM]->setPos(sr.x(), sr.bottom()-30.0);
+    staticWalls[WALL_BOTTOM]->setRect(0.0, 0.0, sr.width(), 30.0);
+}
+
+void CRobotScene::updateMapSize()
+{
+    updateGrid();
+    updateStaticWalls();
+    lightingDirty = true;
+}
+
 void CRobotScene::removeLight(QObject *o)
 {
     qDebug() << "Removing light";
     CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
     lights.removeOne(l);
-    markLightingDirty();
+    lightingDirty = true;
 }
 
 void CRobotScene::removeWall(QObject *o)
 {
     qDebug() << "Removing wall";
     CResizablePixmapGraphicsItem *w = static_cast<CResizablePixmapGraphicsItem *>(o);
-    walls.remove(w);
-    markLightingDirty();
+    dynamicWalls.removeOne(w);
+    lightingDirty = true;
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -209,7 +250,7 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
         if (mouseMode == MODE_WALL)
         {
-            addWall(getMinRect(getDragRect(), minsize, minsize), false);
+            addWall(getMinRect(getDragRect(), minsize, minsize));
             lightingDirty = true;
         }
         else if (mouseMode == MODE_BOX)
@@ -245,36 +286,25 @@ void CRobotScene::addLight(const QPointF &p, float r)
     lights << l;
 }
 
-void CRobotScene::addWall(const QRectF &rect, bool st)
+void CRobotScene::addWall(const QRectF &rect)
 {
-    if (!st)
-    {
-        CResizablePixmapGraphicsItem *resi
-                = new CResizablePixmapGraphicsItem(blockPixmap, true);
-        resi->setPos(rect.topLeft());
-        resi->setSize(rect.size());
-        addItem(resi);
-        connect(resi, SIGNAL(destroyed(QObject*)), this,
-                SLOT(removeWall(QObject*)));
-        connect(resi, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
-        connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
-        walls[resi] = st;
-    }
-    else
-    {
-        QGraphicsRectItem *it = new QGraphicsRectItem(0.0, 0.0,
-                                                      rect.width(),
-                                                      rect.height());
-        it->setPen(Qt::NoPen);
-        it->setBrush(blockPixmap);
-        it->setPos(rect.topLeft());
-        addItem(it);
-        walls[it] = st;
-    }
+    CResizablePixmapGraphicsItem *resi
+            = new CResizablePixmapGraphicsItem(blockPixmap, true);
+    resi->setPos(rect.topLeft());
+    resi->setSize(rect.size());
+    addItem(resi);
+    connect(resi, SIGNAL(destroyed(QObject*)), this,
+            SLOT(removeWall(QObject*)));
+    connect(resi, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
+    connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
+    dynamicWalls << resi;
 }
 
 void CRobotScene::updateLighting()
 {
+    QTime startt;
+    startt.start();
+
     shadowImage = QImage(sceneRect().size().toSize(), QImage::Format_ARGB32_Premultiplied);
     shadowImage.fill(Qt::transparent);
     QPainter shpainter(&shadowImage);
@@ -294,8 +324,11 @@ void CRobotScene::updateLighting()
     prgdialog.setCancelButton(0); // No canceling
 
     QList<QPolygonF> obstacles;
-    foreach (QGraphicsItem *w, walls.keys())
+    foreach (QGraphicsItem *w, staticWalls.values())
         obstacles << w->mapToScene(w->boundingRect());
+    foreach (QGraphicsItem *w, dynamicWalls)
+        obstacles << w->mapToScene(w->boundingRect());
+
 
     const int left = sceneRect().left(), right = sceneRect().right();
     const int top = sceneRect().top(), bottom = sceneRect().bottom();
@@ -334,7 +367,10 @@ void CRobotScene::updateLighting()
         }
     }
 
+    lightingDirty = false;
     update();
+
+    qDebug() << "Updated lightingMap in" << startt.elapsed() << "ms.";
 }
 
 void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
@@ -370,16 +406,10 @@ void CRobotScene::setEditModeEnabled(bool e)
                 l->setVisible(true);
         }
 
-        for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
-             it!=walls.end(); ++it)
+        foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
         {
-            if (!it.value())
-            {
-                CResizablePixmapGraphicsItem *r =
-                        static_cast<CResizablePixmapGraphicsItem *>(it.key());
-                r->setMovable(true);
-                r->setResizable(true);
-            }
+            w->setMovable(true);
+            w->setResizable(true);
         }
 
         setMouseMode(mouseMode); // Update mode, calls update() too
@@ -389,16 +419,10 @@ void CRobotScene::setEditModeEnabled(bool e)
         foreach (CLightGraphicsItem *l, lights)
             l->setVisible(false);
 
-        for (QHash<QGraphicsItem *, bool>::iterator it=walls.begin();
-             it!=walls.end(); ++it)
+        foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
         {
-            if (!it.value())
-            {
-                CResizablePixmapGraphicsItem *r =
-                        static_cast<CResizablePixmapGraphicsItem *>(it.key());
-                r->setMovable(false);
-                r->setResizable(false);
-            }
+            w->setMovable(false);
+            w->setResizable(false);
         }
 
         if (lightingDirty)
@@ -408,9 +432,7 @@ void CRobotScene::setEditModeEnabled(bool e)
 
         dragging = false;
         updateMouseCursor();
-    }
-
-    lightingDirty = false;
+    }    
 }
 
 QPointF CRobotScene::alignPosToGrid(QPointF pos) const
@@ -432,25 +454,25 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
 
 void CRobotScene::clearMap()
 {
+    QList<QGraphicsItem *> swalls;
     foreach (QGraphicsItem *it, items())
     {
-        if (walls.contains(it))
-        {
-            if (walls[it])
-                continue; // Only remove non-static walls
-            walls.remove(it);
-        }
+        if (swalls.contains(it))
+            continue;
 
         if (it == robotGraphicsItem)
             continue;
 
+        CResizablePixmapGraphicsItem *rit =
+                dynamic_cast<CResizablePixmapGraphicsItem *>(it);
+        if (rit && dynamicWalls.contains(rit))
+            dynamicWalls.removeOne(rit);
+
         delete it;
     }
 
-    const bool uplights = !lights.isEmpty();
+    lightingDirty = (lightingDirty || !lights.isEmpty());
     lights.clear();
-    if (uplights)
-        updateLighting();
 }
 
 void CRobotScene::setLightItemsVisible(bool v)

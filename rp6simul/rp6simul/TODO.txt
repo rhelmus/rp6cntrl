@@ -22,4 +22,5 @@
     - Following robot
     - Don't collide with lights, handles etc
     - Map settings
+    - Disable (wall) delete outside edit mode
  - Robot widget
