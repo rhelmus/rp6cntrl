@@ -2,6 +2,7 @@
 #include "utils.h"
 
 #include <QDebug>
+#include <QDir>
 #include <QtGlobal>
 #include <QStringList>
 
@@ -107,7 +108,8 @@ CLuaInterface::~CLuaInterface()
 
 void CLuaInterface::exec()
 {
-    if (luaL_dofile(luaState, "lua/main.lua"))
+    const QString p = QDir::toNativeSeparators("lua/main.lua");
+    if (luaL_dofile(luaState, getCString(p)))
         luaError(luaState, true);
 }
 
