@@ -34,6 +34,7 @@ class CRP6Simulator : public QMainWindow
     QAction *runPluginAction, *stopPluginAction;
     QList<QAction *> editMapActionList;
     QActionGroup *editMapActionGroup;
+    QAction *updateMapLightingAction;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     QPlainTextEdit *logWidget;
