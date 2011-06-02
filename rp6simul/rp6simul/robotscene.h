@@ -63,7 +63,6 @@ public:
     void addWall(const QRectF &rect);
     void addWall(qreal x, qreal y, qreal w, qreal h)
     { addWall(QRectF(x, y, w, h)); }
-    void updateLighting(void);
     void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
@@ -79,6 +78,7 @@ public:
     QPointF alignPosToGrid(QPointF pos) const;
 
 public slots:
+    void updateLighting(void);
     void clearMap(void);
     void setGridVisible(bool v)
     { if (v != gridVisible) { gridVisible = v; update(); } }

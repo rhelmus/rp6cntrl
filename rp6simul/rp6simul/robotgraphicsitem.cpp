@@ -25,7 +25,7 @@ void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
 {
     QGraphicsRectItem *handle = new CHandleGraphicsItem(pos, this);
     handle->hide();
-    handle->setCursor(Qt::OpenHandCursor);
+    handle->setCursor(QPixmap("../resource/rotate.png"));
 
     QRectF hrect = handle->boundingRect();
     const QRectF myrect(boundingRect());

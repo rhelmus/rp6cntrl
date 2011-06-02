@@ -33,8 +33,7 @@ float CLightGraphicsItem::intensityAt(const QPointF &p,
 
     foreach (QPolygonF obpoly, obstacles)
     {
-        if (obpoly.containsPoint(c, Qt::OddEvenFill) ||
-            obpoly.containsPoint(p, Qt::OddEvenFill))
+        if (obpoly.containsPoint(c, Qt::OddEvenFill))
             return 0.0;
 
         for (QPolygonF::iterator it=obpoly.begin(); it!=(obpoly.end()-1); ++it)

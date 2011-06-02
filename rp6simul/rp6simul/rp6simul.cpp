@@ -139,6 +139,11 @@ void CRP6Simulator::createToolbars()
 
     toolb->addSeparator();
 
+    updateMapLightingAction =
+            toolb->addAction(QIcon("../resource/light-refresh.png"),
+                             "Update lighting", robotScene,
+                             SLOT(updateLighting()));
+
     a = toolb->addAction(QIcon("../resource/tool.png"), "Toggle edit mode",
                          this, SLOT(toggleEditMap(bool)));
     a->setCheckable(true);
@@ -206,11 +211,6 @@ QWidget *CRP6Simulator::createMainWidget()
     robotScene->setSceneRect(screct);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
-
-//    robotScene->addWall(screct.x(), screct.y(), screct.width(), 30.0, true);
-//    robotScene->addWall(screct.x(), screct.bottom()-30.0, screct.width(), 30.0, true);
-//    robotScene->addWall(screct.x(), screct.y(), 30.0, screct.height(), true);
-//    robotScene->addWall(screct.right()-30.0, screct.y(), 30.0, screct.height(), true);
 
     robotScene->addLight(QPointF(250.0, 250.0), 200.0);
     robotScene->addLight(QPointF(550.0, 250.0), 200.0);
@@ -640,6 +640,7 @@ void CRP6Simulator::toggleEditMap(bool checked)
 {
     foreach (QAction *a, editMapActionList)
         a->setEnabled(checked);
+    updateMapLightingAction->setEnabled(!checked);
     robotScene->setEditModeEnabled(checked);
 }
 
