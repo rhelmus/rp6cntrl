@@ -130,12 +130,18 @@ void CRP6Simulator::createToolbars()
             SLOT(changeSceneMouseMode(QAction*)));
 
     QAction *a = toolb->addAction(QIcon("../resource/viewmag_.png"),
-                                  "Zoom map out", this, SLOT(zoomSceneOut()));
+                                  "Zoom map out", robotScene,
+                                  SLOT(zoomSceneOut()));
     a->setShortcut(QKeySequence("-"));
 
     a = toolb->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
-                         this, SLOT(zoomSceneIn()));
+                         robotScene, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
+
+    a = toolb->addAction(QIcon("../resource/follow.png"),
+                         "Toggle robot following", robotScene,
+                         SLOT(setFollowRobot(bool)));
+    a->setCheckable(true);
 
     toolb->addSeparator();
 
@@ -186,11 +192,12 @@ void CRP6Simulator::createToolbars()
     toolb->addAction(a);
     editMapActionList << a;
 
-    a = toolb->addAction(QIcon("../resource/light-icon.png"),
-                         "Toggle light item visibility",
-                         robotScene, SLOT(setLightItemsVisible(bool)));
-    a->setCheckable(true);
-    editMapActionList << a;
+    toggleLightingVisibleAction =
+            toolb->addAction(QIcon("../resource/light-icon.png"),
+                             "Toggle light item visibility",
+                             robotScene, SLOT(setLightItemsVisible(bool)));
+    toggleLightingVisibleAction->setCheckable(true);
+    editMapActionList << toggleLightingVisibleAction;
 
     a = toolb->addAction(QIcon("../resource/grid-icon.png"),
                          "Toggle grid visibility",
@@ -403,20 +410,6 @@ void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
     logWidget->appendHtml(getLogOutput(type, text));
 }
 
-void CRP6Simulator::scaleGraphicsView(qreal f)
-{
-    // Based on Qt's elastic nodes example
-    qreal factor = graphicsView->transform().scale(f, f).mapRect(QRectF(0, 0, 1, 1)).width();
-    if (factor > 20.0)
-        return;
-
-    if ((f < 1.0) && (!graphicsView->horizontalScrollBar()->isVisible() &&
-            !graphicsView->verticalScrollBar()->isVisible()))
-        return;
-
-    graphicsView->scale(f, f);
-}
-
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
@@ -595,6 +588,11 @@ void CRP6Simulator::changeSceneMouseMode(QAction *a)
     const CRobotScene::EMouseMode mode =
             static_cast<CRobotScene::EMouseMode>(a->data().toInt());
     robotScene->setMouseMode(mode);
+    if (mode == CRobotScene::MODE_LIGHT)
+    {
+        toggleLightingVisibleAction->setChecked(true);
+        robotScene->setLightItemsVisible(true);
+    }
 }
 
 void CRP6Simulator::sceneMouseModeChanged(CRobotScene::EMouseMode mode)
@@ -602,16 +600,6 @@ void CRP6Simulator::sceneMouseModeChanged(CRobotScene::EMouseMode mode)
     QList<QAction *> actions = editMapActionGroup->actions();
     foreach (QAction *a, actions)
         a->setChecked((a->data().toInt() == static_cast<int>(mode)));
-}
-
-void CRP6Simulator::zoomSceneIn()
-{
-    scaleGraphicsView(1.2);
-}
-
-void CRP6Simulator::zoomSceneOut()
-{
-    scaleGraphicsView(1/1.2);
 }
 
 void CRP6Simulator::editMapSettings()

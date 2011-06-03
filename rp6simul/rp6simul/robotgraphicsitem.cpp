@@ -128,7 +128,11 @@ void CRobotGraphicsItem::advance(int phase)
         return;
     }
 
+    const QPointF prepos(pos());
     tryMove(leftPower, rightPower);
+
+    if (pos() != prepos)
+        emit posChanged();
 
 #if 0
     const QPointF c(scene()->sceneRect().center());

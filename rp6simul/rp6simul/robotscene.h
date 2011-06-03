@@ -35,7 +35,12 @@ private:
     float gridSize;
     bool autoGridEnabled, gridVisible;
     QImage gridImage;
+    qreal viewAngle;
+    bool followRobot;
 
+    QGraphicsView *getGraphicsView(void) const;
+    void scaleGraphicsView(qreal f);
+    void rotateView(qreal angle);
     QRectF getDragRect(void) const;
     QRectF getLightDragRect(void) const;
     void updateMouseCursor(void);
@@ -48,6 +53,7 @@ private slots:
     void removeLight(QObject *o);
     void removeWall(QObject *o);
     void markLightingDirty(void) { lightingDirty = true; }
+    void robotPosChanged(void);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
@@ -78,6 +84,9 @@ public:
     QPointF alignPosToGrid(QPointF pos) const;
 
 public slots:
+    void zoomSceneIn(void);
+    void zoomSceneOut(void);
+    void setFollowRobot(bool f);
     void updateLighting(void);
     void clearMap(void);
     void setGridVisible(bool v)
