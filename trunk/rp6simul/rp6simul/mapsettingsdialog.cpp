@@ -28,8 +28,9 @@ CMapSettingsDialog::CMapSettingsDialog(QWidget *parent) :
     form->addRow("Auto refresh light map", refreshLightCheckBox = new QCheckBox);
     form->addRow("Ambient light", createLightSlider());
     form->addRow("Grid size", gridSizeSpinBox = createSpinBox(5, 100));
-    form->addRow("Auto snap", snapCheckBox = new QCheckBox);
+    form->addRow("Auto snap to grid", snapCheckBox = new QCheckBox);
 
+    refreshLightCheckBox->setToolTip("If necessary refresh lighting automatically when leaving edit mode.");
     gridSizeSpinBox->setSingleStep(5);
 
     QVBoxLayout *vbox = new QVBoxLayout;

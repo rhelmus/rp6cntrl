@@ -112,7 +112,12 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
         {
             CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
             Q_ASSERT(rscene);
-            setPos(rscene->alignPosToGrid(pos()));
+            QPointF npos(rscene->alignPosToGrid(pos()));
+            if (npos != pos())
+            {
+                setPos(rscene->alignPosToGrid(pos()));
+                emit posChanged();
+            }
         }
         else if (a == dela)
             deleteLater();

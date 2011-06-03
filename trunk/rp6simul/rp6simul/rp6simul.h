@@ -34,7 +34,7 @@ class CRP6Simulator : public QMainWindow
     QAction *runPluginAction, *stopPluginAction;
     QList<QAction *> editMapActionList;
     QActionGroup *editMapActionGroup;
-    QAction *updateMapLightingAction;
+    QAction *updateMapLightingAction, *toggleLightingVisibleAction;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     QPlainTextEdit *logWidget;
@@ -65,7 +65,6 @@ class CRP6Simulator : public QMainWindow
     void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
-    void scaleGraphicsView(qreal f);
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
@@ -81,8 +80,6 @@ private slots:
     void stopPlugin(void);
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
-    void zoomSceneIn(void);
-    void zoomSceneOut(void);
     void editMapSettings(void);
     void toggleEditMap(bool checked);
     void sendSerialPressed(void);

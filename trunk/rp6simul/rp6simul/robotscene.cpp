@@ -32,15 +32,52 @@ CRobotScene::CRobotScene(QObject *parent) :
     boxPixmap("../resource/cardboard-box.png"),
     dragging(false), draggedEnough(false), mouseMode(MODE_POINT),
     editModeEnabled(false), gridSize(15.0), autoGridEnabled(true),
-    gridVisible(false)
+    gridVisible(false), viewAngle(0.0), followRobot(false)
 {
     setBackgroundBrush(Qt::darkGray);
 
     robotGraphicsItem = new CRobotGraphicsItem;
     robotGraphicsItem->setPos(50, 450); // UNDONE
     addItem(robotGraphicsItem);
+    connect(robotGraphicsItem, SIGNAL(posChanged()), this,
+            SLOT(robotPosChanged()));
 
     connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(updateMapSize()));
+}
+
+QGraphicsView *CRobotScene::getGraphicsView() const
+{
+    QGraphicsView *ret = views()[0];
+    Q_ASSERT(ret);
+    return ret;
+}
+
+void CRobotScene::scaleGraphicsView(qreal f)
+{
+    QGraphicsView *view = getGraphicsView();
+
+    // Based on Qt's elastic nodes example
+    qreal factor = view->transform().scale(f, f).mapRect(QRectF(0, 0, 1.0, 1.0)).width();
+    if (factor > 20.0)
+        return;
+
+    if ((f < 1.0) && (!view->horizontalScrollBar()->isVisible() &&
+        !view->verticalScrollBar()->isVisible()))
+        return;
+
+    view->scale(f, f);
+}
+
+void CRobotScene::rotateView(qreal angle)
+{
+    QGraphicsView *view = getGraphicsView();
+    QTransform tr(view->transform());
+    const QPointF c(sceneRect().center());
+    tr.translate(c.x(), c.y());
+    tr.rotate(viewAngle - angle);
+    tr.translate(-c.x(), -c.y());
+    view->setTransform(tr);
+    viewAngle = angle;
 }
 
 QRectF CRobotScene::getDragRect() const
@@ -48,7 +85,7 @@ QRectF CRobotScene::getDragRect() const
     QRectF ret;
     ret.setTopLeft(mouseDragStartPos);
     ret.setBottomRight(mousePos);
-    return getMinRect(ret, 0.0, 0.0);
+    return ret.normalized();
 }
 
 QRectF CRobotScene::getLightDragRect(void) const
@@ -57,12 +94,12 @@ QRectF CRobotScene::getLightDragRect(void) const
     ret.setTopLeft(mouseDragStartPos);
     ret.setBottom(mousePos.y());
     ret.setWidth(ret.height());
-    return getMinRect(ret, 0.0, 0.0);
+    return ret.normalized();
 }
 
 void CRobotScene::updateMouseCursor()
 {
-    QWidget *vp = views()[0]->viewport();
+    QWidget *vp = getGraphicsView()->viewport();
     Q_ASSERT(vp);
 
     if (!editModeEnabled || (mouseMode == MODE_POINT))
@@ -144,6 +181,15 @@ void CRobotScene::removeWall(QObject *o)
     CResizablePixmapGraphicsItem *w = static_cast<CResizablePixmapGraphicsItem *>(o);
     dynamicWalls.removeOne(w);
     lightingDirty = true;
+}
+
+void CRobotScene::robotPosChanged()
+{
+    if (followRobot && !editModeEnabled)
+    {
+        rotateView(robotGraphicsItem->rotation());
+        getGraphicsView()->centerOn(robotGraphicsItem);
+    }
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -337,8 +383,10 @@ void CRobotScene::setEditModeEnabled(bool e)
         {
             w->setMovable(true);
             w->setResizable(true);
+            w->setDeletable(true);
         }
 
+        rotateView(0.0);
         setMouseMode(mouseMode); // Update mode, calls update() too
     }
     else
@@ -350,6 +398,7 @@ void CRobotScene::setEditModeEnabled(bool e)
         {
             w->setMovable(false);
             w->setResizable(false);
+            w->setDeletable(false);
         }
 
         if (lightingDirty && autoRefreshLighting)
@@ -377,6 +426,25 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
         pos.ry() -= ry;
 
     return pos;
+}
+
+void CRobotScene::zoomSceneIn()
+{
+    scaleGraphicsView(1.2);
+}
+
+void CRobotScene::zoomSceneOut()
+{
+    scaleGraphicsView(1/1.2);
+}
+
+void CRobotScene::setFollowRobot(bool f)
+{
+     followRobot = f;
+     if (!f)
+         rotateView(0.0);
+     else
+         robotPosChanged(); // Trigger initial focus in case robot doesn't move
 }
 
 void CRobotScene::updateLighting()
@@ -469,19 +537,20 @@ void CRobotScene::updateLighting()
 
 void CRobotScene::clearMap()
 {
-    QList<QGraphicsItem *> swalls;
+    const QList<QGraphicsRectItem *> swalls(staticWalls.values());
     foreach (QGraphicsItem *it, items())
     {
-        if (swalls.contains(it))
+        QGraphicsRectItem *rit = qgraphicsitem_cast<QGraphicsRectItem *>(it);
+        if (rit && swalls.contains(rit))
             continue;
 
         if (it == robotGraphicsItem)
             continue;
 
-        CResizablePixmapGraphicsItem *rit =
+        CResizablePixmapGraphicsItem *reit =
                 dynamic_cast<CResizablePixmapGraphicsItem *>(it);
-        if (rit && dynamicWalls.contains(rit))
-            dynamicWalls.removeOne(rit);
+        if (reit && dynamicWalls.contains(reit))
+            dynamicWalls.removeOne(reit);
 
         delete it;
     }
