@@ -8,6 +8,11 @@
 
 namespace {
 
+qreal getTransformScaleWidth(const QTransform &tr)
+{
+    return tr.mapRect(QRectF(0, 0, 1.0, 1.0)).width();
+}
+
 QRectF getMinRect(QRectF r, qreal minw, qreal minh)
 {
     if (r.width() < minw)
@@ -43,6 +48,9 @@ CRobotScene::CRobotScene(QObject *parent) :
             SLOT(robotPosChanged()));
 
     connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(updateMapSize()));
+
+    qRegisterMetaTypeStreamOperators<SLightSettings>("SLightSettings");
+    qRegisterMetaTypeStreamOperators<SObjectSettings>("SObjectSettings");
 }
 
 QGraphicsView *CRobotScene::getGraphicsView() const
@@ -56,8 +64,7 @@ void CRobotScene::scaleGraphicsView(qreal f)
 {
     QGraphicsView *view = getGraphicsView();
 
-    // Based on Qt's elastic nodes example
-    qreal factor = view->transform().scale(f, f).mapRect(QRectF(0, 0, 1.0, 1.0)).width();
+    const qreal factor = getTransformScaleWidth(view->transform().scale(f, f));
     if (factor > 20.0)
         return;
 
@@ -162,6 +169,7 @@ void CRobotScene::updateStaticWalls()
 
 void CRobotScene::updateMapSize()
 {
+    qDebug() << "Update map size";
     updateGrid();
     updateStaticWalls();
     lightingDirty = true;
@@ -178,9 +186,18 @@ void CRobotScene::removeLight(QObject *o)
 void CRobotScene::removeWall(QObject *o)
 {
     qDebug() << "Removing wall";
-    CResizablePixmapGraphicsItem *w = static_cast<CResizablePixmapGraphicsItem *>(o);
+    CResizablePixmapGraphicsItem *w =
+            static_cast<CResizablePixmapGraphicsItem *>(o);
     dynamicWalls.removeOne(w);
     lightingDirty = true;
+}
+
+void CRobotScene::removeBox(QObject *o)
+{
+    qDebug() << "Removing box";
+    CResizablePixmapGraphicsItem *b =
+            static_cast<CResizablePixmapGraphicsItem *>(o);
+    boxes.removeOne(b);
 }
 
 void CRobotScene::robotPosChanged()
@@ -300,14 +317,7 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             lightingDirty = true;
         }
         else if (mouseMode == MODE_BOX)
-        {
-            const QRectF r(getMinRect(getDragRect(), minsize, minsize));
-            CResizablePixmapGraphicsItem *resi =
-                    new CResizablePixmapGraphicsItem(boxPixmap, false);
-            resi->setPos(r.topLeft());
-            resi->setSize(r.size());
-            addItem(resi);
-        }
+            addBox(getMinRect(getDragRect(), minsize, minsize));
         else if (mouseMode == MODE_LIGHT)
         {
             const QRectF r(getMinRect(getLightDragRect(), minsize, minsize));
@@ -344,6 +354,17 @@ void CRobotScene::addWall(const QRectF &rect)
     connect(resi, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
     connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
     dynamicWalls << resi;
+}
+
+void CRobotScene::addBox(const QRectF &rect)
+{
+    CResizablePixmapGraphicsItem *resi =
+            new CResizablePixmapGraphicsItem(boxPixmap, false);
+    resi->setPos(rect.topLeft());
+    resi->setSize(rect.size());
+    addItem(resi);
+    connect(resi, SIGNAL(destroyed(QObject*)), this, SLOT(removeBox(QObject*)));
+    boxes << resi;
 }
 
 void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
@@ -426,6 +447,140 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
         pos.ry() -= ry;
 
     return pos;
+}
+
+void CRobotScene::saveMap(QSettings &file)
+{
+    /* Settings:
+        - Version nr*
+        - Map size*
+        - Grid visible?
+        - Grid size*
+        - Auto snap*
+        - Lights*
+        - Auto refresh lighting*
+        - Ambient light*
+        - Lights visible (edit mode)?
+        - Dynamic walls*
+        - Robot start position
+        - Scale*
+        - Boxes*
+        - Light/shadow pixmaps*
+        - Screenshot
+    */
+
+    // UNDONE: Update lightmap if necessary?
+    // Or only save if outside edit mode?
+
+    QList<QVariant> lightsvarlist;
+    foreach (CLightGraphicsItem *l, lights)
+    {
+        QVariant v;
+        v.setValue(SLightSettings(l->pos(), l->getRadius()));
+        lightsvarlist << v;
+    }
+
+    QList<QVariant> wallsvarlist;
+    foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
+    {
+        QVariant v;
+        v.setValue(SObjectSettings(w->pos(), w->getSize()));
+        wallsvarlist << v;
+    }
+
+    QList<QVariant> boxesvarlist;
+    foreach (CResizablePixmapGraphicsItem *w, boxes)
+    {
+        QVariant v;
+        v.setValue(SObjectSettings(w->pos(), w->getSize()));
+        boxesvarlist << v;
+    }
+
+    file.beginGroup("map");
+
+    file.setValue("version", 1);
+    file.setValue("mapRect", sceneRect());
+    file.setValue("gridSize", gridSize);
+    file.setValue("autoGrid", autoGridEnabled);
+    file.setValue("lights", lightsvarlist);
+    file.setValue("autoRefreshLighting", autoRefreshLighting);
+    file.setValue("ambientLight", ambientLight);
+    file.setValue("walls", wallsvarlist);
+    file.setValue("boxes", boxesvarlist);
+    file.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
+    file.setValue("shadowImage", shadowImage);
+    file.setValue("lightImage", lightImage);
+
+    file.endGroup();
+}
+
+void CRobotScene::loadMap(QSettings &file)
+{
+    clearMap();
+
+    file.beginGroup("map");
+
+    if (file.value("version", -1) != 1)
+        qWarning("Missing/unsupported map version");
+
+    // First set grid size: setting map size may trigger grid update
+    gridSize = file.value("gridSize", 15.0).toReal();
+
+    const QRectF maprect(file.value("mapRect",
+                                    QRectF(0.0, 0.0, 100.0, 100.0)).toRectF());
+
+    if (maprect != sceneRect())
+        setSceneRect(maprect); // Triggers updateGrid
+    else
+        updateGrid();
+
+    autoGridEnabled = file.value("autoGrid", true).toBool();
+
+    QList<QVariant> varlist = file.value("lights").toList();
+    foreach (QVariant v, varlist)
+    {
+        SLightSettings s(v.value<SLightSettings>());
+        addLight(s.pos + QPointF(s.radius, s.radius), s.radius);
+    }
+
+    autoRefreshLighting = file.value("autoRefreshLighting", true).toBool();
+    ambientLight = file.value("ambientLight", 0.35).toFloat();
+
+    varlist = file.value("walls").toList();
+    foreach (QVariant v, varlist)
+    {
+        SObjectSettings s(v.value<SObjectSettings>());
+        addWall(QRectF(s.pos, s.size));
+    }
+
+    varlist = file.value("boxes").toList();
+    foreach (QVariant v, varlist)
+    {
+        SObjectSettings s(v.value<SObjectSettings>());
+        addBox(QRectF(s.pos, s.size));
+    }
+
+    const qreal scale = file.value("scale", 1.0).toReal();
+    const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
+    scaleGraphicsView(scale / curscale);
+
+    shadowImage = file.value("shadowImage").value<QImage>();
+    lightImage = file.value("lightImage").value<QImage>();
+
+    if (shadowImage.isNull() || lightImage.isNull() ||
+        (shadowImage.size() != sceneRect().size().toSize()) ||
+        (lightImage.size() != sceneRect().size().toSize()))
+    {
+        qWarning("Failed to load light maps. Regenerating...");
+        updateLighting();
+    }
+    else
+    {
+        lightingDirty = false;
+        update();
+    }
+
+    file.endGroup();
 }
 
 void CRobotScene::zoomSceneIn()
@@ -540,6 +695,9 @@ void CRobotScene::clearMap()
     const QList<QGraphicsRectItem *> swalls(staticWalls.values());
     foreach (QGraphicsItem *it, items())
     {
+        if (it->parentItem())
+            continue; // Don't remove child items
+
         QGraphicsRectItem *rit = qgraphicsitem_cast<QGraphicsRectItem *>(it);
         if (rit && swalls.contains(rit))
             continue;
@@ -549,8 +707,12 @@ void CRobotScene::clearMap()
 
         CResizablePixmapGraphicsItem *reit =
                 dynamic_cast<CResizablePixmapGraphicsItem *>(it);
-        if (reit && dynamicWalls.contains(reit))
+        if (reit)
+        {
+            // Remove wall/box if present
             dynamicWalls.removeOne(reit);
+            boxes.removeOne(reit);
+        }
 
         delete it;
     }

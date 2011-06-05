@@ -40,6 +40,7 @@ public:
     void setSize(const QSizeF &s);
     void setSize(qreal w, qreal h) { setSize(QSizeF(w, h)); }
     void setResizable(bool r);
+    QSizeF getSize(void) const { return boundRect.size(); }
 
 signals:
     void sizeChanged(void);

@@ -143,6 +143,13 @@ void CRP6Simulator::createToolbars()
                          SLOT(setFollowRobot(bool)));
     a->setCheckable(true);
 
+    // UNDONE: Move to file menu
+    toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                     "Export map as template", this, SLOT(exportMap()));
+
+    toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
+                     "Export map as template", this, SLOT(importMap()));
+
     toolb->addSeparator();
 
     updateMapLightingAction =
@@ -618,6 +625,7 @@ void CRP6Simulator::editMapSettings()
         QRectF r(robotScene->sceneRect());
         r.setSize(dialog.getMapSize());
         robotScene->setSceneRect(r);
+        qDebug() << "Ambient light changed:" << (robotScene->getAmbientLight() != dialog.getAmbientLight()) << robotScene->getAmbientLight() << dialog.getAmbientLight();
         robotScene->setAmbientLight(dialog.getAmbientLight());
         robotScene->setGridSize(dialog.getGridSize());
         robotScene->setAutoGrid(dialog.getAutoGridSnap());
@@ -630,6 +638,22 @@ void CRP6Simulator::toggleEditMap(bool checked)
         a->setEnabled(checked);
     updateMapLightingAction->setEnabled(!checked);
     robotScene->setEditModeEnabled(checked);
+}
+
+void CRP6Simulator::exportMap()
+{
+    QSettings map("export-test.rp6", QSettings::IniFormat);
+    if (!checkSettingsFile(map))
+        return;
+    robotScene->saveMap(map);
+}
+
+void CRP6Simulator::importMap()
+{
+    QSettings map("export-test.rp6", QSettings::IniFormat);
+    if (!checkSettingsFile(map))
+        return;
+    robotScene->loadMap(map);
 }
 
 void CRP6Simulator::sendSerialPressed()

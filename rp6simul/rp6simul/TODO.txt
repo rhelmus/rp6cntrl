@@ -19,6 +19,8 @@
 - Dir separators for Windows port
 - Map:
     - Import from other project files
-    - Following robot
-    - Don't collide with lights, handles etc
- - Robot widget
+    - Save/Load progress
+    - Robot start
+- Robot widget
+- Check version on project loading
+- Use qRound for float/double --> int conversions

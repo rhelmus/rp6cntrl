@@ -1,6 +1,24 @@
+#include "handlegraphicsitem.h"
+#include "lightgraphicsitem.h"
 #include "robotgraphicsitem.h"
 
 #include <QtGui>
+
+namespace {
+
+bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles)
+{
+    foreach (QGraphicsItem *it, obstacles)
+    {
+        if (!qgraphicsitem_cast<CLightGraphicsItem *>(it) &&
+            !qgraphicsitem_cast<CHandleGraphicsItem *>(it))
+            return true;
+    }
+
+    return false;
+}
+
+}
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
     : CResizablePixmapGraphicsItem(QPixmap("../resource/rp6-top.png"), false, parent),
@@ -51,70 +69,65 @@ QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
     return (mapToParent(x, y) - mapToParent(0.0, 0.0));
 }
 
-bool CRobotGraphicsItem::tryMove(float lpower, float rpower)
+void CRobotGraphicsItem::tryMove(float lpower, float rpower)
 {
     const float lspeed = lpower / 10.0;
     const float rspeed = rpower / 10.0;
     const float movespeed = (lspeed + rspeed) / 5.0;
     const float rotspeed = (lspeed - rspeed) / 15.0;
 
-    QList<QGraphicsItem *> obstacles =
-            tryDoMove(rotspeed, mapDeltaPos(0.0, -movespeed));
-
-    if (!obstacles.isEmpty())
+    if (!tryDoMove(rotspeed, mapDeltaPos(0.0, -movespeed)))
     {
         skipFrames = 3;
 
         const float l = 0.25, h = 0.75, inc = 0.25;
         for (float dx = l; dx <= h; dx += inc)
         {
-            if (tryDoMove(0.0, mapDeltaPos(dx, 0.0)).isEmpty())
-                return true;
+            if (tryDoMove(0.0, mapDeltaPos(dx, 0.0)))
+                return;
 
-            if (tryDoMove(0.0, mapDeltaPos(-dx, 0.0)).isEmpty())
-                return true;
+            if (tryDoMove(0.0, mapDeltaPos(-dx, 0.0)))
+                return;
 
             for (float dy = l; dy <= h; dy += inc)
             {
-                if (tryDoMove(0.0, mapDeltaPos(0.0, dy)).isEmpty())
-                    return true;
-                if (tryDoMove(0.0, mapDeltaPos(0.0, -dy)).isEmpty())
-                    return true;
-                if (tryDoMove(0.0, mapDeltaPos(dx, dy)).isEmpty())
-                    return true;
-                if (tryDoMove(0.0, mapDeltaPos(-dx, dy)).isEmpty())
-                    return true;
+                if (tryDoMove(0.0, mapDeltaPos(0.0, dy)))
+                    return;
+                if (tryDoMove(0.0, mapDeltaPos(0.0, -dy)))
+                    return;
+                if (tryDoMove(0.0, mapDeltaPos(dx, dy)))
+                    return;
+                if (tryDoMove(0.0, mapDeltaPos(-dx, dy)))
+                    return;
             }
         }
     }
 
     skipFrames = 0;
-
-    return (!obstacles.isEmpty());
 }
 
-QList<QGraphicsItem *> CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos)
+bool CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos)
 {
     const QPointF oldpos(pos());
     const qreal oldrot = rotation();
 
     setRotation(rotation() + rotspeed);
-    QList<QGraphicsItem *> ret = collidingItems();
-    if (!ret.isEmpty())
+    if (checkCollidingItems(collidingItems()))
     {
         setRotation(oldrot);
+        return false;
     }
     else
     {
         setPos(pos() + dpos);
-
-        ret = collidingItems();
-
-        if (!ret.isEmpty())
+        if (checkCollidingItems(collidingItems()))
+        {
             setPos(oldpos);
+            return false;
+        }
     }
 
-    return ret;
+    return true;
 }
 
 void CRobotGraphicsItem::advance(int phase)
@@ -133,17 +146,6 @@ void CRobotGraphicsItem::advance(int phase)
 
     if (pos() != prepos)
         emit posChanged();
-
-#if 0
-    const QPointF c(scene()->sceneRect().center());
-    QTransform tr;
-    tr.translate(c.x(), c.y());
-    tr.rotate(-rotation());
-    tr.translate(-c.x(), -c.y());
-    QGraphicsView *view = scene()->views()[0];
-    view->setTransform(tr);
-    view->centerOn(this);
-#endif
 }
 
 bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)

@@ -3,6 +3,9 @@
 
 #include <QGraphicsScene>
 #include <QHash>
+#include <QMetaType>
+
+class QSettings;
 
 class CLightGraphicsItem;
 class CResizablePixmapGraphicsItem;
@@ -27,6 +30,7 @@ private:
     QHash<EStaticWall, QGraphicsRectItem *> staticWalls;
     QList<CResizablePixmapGraphicsItem *> dynamicWalls;
     QPixmap blockPixmap, boxPixmap;
+    QList<CResizablePixmapGraphicsItem *> boxes;
     CRobotGraphicsItem *robotGraphicsItem;
     QPointF mousePos, mouseDragStartPos;    
     bool dragging, draggedEnough;
@@ -52,6 +56,7 @@ private slots:
     void updateMapSize(void);
     void removeLight(QObject *o);
     void removeWall(QObject *o);
+    void removeBox(QObject *o);
     void markLightingDirty(void) { lightingDirty = true; }
     void robotPosChanged(void);
 
@@ -67,8 +72,7 @@ public:
 
     void addLight(const QPointF &p, float r);
     void addWall(const QRectF &rect);
-    void addWall(qreal x, qreal y, qreal w, qreal h)
-    { addWall(QRectF(x, y, w, h)); }
+    void addBox(const QRectF &rect);
     void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
@@ -82,6 +86,8 @@ public:
     bool getAutoGrid(void) const { return autoGridEnabled; }
     void setAutoGrid(bool a) { autoGridEnabled = a; }
     QPointF alignPosToGrid(QPointF pos) const;
+    void saveMap(QSettings &file);
+    void loadMap(QSettings &file);
 
 public slots:
     void zoomSceneIn(void);
@@ -96,5 +102,37 @@ public slots:
 signals:
     void mouseModeChanged(CRobotScene::EMouseMode);
 };
+
+// Structures for map IO
+
+struct SLightSettings
+{
+    QPointF pos;
+    qreal radius;
+    SLightSettings(void) : radius(0.0) { }
+    SLightSettings(const QPointF &p, qreal r) : pos(p), radius(r) { }
+};
+
+inline QDataStream &operator<<(QDataStream &out, const SLightSettings &ls)
+{ out << ls.pos << ls.radius; return out; }
+inline QDataStream &operator>>(QDataStream &in, SLightSettings &ls)
+{ in >> ls.pos; in >> ls.radius; return in; }
+
+Q_DECLARE_METATYPE(SLightSettings)
+
+struct SObjectSettings
+{
+    QPointF pos;
+    QSizeF size;
+    SObjectSettings(void) { }
+    SObjectSettings(const QPointF &p, const QSizeF &s) : pos(p), size(s) { }
+};
+
+inline QDataStream &operator<<(QDataStream &out, const SObjectSettings &os)
+{ out << os.pos << os.size; return out; }
+inline QDataStream &operator>>(QDataStream &in, SObjectSettings &os)
+{ in >> os.pos; in >> os.size; return in; }
+
+Q_DECLARE_METATYPE(SObjectSettings)
 
 #endif // ROBOTSCENE_H

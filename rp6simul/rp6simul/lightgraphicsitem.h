@@ -2,6 +2,7 @@
 #define LIGHTGRAPHICSITEM_H
 
 #include "basegraphicsitem.h"
+#include "graphicsitemtypes.h"
 
 class CHandleGraphicsItem;
 
@@ -32,6 +33,9 @@ public:
     float getRadius(void) const { return radius; }
     float intensityAt(const QPointF &p,
                       const QList<QPolygonF> &obstacles) const;
+
+    enum { Type = GRAPHICSITEM_TYPELIGHT };
+    int type(void) const { return Type; }
 
 signals:
     void radiusChanged(void);
