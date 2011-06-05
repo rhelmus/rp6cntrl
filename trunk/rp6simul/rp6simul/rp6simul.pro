@@ -100,7 +100,8 @@ HEADERS  += rp6simul.h \
     ../lua/lauxlib.h \
     ../lua/lapi.h \
     ../lua/lua.hpp \
-    clock.h
+    clock.h \
+    graphicsitemtypes.h
 
 OTHER_FILES += \
     TODO.txt \

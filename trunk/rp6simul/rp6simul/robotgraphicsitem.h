@@ -17,8 +17,8 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
-    bool tryMove(float lpower, float rpower);
-    QList<QGraphicsItem *> tryDoMove(float rotspeed, QPointF dpos);
+    void tryMove(float lpower, float rpower);
+    bool tryDoMove(float rotspeed, QPointF dpos);
 
 protected:
     void advance(int phase);

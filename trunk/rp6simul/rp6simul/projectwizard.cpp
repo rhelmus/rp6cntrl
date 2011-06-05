@@ -35,7 +35,7 @@ void CProjectWizard::accept()
     }
 
     CProjectSettings prsettings(file);
-    if (checkProjectSettings(prsettings))
+    if (checkSettingsFile(prsettings))
     {
         prsettings.setValue("version", 1);
         prsettings.setValue("name", field("projectName"));

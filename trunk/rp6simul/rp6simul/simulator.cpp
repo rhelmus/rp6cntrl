@@ -448,7 +448,7 @@ void CSimulator::terminatePluginMainThread()
 QString CSimulator::getPluginFile() const
 {
     CProjectSettings prsettings(currentProjectFile);
-    if (!checkProjectSettings(prsettings))
+    if (!checkSettingsFile(prsettings))
         return QString();
     return prsettings.value("RP6Plugin").toString();
 }
@@ -499,7 +499,7 @@ bool CSimulator::initPlugin()
 
     // Push driver list
     CProjectSettings prsettings(currentProjectFile);
-    if (checkProjectSettings(prsettings))
+    if (checkSettingsFile(prsettings))
     {
         NLua::pushStringList(NLua::luaInterface,
                              prsettings.value("drivers").toStringList());
@@ -844,7 +844,7 @@ void CSimulator::initLua()
 bool CSimulator::openProjectFile(const QString &file)
 {
     CProjectSettings prsettings(file);
-    if (!checkProjectSettings(prsettings))
+    if (!checkSettingsFile(prsettings))
         return false;
 
     stopPlugin();

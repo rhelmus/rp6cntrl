@@ -1,0 +1,12 @@
+#ifndef GRAPHICSITEMTYPES_H
+#define GRAPHICSITEMTYPES_H
+
+#include <QGraphicsItem>
+
+enum
+{
+    GRAPHICSITEM_TYPEHANDLE = QGraphicsItem::UserType + 1,
+    GRAPHICSITEM_TYPELIGHT
+};
+
+#endif // GRAPHICSITEMTYPES_H

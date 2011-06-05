@@ -1,6 +1,8 @@
 #ifndef HANDLEGRAPHICSITEM_H
 #define HANDLEGRAPHICSITEM_H
 
+#include "graphicsitemtypes.h"
+
 #include <QGraphicsRectItem>
 #include <QGraphicsSceneMouseEvent>
 
@@ -31,6 +33,9 @@ public:
     CHandleGraphicsItem(EHandlePosFlags pos, QGraphicsItem *parent = 0);
 
     EHandlePosFlags handlePosition(void) const { return handlePos; }
+
+    enum { Type = GRAPHICSITEM_TYPEHANDLE };
+    int type(void) const { return Type; }
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(CHandleGraphicsItem::EHandlePosFlags)

@@ -84,7 +84,7 @@ void CMapSettingsDialog::setAutoRefreshLight(bool a)
 
 void CMapSettingsDialog::setAmbientLight(float l)
 {
-    ambientLightSlider->setValue(l * 100.0);
+    ambientLightSlider->setValue(qRound(l * 100.0));
 }
 
 void CMapSettingsDialog::setGridSize(float s)

@@ -82,6 +82,8 @@ private slots:
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
     void toggleEditMap(bool checked);
+    void exportMap(void);
+    void importMap(void);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);
