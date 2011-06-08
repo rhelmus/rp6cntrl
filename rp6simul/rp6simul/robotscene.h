@@ -5,8 +5,6 @@
 #include <QHash>
 #include <QMetaType>
 
-class QSettings;
-
 class CLightGraphicsItem;
 class CResizablePixmapGraphicsItem;
 class CRobotGraphicsItem;
@@ -86,8 +84,8 @@ public:
     bool getAutoGrid(void) const { return autoGridEnabled; }
     void setAutoGrid(bool a) { autoGridEnabled = a; }
     QPointF alignPosToGrid(QPointF pos) const;
-    void saveMap(QSettings &file);
-    void loadMap(QSettings &file);
+    void saveMap(const QString &f);
+    void loadMap(const QString &f);
 
 public slots:
     void zoomSceneIn(void);

@@ -16,6 +16,7 @@ class QPushButton;
 class QLCDNumber;
 class QLineEdit;
 class QPlainTextEdit;
+class QStackedWidget;
 class QTableWidget;
 class QTreeWidget;
 
@@ -32,9 +33,11 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QAction *runPluginAction, *stopPluginAction;
+    QToolBar *editMapToolBar;
     QList<QAction *> editMapActionList;
     QActionGroup *editMapActionGroup;
     QAction *updateMapLightingAction, *toggleLightingVisibleAction;
+    QStackedWidget *mainStackedWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     QPlainTextEdit *logWidget;

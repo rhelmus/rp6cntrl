@@ -449,7 +449,7 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
     return pos;
 }
 
-void CRobotScene::saveMap(QSettings &file)
+void CRobotScene::saveMap(const QString &f)
 {
     /* Settings:
         - Version nr*
@@ -471,6 +471,8 @@ void CRobotScene::saveMap(QSettings &file)
 
     // UNDONE: Update lightmap if necessary?
     // Or only save if outside edit mode?
+
+    QSettings file(f, QSettings::IniFormat);
 
     QList<QVariant> lightsvarlist;
     foreach (CLightGraphicsItem *l, lights)
@@ -514,10 +516,11 @@ void CRobotScene::saveMap(QSettings &file)
     file.endGroup();
 }
 
-void CRobotScene::loadMap(QSettings &file)
+void CRobotScene::loadMap(const QString &f)
 {
     clearMap();
 
+    QSettings file(f, QSettings::IniFormat);
     file.beginGroup("map");
 
     if (file.value("version", -1) != 1)
@@ -527,7 +530,7 @@ void CRobotScene::loadMap(QSettings &file)
     gridSize = file.value("gridSize", 15.0).toReal();
 
     const QRectF maprect(file.value("mapRect",
-                                    QRectF(0.0, 0.0, 100.0, 100.0)).toRectF());
+                                    QRectF(0.0, 0.0, 1000.0, 1000.0)).toRectF());
 
     if (maprect != sceneRect())
         setSceneRect(maprect); // Triggers updateGrid
