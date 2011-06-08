@@ -123,52 +123,54 @@ void CRP6Simulator::createToolbars()
     stopPluginAction->setEnabled(false);
 
 
-    addToolBar(Qt::LeftToolBarArea, toolb = new QToolBar("Edit map"));
+    addToolBar(Qt::LeftToolBarArea, editMapToolBar = new QToolBar("Edit map"));
+    editMapToolBar->setEnabled(false);
 
     editMapActionGroup = new QActionGroup(this);
     connect(editMapActionGroup, SIGNAL(triggered(QAction*)), this,
             SLOT(changeSceneMouseMode(QAction*)));
 
-    QAction *a = toolb->addAction(QIcon("../resource/viewmag_.png"),
-                                  "Zoom map out", robotScene,
-                                  SLOT(zoomSceneOut()));
+    QAction *a = editMapToolBar->addAction(QIcon("../resource/viewmag_.png"),
+                                           "Zoom map out", robotScene,
+                                           SLOT(zoomSceneOut()));
     a->setShortcut(QKeySequence("-"));
 
-    a = toolb->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
-                         robotScene, SLOT(zoomSceneIn()));
+    a = editMapToolBar->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
+                                  robotScene, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
 
-    a = toolb->addAction(QIcon("../resource/follow.png"),
-                         "Toggle robot following", robotScene,
-                         SLOT(setFollowRobot(bool)));
+    a = editMapToolBar->addAction(QIcon("../resource/follow.png"),
+                                  "Toggle robot following", robotScene,
+                                  SLOT(setFollowRobot(bool)));
     a->setCheckable(true);
 
     // UNDONE: Move to file menu
-    toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
-                     "Export map as template", this, SLOT(exportMap()));
+    editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                              "Export map as template", this, SLOT(exportMap()));
 
-    toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
-                     "Export map as template", this, SLOT(importMap()));
+    editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
+                              "Import map template", this, SLOT(importMap()));
 
-    toolb->addSeparator();
+    editMapToolBar->addSeparator();
 
     updateMapLightingAction =
-            toolb->addAction(QIcon("../resource/light-refresh.png"),
-                             "Update lighting", robotScene,
-                             SLOT(updateLighting()));
+            editMapToolBar->addAction(QIcon("../resource/light-refresh.png"),
+                                      "Update lighting", robotScene,
+                                      SLOT(updateLighting()));
 
-    a = toolb->addAction(QIcon("../resource/tool.png"), "Toggle edit mode",
-                         this, SLOT(toggleEditMap(bool)));
+    a = editMapToolBar->addAction(QIcon("../resource/tool.png"),
+                                  "Toggle edit mode", this,
+                                  SLOT(toggleEditMap(bool)));
     a->setCheckable(true);
     a->setShortcut(QKeySequence("Ctrl+E"));
 
-    a = toolb->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
-                         this, SLOT(editMapSettings()));
+    a = editMapToolBar->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
+                                  this, SLOT(editMapSettings()));
     editMapActionList << a;
 
-    a = toolb->addAction(QIcon("../resource/clear.png"),
-                         "Clear map (removes all walls and items)", robotScene,
-                         SLOT(clearMap()));
+    a = editMapToolBar->addAction(QIcon("../resource/clear.png"),
+                                  "Clear map (removes all walls and items)",
+                                  robotScene, SLOT(clearMap()));
     editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/mouse-arrow.png"),
@@ -176,39 +178,39 @@ void CRP6Simulator::createToolbars()
     a->setCheckable(true);
     a->setChecked(true);
     a->setData(CRobotScene::MODE_POINT);
-    toolb->addAction(a);
+    editMapToolBar->addAction(a);
     editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/wall.jpg"), "Add wall");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_WALL);
-    toolb->addAction(a);
+    editMapToolBar->addAction(a);
     editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/cardboard-box.png"),
                                       "Add box obstacle");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_BOX);
-    toolb->addAction(a);
+    editMapToolBar->addAction(a);
     editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/light-add.png"),
                                       "Add light source");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_LIGHT);
-    toolb->addAction(a);
+    editMapToolBar->addAction(a);
     editMapActionList << a;
 
     toggleLightingVisibleAction =
-            toolb->addAction(QIcon("../resource/light-icon.png"),
-                             "Toggle light item visibility",
-                             robotScene, SLOT(setLightItemsVisible(bool)));
+            editMapToolBar->addAction(QIcon("../resource/light-icon.png"),
+                                      "Toggle light item visibility",
+                                      robotScene, SLOT(setLightItemsVisible(bool)));
     toggleLightingVisibleAction->setCheckable(true);
     editMapActionList << toggleLightingVisibleAction;
 
-    a = toolb->addAction(QIcon("../resource/grid-icon.png"),
-                         "Toggle grid visibility",
-                         robotScene, SLOT(setGridVisible(bool)));
+    a = editMapToolBar->addAction(QIcon("../resource/grid-icon.png"),
+                                  "Toggle grid visibility",
+                                  robotScene, SLOT(setGridVisible(bool)));
     a->setCheckable(true);
     editMapActionList << a;
 
@@ -226,13 +228,15 @@ QWidget *CRP6Simulator::createMainWidget()
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
 
-    robotScene->addLight(QPointF(250.0, 250.0), 200.0);
+    /*robotScene->addLight(QPointF(250.0, 250.0), 200.0);
     robotScene->addLight(QPointF(550.0, 250.0), 200.0);
     robotScene->addLight(QPointF(50.0, 50.0), 200.0);
-    robotScene->updateLighting();
+    robotScene->updateLighting();*/
 
-    QWidget *ret = new QWidget;
-    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    mainStackedWidget = new QStackedWidget;
+    QWidget *w = new QWidget;
+    mainStackedWidget->addWidget(w);
+    QHBoxLayout *hbox = new QHBoxLayout(w);
 
     graphicsView = new QGraphicsView(robotScene);
     graphicsView->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
@@ -262,7 +266,24 @@ QWidget *CRP6Simulator::createMainWidget()
     QObject::connect(timer, SIGNAL(timeout()), robotScene, SLOT(advance()));
     timer->start(1000 / 33);
 
-    return ret;
+
+    // Place holder when no project is loaded
+    w = new QWidget;
+    hbox = new QHBoxLayout(w);
+    mainStackedWidget->addWidget(w);
+
+    QLabel *label = new QLabel("<qt>Welcome to rp6sim!<br>"
+                               "You can load/create projects from the "
+                               "<b>File</b> menu.</qt>");
+    label->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    label->setAlignment(Qt::AlignCenter);
+    label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    label->setMargin(25);
+    hbox->addWidget(label);
+
+    mainStackedWidget->setCurrentIndex(1);
+
+    return mainStackedWidget;
 }
 
 QWidget *CRP6Simulator::createLogWidgets()
@@ -389,10 +410,15 @@ void CRP6Simulator::initLua()
 
 void CRP6Simulator::openProjectFile(const QString &file)
 {
+    // UNDONE: Only check here for file being valid?
+
     if (!simulator->openProjectFile(file))
         return;
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
+    editMapToolBar->setEnabled(true);
+    mainStackedWidget->setCurrentIndex(0);
+    robotScene->loadMap(file);
 }
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
@@ -642,18 +668,12 @@ void CRP6Simulator::toggleEditMap(bool checked)
 
 void CRP6Simulator::exportMap()
 {
-    QSettings map("export-test.rp6", QSettings::IniFormat);
-    if (!checkSettingsFile(map))
-        return;
-    robotScene->saveMap(map);
+    robotScene->saveMap("export-test.rp6");
 }
 
 void CRP6Simulator::importMap()
 {
-    QSettings map("export-test.rp6", QSettings::IniFormat);
-    if (!checkSettingsFile(map))
-        return;
-    robotScene->loadMap(map);
+    robotScene->loadMap("export-test.rp6");
 }
 
 void CRP6Simulator::sendSerialPressed()
