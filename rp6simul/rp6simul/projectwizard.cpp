@@ -194,12 +194,6 @@ QAction *CNewProjectSettingsPage::getAddAction(const QString &driver)
     return 0;
 }
 
-bool CNewProjectSettingsPage::checkPermissions(const QString &file) const
-{
-    QFileInfo fi(file);
-    return (fi.isReadable());
-}
-
 void CNewProjectSettingsPage::addDriver(QAction *action)
 {
     // Special case: add custom driver
@@ -211,7 +205,7 @@ void CNewProjectSettingsPage::addDriver(QAction *action)
         if (!file.isEmpty())
         {
             lua_getglobal(NLua::luaInterface, "getDriver");
-            lua_pushstring(NLua::luaInterface, getCString(file));
+            lua_pushstring(NLua::luaInterface, qPrintable(file));
 
             lua_call(NLua::luaInterface, 1, 2);
 
@@ -302,22 +296,7 @@ bool CNewProjectSettingsPage::isComplete() const
 bool CNewProjectSettingsPage::validatePage()
 {
     QString file(field("RP6Plugin").toString());
-    if (!file.isEmpty() && !checkPermissions(file))
-    {
-        QMessageBox::warning(this, "RP6 plugin error",
-                             "You do not have sufficient permissions for "
-                             "the RP6 plugin specified.");
-        return false;
-    }
-
-    if (!QLibrary::isLibrary(file))
-    {
-        QMessageBox::warning(this, "RP6 plugin error",
-                             "Incorrect file type selected.");
-        return false;
-    }
-
-    return true;
+    return verifyPluginFile(file);
 }
 
 QStringList CNewProjectSettingsPage::getSelectedDrivers() const

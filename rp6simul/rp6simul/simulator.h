@@ -11,6 +11,7 @@
 #include <QMutex>
 #include <QObject>
 #include <QReadWriteLock>
+#include <QStringList>
 
 // UNDONE: Move to shared.h?
 typedef void (*TCallPluginMainFunc)(void);
@@ -37,6 +38,8 @@ enum EISRTypes
     ISR_END
 };
 
+class QSettings;
+
 class CAVRClock;
 class CCallPluginMainThread;
 
@@ -60,7 +63,8 @@ class CSimulator : public QObject
     bool ISRFailedArray[ISR_END];
     QMutex ISRExecMutex;
 
-    QString currentProjectFile;
+    QString currentPluginFileName;
+    QStringList currentDriverList;
     QLibrary RP6Plugin;
 
     static CSimulator *instance;
@@ -70,7 +74,6 @@ class CSimulator : public QObject
     void setLuaAVRConstants(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
-    QString getPluginFile(void) const;
     bool initPlugin(void);
     void checkPluginThreadDelay(void);
     TIORegisterData getIORegister(EIORegisterTypes type) const;
@@ -105,7 +108,7 @@ public:
     ~CSimulator(void);
 
     void initLua(void);
-    bool openProjectFile(const QString &file);
+    bool loadProjectFile(const QSettings &settings);
     void execISR(EISRTypes type);
     CAVRClock *getAVRClock(void) { return AVRClock; }
     bool runPlugin(void);

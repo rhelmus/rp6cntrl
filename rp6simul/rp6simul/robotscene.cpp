@@ -34,10 +34,10 @@ CRobotScene::CRobotScene(QObject *parent) :
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
-    boxPixmap("../resource/cardboard-box.png"),
-    dragging(false), draggedEnough(false), mouseMode(MODE_POINT),
-    editModeEnabled(false), gridSize(15.0), autoGridEnabled(true),
-    gridVisible(false), viewAngle(0.0), followRobot(false)
+    boxPixmap("../resource/cardboard-box.png"), followRobot(false),
+    viewAngle(0.0), dragging(false), draggedEnough(false),
+    mouseMode(MODE_POINT), editModeEnabled(false), mapEdited(false),
+    gridSize(15.0), autoGridEnabled(true), gridVisible(false)
 {
     setBackgroundBrush(Qt::darkGray);
 
@@ -167,11 +167,52 @@ void CRobotScene::updateStaticWalls()
     staticWalls[WALL_BOTTOM]->setRect(0.0, 0.0, sr.width(), 30.0);
 }
 
+void CRobotScene::addLight(const QPointF &p, float r)
+{
+    CLightGraphicsItem *l = new CLightGraphicsItem(r);
+    l->setPos(p - QPointF(r, r));
+    l->setVisible(editModeEnabled);
+    addItem(l);
+    connect(l, SIGNAL(destroyed(QObject*)), this, SLOT(removeLight(QObject*)));
+    connect(l, SIGNAL(posChanged()), this, SLOT(markMapEdited()));
+    connect(l, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
+    connect(l, SIGNAL(radiusChanged()), this, SLOT(markLightingDirty()));
+    lights << l;
+}
+
+void CRobotScene::addWall(const QRectF &rect)
+{
+    CResizablePixmapGraphicsItem *resi
+            = new CResizablePixmapGraphicsItem(blockPixmap, true);
+    resi->setPos(rect.topLeft());
+    resi->setSize(rect.size());
+    addItem(resi);
+    connect(resi, SIGNAL(destroyed(QObject*)), this,
+            SLOT(removeWall(QObject*)));
+    connect(resi, SIGNAL(posChanged()), this, SLOT(markMapEdited()));
+    connect(resi, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
+    connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
+    dynamicWalls << resi;
+}
+
+void CRobotScene::addBox(const QRectF &rect)
+{
+    CResizablePixmapGraphicsItem *resi =
+            new CResizablePixmapGraphicsItem(boxPixmap, false);
+    resi->setPos(rect.topLeft());
+    resi->setSize(rect.size());
+    addItem(resi);
+    connect(resi, SIGNAL(destroyed(QObject*)), this, SLOT(removeBox(QObject*)));
+    connect(resi, SIGNAL(posChanged()), this, SLOT(markMapEdited()));
+    boxes << resi;
+}
+
 void CRobotScene::updateMapSize()
 {
     qDebug() << "Update map size";
     updateGrid();
     updateStaticWalls();
+    mapEdited = true; // UNDONE: Affects initial resize?
     lightingDirty = true;
 }
 
@@ -180,6 +221,7 @@ void CRobotScene::removeLight(QObject *o)
     qDebug() << "Removing light";
     CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
     lights.removeOne(l);
+    mapEdited = true;
     lightingDirty = true;
 }
 
@@ -189,6 +231,7 @@ void CRobotScene::removeWall(QObject *o)
     CResizablePixmapGraphicsItem *w =
             static_cast<CResizablePixmapGraphicsItem *>(o);
     dynamicWalls.removeOne(w);
+    mapEdited = true;
     lightingDirty = true;
 }
 
@@ -198,6 +241,7 @@ void CRobotScene::removeBox(QObject *o)
     CResizablePixmapGraphicsItem *b =
             static_cast<CResizablePixmapGraphicsItem *>(o);
     boxes.removeOne(b);
+    mapEdited = true;
 }
 
 void CRobotScene::robotPosChanged()
@@ -314,57 +358,25 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         if (mouseMode == MODE_WALL)
         {
             addWall(getMinRect(getDragRect(), minsize, minsize));
+            mapEdited = true;
             lightingDirty = true;
         }
         else if (mouseMode == MODE_BOX)
+        {
             addBox(getMinRect(getDragRect(), minsize, minsize));
+            mapEdited = true;
+        }
         else if (mouseMode == MODE_LIGHT)
         {
             const QRectF r(getMinRect(getLightDragRect(), minsize, minsize));
             const float radius = r.height()/2.0;
             addLight(r.center(), radius);
+            mapEdited = true;
             lightingDirty = true;
         }
     }
 
     dragging = draggedEnough = false;
-}
-
-void CRobotScene::addLight(const QPointF &p, float r)
-{
-    CLightGraphicsItem *l = new CLightGraphicsItem(r);
-    l->setPos(p - QPointF(r, r));
-    l->setVisible(editModeEnabled);
-    addItem(l);
-    connect(l, SIGNAL(destroyed(QObject*)), this, SLOT(removeLight(QObject*)));
-    connect(l, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
-    connect(l, SIGNAL(radiusChanged()), this, SLOT(markLightingDirty()));
-    lights << l;
-}
-
-void CRobotScene::addWall(const QRectF &rect)
-{
-    CResizablePixmapGraphicsItem *resi
-            = new CResizablePixmapGraphicsItem(blockPixmap, true);
-    resi->setPos(rect.topLeft());
-    resi->setSize(rect.size());
-    addItem(resi);
-    connect(resi, SIGNAL(destroyed(QObject*)), this,
-            SLOT(removeWall(QObject*)));
-    connect(resi, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
-    connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
-    dynamicWalls << resi;
-}
-
-void CRobotScene::addBox(const QRectF &rect)
-{
-    CResizablePixmapGraphicsItem *resi =
-            new CResizablePixmapGraphicsItem(boxPixmap, false);
-    resi->setPos(rect.topLeft());
-    resi->setSize(rect.size());
-    addItem(resi);
-    connect(resi, SIGNAL(destroyed(QObject*)), this, SLOT(removeBox(QObject*)));
-    boxes << resi;
 }
 
 void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
@@ -432,6 +444,45 @@ void CRobotScene::setEditModeEnabled(bool e)
     }    
 }
 
+void CRobotScene::setAutoRefreshLighting(bool a)
+{
+    if (a != autoRefreshLighting)
+    {
+        autoRefreshLighting = a;
+        mapEdited = true;
+    }
+}
+
+void CRobotScene::setAmbientLight(float l)
+{
+    if (!qFuzzyCompare(l, ambientLight))
+    {
+        ambientLight = l;
+        mapEdited = true;
+        lightingDirty = true;
+    }
+}
+
+void CRobotScene::setGridSize(float s)
+ {
+    if (!qFuzzyCompare(s, gridSize))
+    {
+        gridSize = s;
+        updateGrid();
+        update();
+        mapEdited = true;
+    }
+}
+
+void CRobotScene::setAutoGrid(bool a)
+{
+    if (a != autoGridEnabled)
+    {
+        autoGridEnabled = a;
+        mapEdited = true;
+    }
+}
+
 QPointF CRobotScene::alignPosToGrid(QPointF pos) const
 {
     int rx = (int)pos.x() % (int)gridSize, ry = (int)pos.y() % (int)gridSize;
@@ -449,7 +500,7 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
     return pos;
 }
 
-void CRobotScene::saveMap(const QString &f)
+void CRobotScene::saveMap(QSettings &settings)
 {
     /* Settings:
         - Version nr*
@@ -471,8 +522,6 @@ void CRobotScene::saveMap(const QString &f)
 
     // UNDONE: Update lightmap if necessary?
     // Or only save if outside edit mode?
-
-    QSettings file(f, QSettings::IniFormat);
 
     QList<QVariant> lightsvarlist;
     foreach (CLightGraphicsItem *l, lights)
@@ -498,77 +547,80 @@ void CRobotScene::saveMap(const QString &f)
         boxesvarlist << v;
     }
 
-    file.beginGroup("map");
+    settings.beginGroup("map");
 
-    file.setValue("version", 1);
-    file.setValue("mapRect", sceneRect());
-    file.setValue("gridSize", gridSize);
-    file.setValue("autoGrid", autoGridEnabled);
-    file.setValue("lights", lightsvarlist);
-    file.setValue("autoRefreshLighting", autoRefreshLighting);
-    file.setValue("ambientLight", ambientLight);
-    file.setValue("walls", wallsvarlist);
-    file.setValue("boxes", boxesvarlist);
-    file.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
-    file.setValue("shadowImage", shadowImage);
-    file.setValue("lightImage", lightImage);
+    settings.setValue("version", 1);
+    settings.setValue("mapRect", sceneRect());
+    settings.setValue("gridSize", gridSize);
+    settings.setValue("autoGrid", autoGridEnabled);
+    settings.setValue("lights", lightsvarlist);
+    settings.setValue("autoRefreshLighting", autoRefreshLighting);
+    settings.setValue("ambientLight", ambientLight);
+    settings.setValue("walls", wallsvarlist);
+    settings.setValue("boxes", boxesvarlist);
+    settings.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
+    settings.setValue("shadowImage", shadowImage);
+    settings.setValue("lightImage", lightImage);
 
-    file.endGroup();
+    settings.endGroup();
+
+    // UNDONE: Should be here? (ie map export)
+    mapEdited = false;
 }
 
-void CRobotScene::loadMap(const QString &f)
+void CRobotScene::loadMap(QSettings &settings)
 {
     clearMap();
 
-    QSettings file(f, QSettings::IniFormat);
-    file.beginGroup("map");
+    settings.beginGroup("map");
 
-    if (file.value("version", -1) != 1)
-        qWarning("Missing/unsupported map version");
+    if (settings.value("version", -1) != 1)
+        QMessageBox::warning(CRP6Simulator::getInstance(), "Map version",
+                             "Missing/unsupported map version");
 
     // First set grid size: setting map size may trigger grid update
-    gridSize = file.value("gridSize", 15.0).toReal();
+    gridSize = settings.value("gridSize", 15.0).toReal();
 
-    const QRectF maprect(file.value("mapRect",
-                                    QRectF(0.0, 0.0, 1000.0, 1000.0)).toRectF());
+    const QRectF maprect(settings.value("mapRect",
+                                        QRectF(0.0, 0.0, 1000.0, 1000.0)).toRectF());
 
     if (maprect != sceneRect())
         setSceneRect(maprect); // Triggers updateGrid
     else
         updateGrid();
 
-    autoGridEnabled = file.value("autoGrid", true).toBool();
+    autoGridEnabled = settings.value("autoGrid", true).toBool();
 
-    QList<QVariant> varlist = file.value("lights").toList();
+    QList<QVariant> varlist = settings.value("lights").toList();
     foreach (QVariant v, varlist)
     {
         SLightSettings s(v.value<SLightSettings>());
         addLight(s.pos + QPointF(s.radius, s.radius), s.radius);
     }
 
-    autoRefreshLighting = file.value("autoRefreshLighting", true).toBool();
-    ambientLight = file.value("ambientLight", 0.35).toFloat();
+    autoRefreshLighting = settings.value("autoRefreshLighting", true).toBool();
+    ambientLight = settings.value("ambientLight", 0.35).toFloat();
 
-    varlist = file.value("walls").toList();
+    varlist = settings.value("walls").toList();
     foreach (QVariant v, varlist)
     {
         SObjectSettings s(v.value<SObjectSettings>());
         addWall(QRectF(s.pos, s.size));
     }
 
-    varlist = file.value("boxes").toList();
+    varlist = settings.value("boxes").toList();
     foreach (QVariant v, varlist)
     {
         SObjectSettings s(v.value<SObjectSettings>());
         addBox(QRectF(s.pos, s.size));
     }
 
-    const qreal scale = file.value("scale", 1.0).toReal();
+    const qreal scale = settings.value("scale", 1.0).toReal();
     const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
     scaleGraphicsView(scale / curscale);
 
-    shadowImage = file.value("shadowImage").value<QImage>();
-    lightImage = file.value("lightImage").value<QImage>();
+    shadowImage = settings.value("shadowImage").value<QImage>();
+    lightImage = settings.value("lightImage").value<QImage>();
 
     if (shadowImage.isNull() || lightImage.isNull() ||
         (shadowImage.size() != sceneRect().size().toSize()) ||
@@ -583,7 +635,9 @@ void CRobotScene::loadMap(const QString &f)
         update();
     }
 
-    file.endGroup();
+    mapEdited = false;
+
+    settings.endGroup();
 }
 
 void CRobotScene::zoomSceneIn()
@@ -720,6 +774,7 @@ void CRobotScene::clearMap()
         delete it;
     }
 
+    mapEdited = true;
     lightingDirty = (lightingDirty || !lights.isEmpty());
     lights.clear();
 }

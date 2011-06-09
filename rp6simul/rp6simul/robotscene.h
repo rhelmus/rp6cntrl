@@ -8,6 +8,7 @@
 class CLightGraphicsItem;
 class CResizablePixmapGraphicsItem;
 class CRobotGraphicsItem;
+class QSettings;
 
 class CRobotScene : public QGraphicsScene
 {
@@ -25,20 +26,27 @@ private:
     bool lightingDirty, autoRefreshLighting;
     bool lightItemsVisible;
     float ambientLight;
+
     QHash<EStaticWall, QGraphicsRectItem *> staticWalls;
     QList<CResizablePixmapGraphicsItem *> dynamicWalls;
-    QPixmap blockPixmap, boxPixmap;
+    QPixmap blockPixmap;
+
+    QPixmap boxPixmap;
     QList<CResizablePixmapGraphicsItem *> boxes;
+
     CRobotGraphicsItem *robotGraphicsItem;
+    bool followRobot;
+    qreal viewAngle;
+
     QPointF mousePos, mouseDragStartPos;    
     bool dragging, draggedEnough;
     EMouseMode mouseMode;
     bool editModeEnabled;
+    bool mapEdited;
+
     float gridSize;
     bool autoGridEnabled, gridVisible;
     QImage gridImage;
-    qreal viewAngle;
-    bool followRobot;
 
     QGraphicsView *getGraphicsView(void) const;
     void scaleGraphicsView(qreal f);
@@ -49,12 +57,16 @@ private:
     void updateGrid(void);
     QGraphicsRectItem *createStaticWall(void) const;
     void updateStaticWalls(void);
+    void addLight(const QPointF &p, float r);
+    void addWall(const QRectF &rect);
+    void addBox(const QRectF &rect);
 
 private slots:
     void updateMapSize(void);
     void removeLight(QObject *o);
     void removeWall(QObject *o);
     void removeBox(QObject *o);
+    void markMapEdited(void) { mapEdited = true; }
     void markLightingDirty(void) { lightingDirty = true; }
     void robotPosChanged(void);
 
@@ -68,24 +80,21 @@ protected:
 public:
     explicit CRobotScene(QObject *parent = 0);
 
-    void addLight(const QPointF &p, float r);
-    void addWall(const QRectF &rect);
-    void addBox(const QRectF &rect);
     void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
     bool getAutoRefreshLighting(void) const { return autoRefreshLighting; }
-    void setAutoRefreshLighting(bool a) { autoRefreshLighting = a; }
+    void setAutoRefreshLighting(bool a);
     float getAmbientLight(void) const { return ambientLight; }
-    void setAmbientLight(float l)
-    { if (l != ambientLight) { ambientLight = l; lightingDirty = true; } }
+    void setAmbientLight(float l);
     float getGridSize(void) const { return gridSize; }
-    void setGridSize(float s) { gridSize = s; updateGrid(); update(); }
+    void setGridSize(float s);
     bool getAutoGrid(void) const { return autoGridEnabled; }
-    void setAutoGrid(bool a) { autoGridEnabled = a; }
+    void setAutoGrid(bool a);
     QPointF alignPosToGrid(QPointF pos) const;
-    void saveMap(const QString &f);
-    void loadMap(const QString &f);
+    void saveMap(QSettings &settings);
+    void loadMap(QSettings &settings);
+    bool getMapEdited(void) const { return mapEdited; }
 
 public slots:
     void zoomSceneIn(void);

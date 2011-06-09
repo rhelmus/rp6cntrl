@@ -8,8 +8,6 @@
 class QSettings;
 class QString;
 
-const char *getCString(const QString &s);
-
 inline unsigned long getUSDiff(const timespec &start, const timespec &end)
 {
     return ((end.tv_sec-start.tv_sec) * 1000000) +

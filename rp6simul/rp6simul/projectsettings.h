@@ -15,4 +15,6 @@ inline QString projectFilePath(const QString &dir, const QString &name)
     return QDir(dir).absoluteFilePath(name + ".rp6");
 }
 
+bool verifyPluginFile(const QString &file);
+
 #endif // PROJECTSETTINGS_H

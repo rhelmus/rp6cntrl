@@ -109,7 +109,7 @@ CLuaInterface::~CLuaInterface()
 void CLuaInterface::exec()
 {
     const QString p = QDir::toNativeSeparators("lua/main.lua");
-    if (luaL_dofile(luaState, getCString(p)))
+    if (luaL_dofile(luaState, qPrintable(p)))
         luaError(luaState, true);
 }
 
@@ -267,7 +267,7 @@ void pushStringList(lua_State *l, const QStringList &list)
     int i = 1;
     foreach(QString s, list)
     {
-        lua_pushstring(l, getCString(s));
+        lua_pushstring(l, qPrintable(s));
         lua_rawseti(l, -2, i);
         ++i;
     }

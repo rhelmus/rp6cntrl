@@ -2,6 +2,7 @@
 #include "avrtimer.h"
 #include "lua.h"
 #include "mapsettingsdialog.h"
+#include "projectsettings.h"
 #include "projectwizard.h"
 #include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
@@ -410,15 +411,16 @@ void CRP6Simulator::initLua()
 
 void CRP6Simulator::openProjectFile(const QString &file)
 {
-    // UNDONE: Only check here for file being valid?
+    CProjectSettings prsettings(file);
 
-    if (!simulator->openProjectFile(file))
+    if (!simulator->loadProjectFile(prsettings))
         return;
+
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
     editMapToolBar->setEnabled(true);
     mainStackedWidget->setCurrentIndex(0);
-    robotScene->loadMap(file);
+    robotScene->loadMap(prsettings);
 }
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
@@ -668,19 +670,23 @@ void CRP6Simulator::toggleEditMap(bool checked)
 
 void CRP6Simulator::exportMap()
 {
-    robotScene->saveMap("export-test.rp6");
+    // UNDONE
+    QSettings s("export-test.rp6", QSettings::IniFormat);
+    robotScene->saveMap(s);
 }
 
 void CRP6Simulator::importMap()
 {
-    robotScene->loadMap("export-test.rp6");
+    // UNDONE
+    QSettings s("export-test.rp6", QSettings::IniFormat);
+    robotScene->loadMap(s);
 }
 
 void CRP6Simulator::sendSerialPressed()
 {
     NLua::CLuaLocker lualocker;
     lua_getglobal(NLua::luaInterface, "sendSerial");
-    lua_pushstring(NLua::luaInterface, getCString(serialInputWidget->text() + "\n"));
+    lua_pushstring(NLua::luaInterface, qPrintable(serialInputWidget->text() + "\n"));
     lua_call(NLua::luaInterface, 1, 0);
 
     serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));

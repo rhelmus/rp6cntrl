@@ -42,7 +42,6 @@ class CNewProjectSettingsPage: public QWizardPage
 
     void getDriverList(void);
     QAction *getAddAction(const QString &driver);
-    bool checkPermissions(const QString &file) const;
 
 private slots:
     void addDriver(QAction *action);
