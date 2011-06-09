@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QSettings>
 #include <QTime>
 
 // Keep in sync with EIORegisterTypes
@@ -142,7 +143,7 @@ void CSimulator::setLuaIOTypes()
     for (int i=0; i<IO_END; ++i)
     {
         QString io = QString("IO_%1").arg(IORegisterStringArray[i]);
-        NLua::setVariable(i, getCString(io), "avr");
+        NLua::setVariable(i, qPrintable(io), "avr");
     }
 }
 
@@ -445,14 +446,6 @@ void CSimulator::terminatePluginMainThread()
     }
 }
 
-QString CSimulator::getPluginFile() const
-{
-    CProjectSettings prsettings(currentProjectFile);
-    if (!checkSettingsFile(prsettings))
-        return QString();
-    return prsettings.value("RP6Plugin").toString();
-}
-
 bool CSimulator::initPlugin()
 {
     if (RP6Plugin.isLoaded() && !RP6Plugin.unload())
@@ -465,13 +458,13 @@ bool CSimulator::initPlugin()
         return false;
     }
 
-    if (getPluginFile().isEmpty())
+    if (currentPluginFileName.isEmpty())
     {
         QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error", "Project has no RP6 plugin set");
         return false;
     }
 
-    RP6Plugin.setFileName(getPluginFile());
+    RP6Plugin.setFileName(currentPluginFileName);
 
     if (!RP6Plugin.load())
     {
@@ -498,11 +491,9 @@ bool CSimulator::initPlugin()
     lua_getglobal(NLua::luaInterface, "initPlugin");
 
     // Push driver list
-    CProjectSettings prsettings(currentProjectFile);
-    if (checkSettingsFile(prsettings))
+    if (!currentDriverList.isEmpty())
     {
-        NLua::pushStringList(NLua::luaInterface,
-                             prsettings.value("drivers").toStringList());
+        NLua::pushStringList(NLua::luaInterface, currentDriverList);
         lua_call(NLua::luaInterface, 1, 0);
     }
     else
@@ -841,14 +832,20 @@ void CSimulator::initLua()
     NLua::registerFunction(luaBitAnd, "bitAnd", "bit");
 }
 
-bool CSimulator::openProjectFile(const QString &file)
+bool CSimulator::loadProjectFile(const QSettings &settings)
 {
-    CProjectSettings prsettings(file);
-    if (!checkSettingsFile(prsettings))
+    const QString plugfile = settings.value("RP6Plugin").toString();
+    if (!verifyPluginFile(plugfile))
         return false;
 
+    currentPluginFileName = plugfile;
+    currentDriverList = settings.value("drivers").toStringList();
+
+    if (currentDriverList.isEmpty())
+        QMessageBox::warning(CRP6Simulator::getInstance(), "Empty driverlist",
+                             "Project has not any drivers specified!");
+
     stopPlugin();
-    currentProjectFile = file;
     return true;
 }
 
@@ -865,7 +862,7 @@ void CSimulator::execISR(EISRTypes type)
     if (!ISRCacheArray[type])
     {
         QString func = constructISRFunc(type);
-        ISRCacheArray[type] = getLibFunc<TISR>(RP6Plugin, getCString(func));
+        ISRCacheArray[type] = getLibFunc<TISR>(RP6Plugin, qPrintable(func));
 
         if (!ISRCacheArray[type])
         {
