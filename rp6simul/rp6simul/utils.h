@@ -14,6 +14,6 @@ inline unsigned long getUSDiff(const timespec &start, const timespec &end)
             ((end.tv_nsec-start.tv_nsec) / 1000);
 }
 
-bool checkSettingsFile(QSettings &file);
+bool verifySettingsFile(QSettings &file);
 
 #endif // UTILS_H
