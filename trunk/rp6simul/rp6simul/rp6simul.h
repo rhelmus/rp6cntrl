@@ -30,8 +30,10 @@ class CRP6Simulator : public QMainWindow
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
     CSimulator *simulator;
+    QString currentProjectFile;
 
     CProjectWizard *projectWizard;
+    QList<QAction *> mapMenuActionList;
     QAction *runPluginAction, *stopPluginAction;
     QToolBar *editMapToolBar;
     QList<QAction *> editMapActionList;
@@ -85,6 +87,7 @@ private slots:
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
     void toggleEditMap(bool checked);
+    void saveMap(void);
     void exportMap(void);
     void importMap(void);
     void sendSerialPressed(void);

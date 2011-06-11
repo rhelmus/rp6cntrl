@@ -6,7 +6,7 @@
 #include <QSettings>
 #include <QString>
 
-bool checkSettingsFile(QSettings &file)
+bool verifySettingsFile(QSettings &file)
 {
     file.sync();
 

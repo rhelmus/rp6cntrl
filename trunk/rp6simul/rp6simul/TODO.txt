@@ -21,6 +21,7 @@
     - Import from other project files
     - Save/Load progress
     - Robot start
+    - Map saving/loading: disable if editing is enabled?
 - Robot widget
 - Check version on project loading
 - Use qRound for float/double --> int conversions

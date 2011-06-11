@@ -47,8 +47,6 @@ CRobotScene::CRobotScene(QObject *parent) :
     connect(robotGraphicsItem, SIGNAL(posChanged()), this,
             SLOT(robotPosChanged()));
 
-    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(updateMapSize()));
-
     qRegisterMetaTypeStreamOperators<SLightSettings>("SLightSettings");
     qRegisterMetaTypeStreamOperators<SObjectSettings>("SObjectSettings");
 }
@@ -113,6 +111,15 @@ void CRobotScene::updateMouseCursor()
         vp->unsetCursor();
     else
         vp->setCursor(Qt::CrossCursor);
+}
+
+void CRobotScene::updateMapSize()
+{
+    qDebug() << "Update map size";
+    updateGrid();
+    updateStaticWalls();
+    markMapEdited(true);
+    lightingDirty = true;
 }
 
 void CRobotScene::updateGrid()
@@ -207,13 +214,17 @@ void CRobotScene::addBox(const QRectF &rect)
     boxes << resi;
 }
 
-void CRobotScene::updateMapSize()
+void CRobotScene::updateItemsEditMode()
 {
-    qDebug() << "Update map size";
-    updateGrid();
-    updateStaticWalls();
-    mapEdited = true; // UNDONE: Affects initial resize?
-    lightingDirty = true;
+    foreach (CLightGraphicsItem *l, lights)
+        l->setVisible(editModeEnabled && lightItemsVisible);
+
+    foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
+    {
+        w->setMovable(editModeEnabled);
+        w->setResizable(editModeEnabled);
+        w->setDeletable(editModeEnabled);
+    }
 }
 
 void CRobotScene::removeLight(QObject *o)
@@ -221,7 +232,7 @@ void CRobotScene::removeLight(QObject *o)
     qDebug() << "Removing light";
     CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
     lights.removeOne(l);
-    mapEdited = true;
+    markMapEdited(true);
     lightingDirty = true;
 }
 
@@ -231,7 +242,7 @@ void CRobotScene::removeWall(QObject *o)
     CResizablePixmapGraphicsItem *w =
             static_cast<CResizablePixmapGraphicsItem *>(o);
     dynamicWalls.removeOne(w);
-    mapEdited = true;
+    markMapEdited(true);
     lightingDirty = true;
 }
 
@@ -241,7 +252,16 @@ void CRobotScene::removeBox(QObject *o)
     CResizablePixmapGraphicsItem *b =
             static_cast<CResizablePixmapGraphicsItem *>(o);
     boxes.removeOne(b);
-    mapEdited = true;
+    markMapEdited(true);
+}
+
+void CRobotScene::markMapEdited(bool e)
+{
+    if (e != mapEdited)
+    {
+        mapEdited = e;
+        emit mapEditedChanged(e);
+    }
 }
 
 void CRobotScene::robotPosChanged()
@@ -358,20 +378,20 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         if (mouseMode == MODE_WALL)
         {
             addWall(getMinRect(getDragRect(), minsize, minsize));
-            mapEdited = true;
+            markMapEdited(true);
             lightingDirty = true;
         }
         else if (mouseMode == MODE_BOX)
         {
             addBox(getMinRect(getDragRect(), minsize, minsize));
-            mapEdited = true;
+            markMapEdited(true);
         }
         else if (mouseMode == MODE_LIGHT)
         {
             const QRectF r(getMinRect(getLightDragRect(), minsize, minsize));
             const float radius = r.height()/2.0;
             addLight(r.center(), radius);
-            mapEdited = true;
+            markMapEdited(true);
             lightingDirty = true;
         }
     }
@@ -406,34 +426,11 @@ void CRobotScene::setEditModeEnabled(bool e)
 
     if (e)
     {
-        if (lightItemsVisible)
-        {
-            foreach (CLightGraphicsItem *l, lights)
-                l->setVisible(true);
-        }
-
-        foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
-        {
-            w->setMovable(true);
-            w->setResizable(true);
-            w->setDeletable(true);
-        }
-
         rotateView(0.0);
         setMouseMode(mouseMode); // Update mode, calls update() too
     }
     else
     {
-        foreach (CLightGraphicsItem *l, lights)
-            l->setVisible(false);
-
-        foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
-        {
-            w->setMovable(false);
-            w->setResizable(false);
-            w->setDeletable(false);
-        }
-
         if (lightingDirty && autoRefreshLighting)
             updateLighting(); // calls update() too
         else
@@ -441,7 +438,15 @@ void CRobotScene::setEditModeEnabled(bool e)
 
         dragging = false;
         updateMouseCursor();
-    }    
+    }
+
+    updateItemsEditMode();
+}
+
+void CRobotScene::setMapSize(const QSizeF &size)
+{
+    setSceneRect(QRectF(0.0, 0.0, size.width(), size.height()));
+    updateMapSize();
 }
 
 void CRobotScene::setAutoRefreshLighting(bool a)
@@ -449,7 +454,7 @@ void CRobotScene::setAutoRefreshLighting(bool a)
     if (a != autoRefreshLighting)
     {
         autoRefreshLighting = a;
-        mapEdited = true;
+        markMapEdited(true);
     }
 }
 
@@ -458,7 +463,7 @@ void CRobotScene::setAmbientLight(float l)
     if (!qFuzzyCompare(l, ambientLight))
     {
         ambientLight = l;
-        mapEdited = true;
+        markMapEdited(true);
         lightingDirty = true;
     }
 }
@@ -470,7 +475,7 @@ void CRobotScene::setGridSize(float s)
         gridSize = s;
         updateGrid();
         update();
-        mapEdited = true;
+        markMapEdited(true);
     }
 }
 
@@ -479,7 +484,7 @@ void CRobotScene::setAutoGrid(bool a)
     if (a != autoGridEnabled)
     {
         autoGridEnabled = a;
-        mapEdited = true;
+        markMapEdited(true);
     }
 }
 
@@ -550,7 +555,7 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.beginGroup("map");
 
     settings.setValue("version", 1);
-    settings.setValue("mapRect", sceneRect());
+    settings.setValue("mapSize", sceneRect().size());
     settings.setValue("gridSize", gridSize);
     settings.setValue("autoGrid", autoGridEnabled);
     settings.setValue("lights", lightsvarlist);
@@ -565,7 +570,7 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.endGroup();
 
     // UNDONE: Should be here? (ie map export)
-    mapEdited = false;
+    markMapEdited(false);
 }
 
 void CRobotScene::loadMap(QSettings &settings)
@@ -581,11 +586,11 @@ void CRobotScene::loadMap(QSettings &settings)
     // First set grid size: setting map size may trigger grid update
     gridSize = settings.value("gridSize", 15.0).toReal();
 
-    const QRectF maprect(settings.value("mapRect",
-                                        QRectF(0.0, 0.0, 1000.0, 1000.0)).toRectF());
+    const QSizeF mapsize(settings.value("mapSize",
+                                        QSizeF(1000.0, 1000.0)).toSizeF());
 
-    if (maprect != sceneRect())
-        setSceneRect(maprect); // Triggers updateGrid
+    if (mapsize != sceneRect().size())
+        setMapSize(mapsize); // Triggers updateGrid
     else
         updateGrid();
 
@@ -628,16 +633,18 @@ void CRobotScene::loadMap(QSettings &settings)
     {
         qWarning("Failed to load light maps. Regenerating...");
         updateLighting();
+        markMapEdited(true);
     }
     else
     {
+        markMapEdited(false);
         lightingDirty = false;
         update();
     }
 
-    mapEdited = false;
-
     settings.endGroup();
+
+    updateItemsEditMode();
 }
 
 void CRobotScene::zoomSceneIn()
@@ -742,6 +749,7 @@ void CRobotScene::updateLighting()
     }
 
     lightingDirty = false;
+    markMapEdited(true);
     update();
 
     qDebug() << "Updated lightingMap in" << startt.elapsed() << "ms.";
@@ -774,7 +782,7 @@ void CRobotScene::clearMap()
         delete it;
     }
 
-    mapEdited = true;
+    markMapEdited(true);
     lightingDirty = (lightingDirty || !lights.isEmpty());
     lights.clear();
 }

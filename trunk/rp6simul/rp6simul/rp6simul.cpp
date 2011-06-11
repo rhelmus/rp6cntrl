@@ -81,7 +81,23 @@ void CRP6Simulator::createMenus()
     menu->addAction("New", this, SLOT(newProject()), tr("ctrl+N"));
     menu->addAction("Open", this, SLOT(openProject()), tr("ctrl+O"));
     menu->addMenu("Open recent...")->addAction("blah");
+
     menu->addSeparator();
+
+    QAction *a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                                 "Save map", this, SLOT(saveMap()));
+    connect(robotScene, SIGNAL(mapEditedChanged(bool)), a,
+            SLOT(setEnabled(bool)));
+    a->setEnabled(false);
+    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                        "Export map as template", this, SLOT(exportMap()));
+    mapMenuActionList << a;
+    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
+                        "Import map template", this, SLOT(importMap()));
+    mapMenuActionList << a;
+
+    menu->addSeparator();
+
     menu->addAction("Quit", this, SLOT(close()), tr("ctrl+Q"));
 
     menu = menuBar()->addMenu("&Edit");
@@ -89,9 +105,13 @@ void CRP6Simulator::createMenus()
     menu->addSeparator();
     menu->addAction("Preferences");
 
+
     menu = menuBar()->addMenu("&Help");
     menu->addAction("About");
     menu->addAction("About Qt", qApp, SLOT(aboutQt()));
+
+    foreach (a, mapMenuActionList)
+        a->setEnabled(false);
 }
 
 void CRP6Simulator::setToolBarToolTips()
@@ -145,14 +165,14 @@ void CRP6Simulator::createToolbars()
                                   SLOT(setFollowRobot(bool)));
     a->setCheckable(true);
 
-    // UNDONE: Move to file menu
-    editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
-                              "Export map as template", this, SLOT(exportMap()));
+    a = editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                                  "Save map", this, SLOT(saveMap()));
+    connect(robotScene, SIGNAL(mapEditedChanged(bool)), a,
+            SLOT(setEnabled(bool)));
 
-    editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
-                              "Import map template", this, SLOT(importMap()));
 
     editMapToolBar->addSeparator();
+
 
     updateMapLightingAction =
             editMapToolBar->addAction(QIcon("../resource/light-refresh.png"),
@@ -224,15 +244,8 @@ void CRP6Simulator::createToolbars()
 QWidget *CRP6Simulator::createMainWidget()
 {
     robotScene = new CRobotScene(this);
-    QRectF screct(0.0, 0.0, 900.0, 900.0);
-    robotScene->setSceneRect(screct);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
-
-    /*robotScene->addLight(QPointF(250.0, 250.0), 200.0);
-    robotScene->addLight(QPointF(550.0, 250.0), 200.0);
-    robotScene->addLight(QPointF(50.0, 50.0), 200.0);
-    robotScene->updateLighting();*/
 
     mainStackedWidget = new QStackedWidget;
     QWidget *w = new QWidget;
@@ -413,6 +426,9 @@ void CRP6Simulator::openProjectFile(const QString &file)
 {
     CProjectSettings prsettings(file);
 
+    if (!verifySettingsFile(prsettings))
+        return;
+
     if (!simulator->loadProjectFile(prsettings))
         return;
 
@@ -421,6 +437,11 @@ void CRP6Simulator::openProjectFile(const QString &file)
     editMapToolBar->setEnabled(true);
     mainStackedWidget->setCurrentIndex(0);
     robotScene->loadMap(prsettings);
+
+    foreach (QAction *a, mapMenuActionList)
+        a->setEnabled(true);
+
+    currentProjectFile = file;
 }
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
@@ -650,9 +671,7 @@ void CRP6Simulator::editMapSettings()
     if (dialog.exec() == QDialog::Accepted)
     {
         robotScene->setAutoRefreshLighting(dialog.getAutoRefreshLight());
-        QRectF r(robotScene->sceneRect());
-        r.setSize(dialog.getMapSize());
-        robotScene->setSceneRect(r);
+        robotScene->setMapSize(dialog.getMapSize());
         qDebug() << "Ambient light changed:" << (robotScene->getAmbientLight() != dialog.getAmbientLight()) << robotScene->getAmbientLight() << dialog.getAmbientLight();
         robotScene->setAmbientLight(dialog.getAmbientLight());
         robotScene->setGridSize(dialog.getGridSize());
@@ -666,6 +685,16 @@ void CRP6Simulator::toggleEditMap(bool checked)
         a->setEnabled(checked);
     updateMapLightingAction->setEnabled(!checked);
     robotScene->setEditModeEnabled(checked);
+}
+
+void CRP6Simulator::saveMap()
+{
+    CProjectSettings prsettings(currentProjectFile);
+
+    if (!verifySettingsFile(prsettings))
+        return;
+
+    robotScene->saveMap(prsettings);
 }
 
 void CRP6Simulator::exportMap()

@@ -54,19 +54,20 @@ private:
     QRectF getDragRect(void) const;
     QRectF getLightDragRect(void) const;
     void updateMouseCursor(void);
+    void updateMapSize(void);
     void updateGrid(void);
     QGraphicsRectItem *createStaticWall(void) const;
     void updateStaticWalls(void);
     void addLight(const QPointF &p, float r);
     void addWall(const QRectF &rect);
     void addBox(const QRectF &rect);
+    void updateItemsEditMode(void);
 
 private slots:
-    void updateMapSize(void);
     void removeLight(QObject *o);
     void removeWall(QObject *o);
     void removeBox(QObject *o);
-    void markMapEdited(void) { mapEdited = true; }
+    void markMapEdited(bool e=true);
     void markLightingDirty(void) { lightingDirty = true; }
     void robotPosChanged(void);
 
@@ -83,6 +84,7 @@ public:
     void setMouseMode(EMouseMode mode, bool sign=false);
     void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
+    void setMapSize(const QSizeF &size);
     bool getAutoRefreshLighting(void) const { return autoRefreshLighting; }
     void setAutoRefreshLighting(bool a);
     float getAmbientLight(void) const { return ambientLight; }
@@ -108,6 +110,7 @@ public slots:
 
 signals:
     void mouseModeChanged(CRobotScene::EMouseMode);
+    void mapEditedChanged(bool);
 };
 
 // Structures for map IO
