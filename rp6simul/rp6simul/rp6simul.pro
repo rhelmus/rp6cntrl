@@ -57,7 +57,8 @@ SOURCES += main.cpp\
     ../lua/lbaselib.c \
     ../lua/lauxlib.c \
     ../lua/lapi.c \
-    clock.cpp
+    clock.cpp \
+    progressdialog.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -101,7 +102,8 @@ HEADERS  += rp6simul.h \
     ../lua/lapi.h \
     ../lua/lua.hpp \
     clock.h \
-    graphicsitemtypes.h
+    graphicsitemtypes.h \
+    progressdialog.h
 
 OTHER_FILES += \
     TODO.txt \

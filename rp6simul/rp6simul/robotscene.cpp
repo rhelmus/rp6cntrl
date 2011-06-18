@@ -1,4 +1,5 @@
 #include "lightgraphicsitem.h"
+#include "progressdialog.h"
 #include "robotscene.h"
 #include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
@@ -291,9 +292,11 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     if (!editModeEnabled)
     {
         painter->drawImage(0, 0, shadowImage);
+//        painter->drawImage(sceneRect(), shadowImage);
 
         painter->setCompositionMode(QPainter::CompositionMode_Overlay);
         painter->drawImage(0, 0, lightImage);
+//        painter->drawImage(sceneRect(), lightImage);
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
     }
 
@@ -564,8 +567,17 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.setValue("walls", wallsvarlist);
     settings.setValue("boxes", boxesvarlist);
     settings.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
+
+    QElapsedTimer etimer;
+    etimer.start();
+
+    settings.sync();
     settings.setValue("shadowImage", shadowImage);
+    settings.sync();
+    qDebug() << "Wrote shadow image after" << etimer.elapsed() << "ms";
     settings.setValue("lightImage", lightImage);
+    settings.sync();
+    qDebug() << "Wrote shadow image after" << etimer.elapsed() << "ms";
 
     settings.endGroup();
 
@@ -666,106 +678,15 @@ void CRobotScene::setFollowRobot(bool f)
          robotPosChanged(); // Trigger initial focus in case robot doesn't move
 }
 
-#if 0
 void CRobotScene::updateLighting()
 {
     QTime startt;
     startt.start();
 
-    shadowImage = QImage(sceneRect().size().toSize(), QImage::Format_ARGB32_Premultiplied);
-    shadowImage.fill(Qt::transparent);
-    QPainter shpainter(&shadowImage);
-    shpainter.setRenderHint(QPainter::Antialiasing);
-
-    lightImage = QImage(sceneRect().size().toSize(), QImage::Format_ARGB32_Premultiplied);
-    lightImage.fill(Qt::transparent);
-    QPainter lipainter(&lightImage);
-    lipainter.setRenderHint(QPainter::Antialiasing);
-
-    QProgressDialog prgdialog(CRP6Simulator::getInstance(),
-                              Qt::FramelessWindowHint);
-    prgdialog.setLabelText("Calculating light map...");
-    prgdialog.setRange(0, sceneRect().width());
-    prgdialog.setMinimumDuration(50);
-    prgdialog.setValue(0);
-    prgdialog.setCancelButton(0); // No canceling
-
-    QList<QPolygonF> obstacles;
-    foreach (QGraphicsItem *w, staticWalls.values())
-        obstacles << w->mapToScene(w->boundingRect());
-    foreach (QGraphicsItem *w, dynamicWalls)
-        obstacles << w->mapToScene(w->boundingRect());
-
-    const int left = sceneRect().left(), right = sceneRect().right();
-    const int top = sceneRect().top(), bottom = sceneRect().bottom();
-    for (int x=left; x<=right; ++x)
-    {
-        if (!(x % 30))
-        {
-            prgdialog.setValue(x);
-            qApp->processEvents();
-        }
-
-        for (int y=top; y<=bottom; ++y)
-        {
-            float intensity = ambientLight;
-            const QPointF p(x, y);
-            bool inwall = false;
-
-            foreach (QPolygonF obpoly, obstacles)
-            {
-                // Pixel in wall?
-                if (obpoly.containsPoint(p, Qt::OddEvenFill))
-                {
-                    intensity = 0.6;
-                    inwall = true;
-                    break;
-                }
-            }
-
-            if (!inwall)
-            {
-                foreach (CLightGraphicsItem *l, lights)
-                {
-                    intensity += l->intensityAt(p, obstacles);
-                    if (intensity >= 2.0)
-                        break;
-                }
-            }
-
-            if (intensity > 1.0)
-            {
-                intensity = qMin(intensity, 2.0f);
-                const int c = qRound(intensity * 127.0);
-                lipainter.setPen(QColor(c, c, c));
-                lipainter.drawPoint(x, y);
-            }
-            else if (intensity < 1.0)
-            {
-                const int alpha = 255 - qRound(intensity * 255.0);
-                shpainter.setPen(QPen(QBrush(QColor(0, 0, 0, alpha)), 1.0));
-                shpainter.drawPoint(x, y);
-            }
-        }
-    }
-
-    lightingDirty = false;
-    markMapEdited(true);
-    update();
-
-    qDebug() << "Updated lightingMap in" << startt.elapsed() << "ms.";
-}
-#else
-
-void CRobotScene::updateLighting()
-{
-    QTime startt;
-    startt.start();
-
-    QProgressDialog prgdialog(CRP6Simulator::getInstance());
+    CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
     prgdialog.setWindowTitle("Updating light map...");
-    prgdialog.setMinimumDuration(0);
-    prgdialog.setRange(0, 3);
+    prgdialog.setRange(0, 100);
+    prgdialog.show();
 
     prgdialog.setLabelText("Creating image caches...");
     prgdialog.setValue(0);
@@ -774,6 +695,9 @@ void CRobotScene::updateLighting()
     shadowImage.fill(qAlpha(0));
     QPainter shpainter(&shadowImage);
     shpainter.setRenderHint(QPainter::Antialiasing);
+
+    prgdialog.setValue(16);
+    qApp->processEvents();
 
     lightImage = QImage(sceneRect().size().toSize(), QImage::Format_ARGB32_Premultiplied);
     lightImage.fill(qRgb(127, 127, 127));
@@ -786,10 +710,11 @@ void CRobotScene::updateLighting()
     QRegion shadowregion(sceneRect().toAlignedRect());
     QList<QPolygonF> obstacles;
 
+    qApp->processEvents();
     if (!prgdialog.wasCanceled())
     {
         prgdialog.setLabelText("Determining lighting regions...");
-        prgdialog.setValue(1);
+        prgdialog.setValue(33);
 
         foreach (CLightGraphicsItem *l, lights)
             lightregion += l->mapToScene(l->boundingRect()).boundingRect().toAlignedRect();
@@ -828,12 +753,17 @@ void CRobotScene::updateLighting()
         }
     }
 
+    qApp->processEvents();
     if (!prgdialog.wasCanceled())
     {
         prgdialog.setLabelText("Performing per pixel lighting...");
-        prgdialog.setValue(2);
+        prgdialog.setValue(66);
 
         const QVector<QRect> lightrects = lightregion.rects();
+        int totw = 0, progw = 0, upcounter = 0;
+
+        foreach (QRect r, lightrects)
+            totw += r.width();
 
         qDebug() << "Starting per pixel after" << startt.elapsed() << "ms";
 
@@ -852,15 +782,25 @@ void CRobotScene::updateLighting()
 
             for (int x=left; x<=right; ++x)
             {
-                if (!(x % 30))
-                {
-                    qApp->processEvents();
-                    if (prgdialog.wasCanceled())
-                        break;
-                }
+                if (prgdialog.wasCanceled())
+                    break;
+
+                ++progw;
 
                 for (int y=top; y<=bottom; ++y)
                 {
+                    ++upcounter;
+
+                    if (upcounter == 50) // UNDONE
+                    {
+    //                    qDebug() << "prog refresh after " << startt.elapsed() << "ms";
+                        prgdialog.setValue(66 + (progw * 100 / totw) / 3);
+                        qApp->processEvents();
+                        if (prgdialog.wasCanceled())
+                            break;
+                        upcounter = 0;
+                    }
+
                     float intensity = ambientLight;
                     const QPointF p(x, y);
                     foreach (CLightGraphicsItem *l, lights)
@@ -887,6 +827,17 @@ void CRobotScene::updateLighting()
             }
         }
     }
+/*
+    shpainter.end();
+    lipainter.end();
+
+    shadowImage = shadowImage.scaled(shadowImage.size() * 0.5,
+                                     Qt::IgnoreAspectRatio,
+                                     Qt::SmoothTransformation);
+    lightImage = lightImage.scaled(lightImage.size() * 0.5,
+                                   Qt::IgnoreAspectRatio,
+                                   Qt::SmoothTransformation);*/
+
 
     lightingDirty = false;
     markMapEdited(true);
@@ -894,8 +845,6 @@ void CRobotScene::updateLighting()
 
     qDebug() << "Updated lightingMap in" << startt.elapsed() << "ms.";
 }
-
-#endif
 
 void CRobotScene::clearMap()
 {
