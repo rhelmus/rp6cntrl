@@ -73,6 +73,10 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent)
     pluginUpdateUITimer->setInterval(250);
 
     initLua();
+
+
+    // UNDONE
+    openProjectFile("/home/rick/test.rp6");
 }
 
 void CRP6Simulator::createMenus()
