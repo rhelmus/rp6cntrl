@@ -307,7 +307,6 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
         if (ambientLight > 1.0)
         {
-
             const int c = ambientLight * 127 / 100;
             painter->fillRect(sceneRect(), QColor(c, c, c));
         }
@@ -328,7 +327,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
             painter->drawImage(lightMapList[i].pos, lightMapList[i].darkImage);
 
-            painter->setCompositionMode(QPainter::CompositionMode_Overlay);
+            painter->setCompositionMode(QPainter::CompositionMode_Multiply);
             painter->drawImage(lightMapList[i].pos, lightMapList[i].lightImage);
             painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
         }
@@ -1140,10 +1139,8 @@ void CRobotScene::updateLighting()
                         QLineF l(QPointF(rad, rad), v);
                         QTransform tr;
                         tr.translate(v.x(), v.y());
-//                        tr.translate(ir.center().x(), ir.center().y());
                         tr.rotate(l.angle());
                         tr.translate(-v.x(), -v.y());
-//                        tr.translate(-ir.center().x(), -ir.center().y());
 
                         QPolygonF p(tr.map(QPolygonF(ir)));
                         qDebug() << "p:" << p;
@@ -1160,42 +1157,25 @@ void CRobotScene::updateLighting()
 
                         qDebug() << "hasup/hasdown" << hasup << hasdown;
 
+                        if ((hasup && !hasdown) || (!hasup && hasdown))
+                        {
+
+                        }
                         shadowPolys << p;
                     }
-
-                    /*
-                    QPolygonF p;
-
-                    QLineF l(QPointF(rad, rad), ir.bottomRight());
-                    l.setLength(rad*2.0);
-                    p << ir.bottomRight() << l.p2();
-
-                    l.setP2(ir.topRight());
-                    l.setLength(rad*2.0);
-                    p << l.p2() << ir.topRight() << p[0];
-
-                    shadowPolys << p;
-
-                    p = QPolygonF();
-                    l.setP2(ir.bottomLeft());
-                    l.setLength(rad*2.0);
-                    p << ir.bottomLeft() << l.p2();
-
-                    l.setP2(ir.topLeft());
-                    l.setLength(rad*2.0);
-                    p << l.p2() << ir.topLeft() << p[0];
-
-                    shadowPolys << p;*/
-
-                    /*pp = QPainterPath();
-                    pp.addPolygon(p);
-                    ppath -= pp;*/
                 }
             }
 
             lpainter.setBrush(rg);
             lpainter.setClipPath(ppath);
             lpainter.drawEllipse(l->boundingRect());
+
+            /*lpainter.setCompositionMode(QPainter::CompositionMode_Plus);
+            lpainter.drawEllipse(l->boundingRect());
+            lpainter.setCompositionMode(QPainter::CompositionMode_Darken);
+            lpainter.setBrush(QColor(127, 127, 127));
+            lpainter.drawEllipse(l->boundingRect());
+            lpainter.setCompositionMode(QPainter::CompositionMode_SourceOver);*/
 
             lpainter.setPen(Qt::red);
             lpainter.setBrush(QColor(127, 127, 127));
