@@ -291,15 +291,15 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
     if (!editModeEnabled)
     {
-#if 0
-        painter->drawImage(0, 0, shadowImage);
+#if 1
+//        painter->drawImage(0, 0, shadowImage);
 //        painter->drawImage(sceneRect(), shadowImage);
 
         painter->setCompositionMode(QPainter::CompositionMode_Overlay);
         painter->drawImage(0, 0, lightImage);
 //        painter->drawImage(sceneRect(), lightImage);
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
-#endif
+#else
         // Temporarely disable AA as it seems to cause artifects...
         painter->setRenderHint(QPainter::Antialiasing, false);
         painter->setPen(Qt::NoPen);
@@ -333,6 +333,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
         }
 
         painter->setRenderHint(QPainter::Antialiasing, true);
+#endif
     }
 
     if (dragging && draggedEnough)
@@ -1043,8 +1044,6 @@ void CRobotScene::updateLighting()
     QTime startt;
     startt.start();
 
-    lightMapList.clear();
-
     ambientRegion = QRegion(sceneRect().toAlignedRect());
 
     CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
@@ -1080,22 +1079,18 @@ void CRobotScene::updateLighting()
         prgdialog.setLabelText("Performing per pixel lighting...");
         prgdialog.setValue(66);
 
+        QList<QPair<QPointF, QImage> > lightimages;
+
         foreach (CLightGraphicsItem *l, lights)
         {
             if (prgdialog.wasCanceled())
                 break;
 
-            SLightMapRegion lreg;
-            lreg.darkImage = QImage(l->boundingRect().size().toSize(),
-                                    QImage::Format_ARGB32_Premultiplied);
-            lreg.lightImage = QImage(l->boundingRect().size().toSize(),
-                                     QImage::Format_RGB32);
-            lreg.pos = l->pos().toPoint();
+            QImage image(l->boundingRect().size().toSize(),
+                         QImage::Format_ARGB32_Premultiplied);
+            image.fill(qAlpha(0));
 
-            lreg.darkImage.fill(qAlpha(0));
-            lreg.lightImage.fill(qRgb(127, 127, 127));
-
-            QPainter dpainter(&lreg.darkImage), lpainter(&lreg.lightImage);
+            QPainter painter(&image);
 
             const qreal rad = l->boundingRect().width() / 2.0;
             QRadialGradient rg(QPointF(rad, rad), rad);
@@ -1113,21 +1108,21 @@ void CRobotScene::updateLighting()
 
             QList<QPolygonF> shadowPolys;
 
-            QPainterPath ppath;
-            ppath.addRect(l->boundingRect());
-            const QRectF lr(l->pos(), l->boundingRect().size());
+            QPainterPath removepath;
+            removepath.addRect(l->boundingRect());
+            const QRectF lightrect(l->pos(), l->boundingRect().size());
+
             foreach (QPolygonF ob, obstacles)
             {
-                QRectF r(ob.boundingRect().toAlignedRect());
-                qDebug() << "r:" << r;
-                if (lr.intersects(r))
+                QRectF obr(ob.boundingRect().toAlignedRect());
+                if (lightrect.intersects(obr))
                 {
-                    QRectF ir(lr.intersected(r));
+                    QRectF ir(lightrect.intersected(obr));
                     ir.moveTopLeft(ir.topLeft() - l->pos());
+
                     QPainterPath pp;
                     pp.addRect(ir);
-
-                    ppath -= pp;
+                    removepath -= pp;
 
                     QList<QPointF> vertices;
                     vertices << ir.topLeft() << ir.topRight() <<
@@ -1166,28 +1161,41 @@ void CRobotScene::updateLighting()
                 }
             }
 
-            lpainter.setBrush(rg);
-            lpainter.setClipPath(ppath);
-            lpainter.drawEllipse(l->boundingRect());
+            painter.setBrush(rg);
+            painter.setClipPath(removepath);
+            painter.drawEllipse(l->boundingRect());
 
-            /*lpainter.setCompositionMode(QPainter::CompositionMode_Plus);
-            lpainter.drawEllipse(l->boundingRect());
-            lpainter.setCompositionMode(QPainter::CompositionMode_Darken);
-            lpainter.setBrush(QColor(127, 127, 127));
-            lpainter.drawEllipse(l->boundingRect());
-            lpainter.setCompositionMode(QPainter::CompositionMode_SourceOver);*/
-
-            lpainter.setPen(Qt::red);
-            lpainter.setBrush(QColor(127, 127, 127));
+            painter.setPen(Qt::red);
+            painter.setBrush(QColor(127, 127, 127));
             foreach (QPolygonF p, shadowPolys)
-                lpainter.drawPolygon(p);
+                painter.drawPolygon(p);
 
-            dpainter.end();
-            lpainter.end();
-            lightMapList << lreg;
+            painter.end();
+            lightimages << qMakePair(l->pos(), image);
         }
-    }
 
+        QImage mergedimg(sceneRect().size().toSize(), QImage::Format_RGB32);
+        mergedimg.fill(qRgb(0, 0, 0));
+        QPainter mpainter(&mergedimg);
+
+        mpainter.setCompositionMode(QPainter::CompositionMode_Plus);
+        const int size = lightimages.size();
+        for (int i=0; i<size; ++i)
+            mpainter.drawImage(lightimages[i].first, lightimages[i].second);
+
+        lightImage = QImage(sceneRect().size().toSize(), QImage::Format_RGB32);
+        lightImage.fill(qRgb(127, 127, 127));
+        QPainter lipainter(&lightImage);
+
+        lipainter.drawImage(0, 0, mergedimg);
+
+        mpainter.setCompositionMode(QPainter::CompositionMode_Multiply);
+//        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
+//                          QColor(5, 5, 5));
+
+//        lipainter.setCompositionMode(QPainter::CompositionMode_Plus);
+//        lipainter.drawImage(0, 0, mergedimg);
+    }  
 
     lightingDirty = false;
     markMapEdited(true);
