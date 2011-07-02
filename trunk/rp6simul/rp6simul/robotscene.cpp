@@ -189,7 +189,7 @@ void CRobotScene::addLight(const QPointF &p, float r)
     connect(l, SIGNAL(posChanged()), this, SLOT(markMapEdited()));
     connect(l, SIGNAL(posChanged()), this, SLOT(markLightingDirty()));
     connect(l, SIGNAL(radiusChanged()), this, SLOT(markLightingDirty()));
-    lights << l;
+    lights << SLight(l);
 }
 
 void CRobotScene::addWall(const QRectF &rect)
@@ -221,8 +221,8 @@ void CRobotScene::addBox(const QRectF &rect)
 
 void CRobotScene::updateItemsEditMode()
 {
-    foreach (CLightGraphicsItem *l, lights)
-        l->setVisible(editModeEnabled && lightItemsVisible);
+    foreach (const SLight &l, lights)
+        l.item->setVisible(editModeEnabled && lightItemsVisible);
 
     foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
     {
@@ -236,7 +236,17 @@ void CRobotScene::removeLight(QObject *o)
 {
     qDebug() << "Removing light";
     CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
-    lights.removeOne(l);
+
+    const int size = lights.size();
+    for (int i=0; i<size; ++i)
+    {
+        if (lights[i].item == l)
+        {
+            lights.removeAt(i);
+            break;
+        }
+    }
+
     markMapEdited(true);
     lightingDirty = true;
 }
@@ -572,10 +582,10 @@ void CRobotScene::saveMap(QSettings &settings)
     // Or only save if outside edit mode?
 
     QList<QVariant> lightsvarlist;
-    foreach (CLightGraphicsItem *l, lights)
+    foreach (const SLight &l, lights)
     {
         QVariant v;
-        v.setValue(SLightSettings(l->pos(), l->getRadius()));
+        v.setValue(SLightSettings(l.item->pos(), l.item->getRadius()));
         lightsvarlist << v;
     }
 
@@ -611,13 +621,15 @@ void CRobotScene::saveMap(QSettings &settings)
     QElapsedTimer etimer;
     etimer.start();
 
+    // UNDONE!
+
     settings.sync();
-    settings.setValue("shadowImage", shadowImage);
+//    settings.setValue("shadowImage", shadowImage);
     settings.sync();
     qDebug() << "Wrote shadow image after" << etimer.elapsed() << "ms";
     settings.setValue("lightImage", lightImage);
     settings.sync();
-    qDebug() << "Wrote shadow image after" << etimer.elapsed() << "ms";
+    qDebug() << "Wrote light image after" << etimer.elapsed() << "ms";
 
     settings.endGroup();
 
@@ -676,11 +688,9 @@ void CRobotScene::loadMap(QSettings &settings)
     const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
     scaleGraphicsView(scale / curscale);
 
-    shadowImage = settings.value("shadowImage").value<QImage>();
     lightImage = settings.value("lightImage").value<QImage>();
 
-    if (shadowImage.isNull() || lightImage.isNull() ||
-        (shadowImage.size() != sceneRect().size().toSize()) ||
+    if (lightImage.isNull() ||
         (lightImage.size() != sceneRect().size().toSize()))
     {
         qWarning("Failed to load light maps. Regenerating...");
@@ -1051,90 +1061,85 @@ void CRobotScene::updateLighting()
     CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
     prgdialog.setWindowTitle("Updating light map...");
     prgdialog.setRange(0, 100);
-    prgdialog.show();
+    prgdialog.setValue(33);
+    prgdialog.setLabelText("Determining lighting regions...");
+//    prgdialog.show();
 
     QList<QPolygonF> obstacles;
 
-    prgdialog.setLabelText("Determining lighting regions...");
-    prgdialog.setValue(33);
-
-    QPainterPath wallsppath;
-
     foreach (QGraphicsItem *w, staticWalls.values())
-    {
         obstacles << w->mapToScene(w->boundingRect());
-        wallsppath.addPath(w->mapToScene(w->shape()));
-    }
 
     foreach (QGraphicsItem *w, dynamicWalls)
-    {
         obstacles << w->mapToScene(w->boundingRect());
-        wallsppath.addPath(w->mapToScene(w->shape()));
-    }
 
-    qApp->processEvents();
+//    qApp->processEvents();
     if (!prgdialog.wasCanceled())
     {
         prgdialog.setLabelText("Performing per pixel lighting...");
         prgdialog.setValue(66);
 
-        QList<QPair<QPointF, QImage> > lightimages;
-
-        foreach (CLightGraphicsItem *l, lights)
+        const int lsize = lights.size();
+        for (int i=0; i<lsize; ++i)
         {
             if (prgdialog.wasCanceled())
                 break;
 
-            QImage image(l->boundingRect().size().toSize(),
-                         QImage::Format_RGB32);
-            image.fill(qRgb(0, 0, 0));
+            if (!lights[i].dirty)
+                continue;
 
-            QPainter painter(&image);
+            lights[i].dirty = false;
 
-            const qreal rad = l->boundingRect().width() / 2.0;
+            const QSize imsize(lights[i].item->boundingRect().size().toSize());
+            if (lights[i].image.isNull() || (lights[i].image.size() != imsize))
+                lights[i].image = QImage(imsize, QImage::Format_RGB32);
+            lights[i].image.fill(qRgb(0, 0, 0));
+
+            QPainter painter(&lights[i].image);
+            painter.setPen(Qt::NoPen);
+
+            const qreal rad = lights[i].item->boundingRect().width() / 2.0;
             QRadialGradient rg(QPointF(rad, rad), rad);
 
-            float intensity = /*ambientLight +*/
-                    l->intensityAt(l->pos() + QPointF(rad, rad), obstacles);
+            float intensity =
+                    lights[i].item->intensityAt(lights[i].item->pos() + QPointF(rad, rad),
+                                                obstacles);
             intensity = qMin(intensity, 2.0f);
             int c = qRound(intensity * 127.0 * 0.65);
             rg.setColorAt(0.0, QColor(c, c, c));
 
-            intensity = /*ambientLight +*/ l->intensityAt(l->pos(), obstacles);
+            intensity = lights[i].item->intensityAt(lights[i].item->pos(), obstacles);
             intensity = qMin(intensity, 2.0f);
             c = qRound(intensity * 127.0 * 0.65);
             rg.setColorAt(1.0, QColor(c, c, c));
 
             QList<QPolygonF> shadowPolys;
 
-            const QRectF lightrect(l->pos(), l->boundingRect().size());
+            const QRectF lightrect(lights[i].item->pos(),
+                                   lights[i].item->boundingRect().size());
 
             foreach (QPolygonF ob, obstacles)
             {
                 QRectF obr(ob.boundingRect());
                 if (lightrect.intersects(obr))
                 {
-                    QRectF ir(/*lightrect.intersected*/(obr));
-                    ir.moveTopLeft(ir.topLeft() - l->pos());
-//                    shadowPolys << ir;
-
                     if (ob.containsPoint(lightrect.center(), Qt::OddEvenFill))
                         continue;
 
-                    QList<QPointF> vertices;
-                    vertices << ir.topLeft() << ir.topRight() <<
-                                ir.bottomLeft() << ir.bottomRight();
+                    QPolygonF obtr(ob.translated(-lights[i].item->pos()));
+                    obtr.pop_back(); // Remove double start/end point
 
                     QList<QPointF> ambverts;
-                    foreach (QPointF v, vertices)
+                    foreach (QPointF v, obtr)
                     {
-                        QLineF l(QPointF(rad, rad), v);
+                        qDebug() << "v:" << v;
+                        QLineF line(QPointF(rad, rad), v);
                         QTransform tr;
                         tr.translate(v.x(), v.y());
-                        tr.rotate(l.angle());
+                        tr.rotate(line.angle());
                         tr.translate(-v.x(), -v.y());
 
-                        QPolygonF p(tr.map(QPolygonF(ir)));
+                        QPolygonF p(tr.map(obtr));
 
                         bool hasup = false, hasdown = false;
 
@@ -1144,6 +1149,9 @@ void CRobotScene::updateLighting()
                                 continue;
                             hasup = (hasup || (pv.y() > v.y()));
                             hasdown = (hasdown || (pv.y() < v.y()));
+
+                            if (hasup && hasdown)
+                                break;
                         }
 
                         qDebug() << "hasup/hasdown" << hasup << hasdown;
@@ -1172,64 +1180,40 @@ void CRobotScene::updateLighting()
             }
 
             painter.setBrush(rg);
-            painter.drawEllipse(l->boundingRect());
+            painter.drawEllipse(lights[i].item->boundingRect());
 
             painter.setBrush(Qt::black);
-//            painter.setPen(Qt::red);
-            painter.setPen(Qt::NoPen);
             painter.setRenderHint(QPainter::Antialiasing);
             foreach (QPolygonF p, shadowPolys)
                 painter.drawPolygon(p);
 
             painter.end();
-            lightimages << qMakePair(l->pos(), image);
         }
 
-        QImage mergedimg(sceneRect().size().toSize(), QImage::Format_RGB32);
-        const int ambc = qRound(ambientLight * 127.0);
-        mergedimg.fill(qRgb(ambc, ambc, ambc));
-        QPainter mpainter(&mergedimg);
-        mpainter.setRenderHint(QPainter::Antialiasing);
-        mpainter.setPen(Qt::NoPen);
+        if (lightImage.isNull() ||
+            (lightImage.size() != sceneRect().size().toSize()))
+            lightImage = QImage(sceneRect().size().toSize(),
+                                QImage::Format_RGB32);
 
-        /*mpainter.setClipRegion(ambientRegion);
-        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
-                          ambcolor);*/
+        const int ambc = qRound(ambientLight * 127.0 * 0.65);
+        lightImage.fill(qRgb(ambc, ambc, ambc));
 
-        //        mpainter.setClipPath(wallsppath);
-        /*            mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
-                                      QColor(127, 127, 127));*/
+        QPainter lipainter(&lightImage);
+        lipainter.setRenderHint(QPainter::Antialiasing);
+        lipainter.setPen(Qt::NoPen);
 
-//        mpainter.setClipping(false);
-
-        mpainter.setCompositionMode(QPainter::CompositionMode_Plus);
-        const int size = lightimages.size();
-        for (int i=0; i<size; ++i)
-            mpainter.drawImage(lightimages[i].first, lightimages[i].second);
+        lipainter.setCompositionMode(QPainter::CompositionMode_Plus);
+        foreach (const SLight &l, lights)
+            lipainter.drawImage(l.item->pos(), l.image);
 
         /*mpainter.setCompositionMode(QPainter::CompositionMode_ColorDodge);
         mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
                           QColor(50, 50, 50));*/
 
-        mpainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
-        mpainter.setBrush(QColor(127, 127, 127));
+        lipainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
+        lipainter.setBrush(QColor(127, 127, 127));
         foreach (QPolygonF ob, obstacles)
-            mpainter.drawPolygon(ob);
-
-        lightImage = mergedimg;
-
-        /*lightImage = QImage(sceneRect().size().toSize(), QImage::Format_RGB32);
-        lightImage.fill(qRgb(0, 0, 0));
-        QPainter lipainter(&lightImage);
-
-        lipainter.drawImage(0, 0, mergedimg);*/
-
-//        mpainter.setCompositionMode(QPainter::CompositionMode_Multiply);
-//        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
-//                          QColor(5, 5, 5));
-
-//        lipainter.setCompositionMode(QPainter::CompositionMode_Plus);
-//        lipainter.drawImage(0, 0, mergedimg);
+            lipainter.drawPolygon(ob);
     }  
 
     lightingDirty = false;
@@ -1278,7 +1262,7 @@ void CRobotScene::setLightItemsVisible(bool v)
     lightItemsVisible = v;
     if (editModeEnabled)
     {
-        foreach (CLightGraphicsItem *l, lights)
-            l->setVisible(v);
+        foreach (const SLight &l, lights)
+            l.item->setVisible(v);
     }
 }
