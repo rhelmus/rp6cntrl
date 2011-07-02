@@ -122,9 +122,9 @@ void CResizablePixmapGraphicsItem::paint(QPainter *painter,
     painter->setRenderHint(QPainter::SmoothPixmapTransform);
 
     if (tiled)
-        painter->drawTiledPixmap(boundRect.toRect(), pixmap);
+        painter->drawTiledPixmap(boundRect, pixmap);
     else
-        painter->drawPixmap(boundRect.toRect(), pixmap);
+        painter->drawPixmap(boundRect, pixmap, boundRect);
 }
 
 bool CResizablePixmapGraphicsItem::sceneEventFilter(QGraphicsItem *watched,

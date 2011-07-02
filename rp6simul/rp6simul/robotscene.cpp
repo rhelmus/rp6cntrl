@@ -162,17 +162,21 @@ void CRobotScene::updateStaticWalls()
         addItem(staticWalls[WALL_BOTTOM] = createStaticWall());
     }
 
+    const qreal blocksize = 30.0;
+
     staticWalls[WALL_LEFT]->setPos(sr.x(), sr.y());
-    staticWalls[WALL_LEFT]->setRect(0.0, 0.0, 30.0, sr.height());
+    staticWalls[WALL_LEFT]->setRect(0.0, 0.0, blocksize, sr.height());
 
-    staticWalls[WALL_RIGHT]->setPos(sr.right()-30.0, sr.y());
-    staticWalls[WALL_RIGHT]->setRect(0.0, 0.0, 30.0, sr.height());
+    staticWalls[WALL_RIGHT]->setPos(sr.right()-blocksize, sr.y());
+    staticWalls[WALL_RIGHT]->setRect(0.0, 0.0, blocksize, sr.height());
 
-    staticWalls[WALL_TOP]->setPos(sr.x(), sr.y());
-    staticWalls[WALL_TOP]->setRect(0.0, 0.0, sr.width(), 30.0);
+    staticWalls[WALL_TOP]->setPos(sr.x()+blocksize, sr.y());
+    staticWalls[WALL_TOP]->setRect(0.0, 0.0, sr.width()-(2.0*blocksize),
+                                   blocksize);
 
-    staticWalls[WALL_BOTTOM]->setPos(sr.x(), sr.bottom()-30.0);
-    staticWalls[WALL_BOTTOM]->setRect(0.0, 0.0, sr.width(), 30.0);
+    staticWalls[WALL_BOTTOM]->setPos(sr.x()+blocksize, sr.bottom()-blocksize);
+    staticWalls[WALL_BOTTOM]->setRect(0.0, 0.0, sr.width()-(2.0*blocksize),
+                                      blocksize);
 }
 
 void CRobotScene::addLight(const QPointF &p, float r)
@@ -295,7 +299,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 //        painter->drawImage(0, 0, shadowImage);
 //        painter->drawImage(sceneRect(), shadowImage);
 
-        painter->setCompositionMode(QPainter::CompositionMode_Overlay);
+        painter->setCompositionMode(QPainter::CompositionMode_HardLight);
         painter->drawImage(0, 0, lightImage);
 //        painter->drawImage(sceneRect(), lightImage);
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
@@ -1044,8 +1048,6 @@ void CRobotScene::updateLighting()
     QTime startt;
     startt.start();
 
-    ambientRegion = QRegion(sceneRect().toAlignedRect());
-
     CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
     prgdialog.setWindowTitle("Updating light map...");
     prgdialog.setRange(0, 100);
@@ -1056,21 +1058,18 @@ void CRobotScene::updateLighting()
     prgdialog.setLabelText("Determining lighting regions...");
     prgdialog.setValue(33);
 
-    foreach (CLightGraphicsItem *l, lights)
-        ambientRegion -= l->mapToScene(l->boundingRect()).boundingRect().toAlignedRect();
+    QPainterPath wallsppath;
 
     foreach (QGraphicsItem *w, staticWalls.values())
     {
         obstacles << w->mapToScene(w->boundingRect());
-        const QRect r(w->mapToScene(w->boundingRect()).boundingRect().toAlignedRect());
-        ambientRegion -= r;
+        wallsppath.addPath(w->mapToScene(w->shape()));
     }
 
     foreach (QGraphicsItem *w, dynamicWalls)
     {
         obstacles << w->mapToScene(w->boundingRect());
-        const QRect r(w->mapToScene(w->boundingRect()).boundingRect().toAlignedRect());
-        ambientRegion -= r;
+        wallsppath.addPath(w->mapToScene(w->shape()));
     }
 
     qApp->processEvents();
@@ -1087,50 +1086,48 @@ void CRobotScene::updateLighting()
                 break;
 
             QImage image(l->boundingRect().size().toSize(),
-                         QImage::Format_ARGB32_Premultiplied);
-            image.fill(qAlpha(0));
+                         QImage::Format_RGB32);
+            image.fill(qRgb(0, 0, 0));
 
             QPainter painter(&image);
 
             const qreal rad = l->boundingRect().width() / 2.0;
             QRadialGradient rg(QPointF(rad, rad), rad);
 
-            float intensity = ambientLight +
+            float intensity = /*ambientLight +*/
                     l->intensityAt(l->pos() + QPointF(rad, rad), obstacles);
             intensity = qMin(intensity, 2.0f);
-            int c = qRound(intensity * 127.0);
+            int c = qRound(intensity * 127.0 * 0.65);
             rg.setColorAt(0.0, QColor(c, c, c));
 
-            intensity = ambientLight + l->intensityAt(l->pos(), obstacles);
+            intensity = /*ambientLight +*/ l->intensityAt(l->pos(), obstacles);
             intensity = qMin(intensity, 2.0f);
-            c = qRound(intensity * 127.0);
+            c = qRound(intensity * 127.0 * 0.65);
             rg.setColorAt(1.0, QColor(c, c, c));
 
             QList<QPolygonF> shadowPolys;
 
-            QPainterPath removepath;
-            removepath.addRect(l->boundingRect());
             const QRectF lightrect(l->pos(), l->boundingRect().size());
 
             foreach (QPolygonF ob, obstacles)
             {
-                QRectF obr(ob.boundingRect().toAlignedRect());
+                QRectF obr(ob.boundingRect());
                 if (lightrect.intersects(obr))
                 {
-                    QRectF ir(lightrect.intersected(obr));
+                    QRectF ir(/*lightrect.intersected*/(obr));
                     ir.moveTopLeft(ir.topLeft() - l->pos());
+//                    shadowPolys << ir;
 
-                    QPainterPath pp;
-                    pp.addRect(ir);
-                    removepath -= pp;
+                    if (ob.containsPoint(lightrect.center(), Qt::OddEvenFill))
+                        continue;
 
                     QList<QPointF> vertices;
                     vertices << ir.topLeft() << ir.topRight() <<
                                 ir.bottomLeft() << ir.bottomRight();
 
+                    QList<QPointF> ambverts;
                     foreach (QPointF v, vertices)
                     {
-                        qDebug() << "v:" << v;
                         QLineF l(QPointF(rad, rad), v);
                         QTransform tr;
                         tr.translate(v.x(), v.y());
@@ -1138,7 +1135,6 @@ void CRobotScene::updateLighting()
                         tr.translate(-v.x(), -v.y());
 
                         QPolygonF p(tr.map(QPolygonF(ir)));
-                        qDebug() << "p:" << p;
 
                         bool hasup = false, hasdown = false;
 
@@ -1153,20 +1149,35 @@ void CRobotScene::updateLighting()
                         qDebug() << "hasup/hasdown" << hasup << hasdown;
 
                         if ((hasup && !hasdown) || (!hasup && hasdown))
-                        {
+                            ambverts << v;
+                    }
 
-                        }
+                    Q_ASSERT(ambverts.size() == 2);
+
+                    if (ambverts.size() == 2)
+                    {
+                        QPolygonF p;
+                        QLineF line(QPointF(rad, rad), ambverts[0]);
+                        // Extrapolate to (at least) end of light image
+                        line.setLength(rad * 2.0);
+                        p << ambverts[0] << line.p2();
+
+                        line.setP2(ambverts[1]);
+                        line.setLength(rad * 2.0);
+                        p << line.p2() << ambverts[1];
+
                         shadowPolys << p;
                     }
                 }
             }
 
             painter.setBrush(rg);
-            painter.setClipPath(removepath);
             painter.drawEllipse(l->boundingRect());
 
-            painter.setPen(Qt::red);
-            painter.setBrush(QColor(127, 127, 127));
+            painter.setBrush(Qt::black);
+//            painter.setPen(Qt::red);
+            painter.setPen(Qt::NoPen);
+            painter.setRenderHint(QPainter::Antialiasing);
             foreach (QPolygonF p, shadowPolys)
                 painter.drawPolygon(p);
 
@@ -1175,21 +1186,45 @@ void CRobotScene::updateLighting()
         }
 
         QImage mergedimg(sceneRect().size().toSize(), QImage::Format_RGB32);
-        mergedimg.fill(qRgb(0, 0, 0));
+        const int ambc = qRound(ambientLight * 127.0);
+        mergedimg.fill(qRgb(ambc, ambc, ambc));
         QPainter mpainter(&mergedimg);
+        mpainter.setRenderHint(QPainter::Antialiasing);
+        mpainter.setPen(Qt::NoPen);
+
+        /*mpainter.setClipRegion(ambientRegion);
+        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
+                          ambcolor);*/
+
+        //        mpainter.setClipPath(wallsppath);
+        /*            mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
+                                      QColor(127, 127, 127));*/
+
+//        mpainter.setClipping(false);
 
         mpainter.setCompositionMode(QPainter::CompositionMode_Plus);
         const int size = lightimages.size();
         for (int i=0; i<size; ++i)
             mpainter.drawImage(lightimages[i].first, lightimages[i].second);
 
-        lightImage = QImage(sceneRect().size().toSize(), QImage::Format_RGB32);
-        lightImage.fill(qRgb(127, 127, 127));
+        /*mpainter.setCompositionMode(QPainter::CompositionMode_ColorDodge);
+        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
+                          QColor(50, 50, 50));*/
+
+        mpainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
+        mpainter.setBrush(QColor(127, 127, 127));
+        foreach (QPolygonF ob, obstacles)
+            mpainter.drawPolygon(ob);
+
+        lightImage = mergedimg;
+
+        /*lightImage = QImage(sceneRect().size().toSize(), QImage::Format_RGB32);
+        lightImage.fill(qRgb(0, 0, 0));
         QPainter lipainter(&lightImage);
 
-        lipainter.drawImage(0, 0, mergedimg);
+        lipainter.drawImage(0, 0, mergedimg);*/
 
-        mpainter.setCompositionMode(QPainter::CompositionMode_Multiply);
+//        mpainter.setCompositionMode(QPainter::CompositionMode_Multiply);
 //        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
 //                          QColor(5, 5, 5));
 
