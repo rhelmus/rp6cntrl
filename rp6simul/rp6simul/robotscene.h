@@ -20,17 +20,18 @@ private:
 
     enum EStaticWall { WALL_LEFT, WALL_RIGHT, WALL_TOP, WALL_BOTTOM };
 
-    struct SLightMapRegion
+    struct SLight
     {
-        QImage darkImage, lightImage;
-        QPoint pos;
+        CLightGraphicsItem *item;
+        QImage image;
+        bool dirty;
+        SLight(CLightGraphicsItem *it=0) : item(it), dirty(true) { }
+
     };
 
-    QList<CLightGraphicsItem *> lights;
+    QList<SLight> lights;
     QPixmap backGroundPixmap;
-    QImage shadowImage, lightImage;
-    QRegion ambientRegion;
-    QList<SLightMapRegion> lightMapList;
+    QImage lightImage;
     bool lightingDirty, autoRefreshLighting;
     bool lightItemsVisible;
     float ambientLight;
