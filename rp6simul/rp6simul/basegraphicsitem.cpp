@@ -53,7 +53,12 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
         if (newp.isNull())
             newp = r.topLeft();
 
-        setPos(newp);
+        if (newp != pos())
+        {
+            setPos(newp);
+            emit posChanged(oldPos);
+            oldPos = newp;
+        }
     }
 
     QGraphicsItem::mouseMoveEvent(event);
@@ -62,11 +67,7 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 void CBaseGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
     if (isMovable && dragging)
-    {
         dragging = false;
-        if (pos() != oldPos)
-            emit posChanged();
-    }
 
     QGraphicsItem::mouseReleaseEvent(event);
 }
@@ -112,11 +113,12 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
         {
             CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
             Q_ASSERT(rscene);
-            QPointF npos(rscene->alignPosToGrid(pos()));
-            if (npos != pos())
+            const QPointF opos(pos());
+            const QPointF npos(rscene->alignPosToGrid(pos()));
+            if (opos != npos)
             {
-                setPos(rscene->alignPosToGrid(pos()));
-                emit posChanged();
+                setPos(npos);
+                emit posChanged(opos);
             }
         }
         else if (a == dela)

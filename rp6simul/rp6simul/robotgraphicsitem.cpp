@@ -145,7 +145,7 @@ void CRobotGraphicsItem::advance(int phase)
     tryMove(leftPower, rightPower);
 
     if (pos() != prepos)
-        emit posChanged();
+        emit posChanged(prepos);
 }
 
 bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)

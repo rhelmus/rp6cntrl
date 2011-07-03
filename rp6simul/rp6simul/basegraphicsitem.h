@@ -36,7 +36,7 @@ public:
     void setDeletable(bool d) { isDeletable = d; }
 
 signals:
-    void posChanged(void);
+    void posChanged(const QPointF &oldp);
 };
 
 #endif // BASEGRAPHICSITEM_H
