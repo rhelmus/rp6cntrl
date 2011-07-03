@@ -5,6 +5,7 @@
 #include <QHash>
 #include <QMetaType>
 
+class CBaseGraphicsItem;
 class CLightGraphicsItem;
 class CResizablePixmapGraphicsItem;
 class CRobotGraphicsItem;
@@ -77,7 +78,7 @@ private slots:
     void removeWall(QObject *o);
     void removeBox(QObject *o);
     void markMapEdited(bool e=true);
-    void markLightingDirty(void) { lightingDirty = true; }
+    void markLightingDirty(const QPointF &oldp);
     void robotPosChanged(void);
 
 protected:
