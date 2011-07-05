@@ -16,7 +16,6 @@ class CResizablePixmapGraphicsItem : public CBaseGraphicsItem
     typedef QHash<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
     THandleList handles;
     CHandleGraphicsItem *pressedHandle;
-    QPolygonF oldBoundRect;
     mutable QPainterPath pmShape;
     mutable bool hasShape;
 
@@ -43,7 +42,7 @@ public:
     QSizeF getSize(void) const { return boundRect.size(); }
 
 signals:
-    void sizeChanged(void);
+    void sizeChanged(const QSizeF &);
 };
 
 #endif // RESIZABLEPIXMAPGRAPHICSITEM_H

@@ -22,32 +22,6 @@ void CLightGraphicsItem::setRadiusHandlePos()
     radiusHandle->setPos(radius - (w / 2.0), radius - (h / 2.0));
 }
 
-float CLightGraphicsItem::intensityAt(const QPointF &p,
-                          const QList<QPolygonF> &obstacles) const
-{
-    const QPointF c(pos() + QPointF(radius, radius));
-    const QLineF line(c, p);
-    const float d = line.length();
-    if (d > radius)
-        return 0.0;
-
-    foreach (QPolygonF obpoly, obstacles)
-    {
-        if (obpoly.containsPoint(c, Qt::OddEvenFill))
-            return 0.0;
-
-        for (QPolygonF::iterator it=obpoly.begin(); it!=(obpoly.end()-1); ++it)
-        {
-            QLineF obl(*it, *(it+1));
-            if (line.intersect(obl, 0) == QLineF::BoundedIntersection)
-                return 0.0;
-        }
-    }
-
-    const float maxint = 2.0;
-    return ((radius - d) / radius) * maxint;
-}
-
 bool CLightGraphicsItem::sceneEventFilter(QGraphicsItem *, QEvent *event)
 {
     if (event->type() == QEvent::GraphicsSceneMousePress)
@@ -64,7 +38,7 @@ bool CLightGraphicsItem::sceneEventFilter(QGraphicsItem *, QEvent *event)
         {
             handleDragging = false;
             if (oldRadius != radius)
-                emit radiusChanged();
+                emit radiusChanged(oldRadius);
         }
     }
     else if (event->type() == QEvent::GraphicsSceneMouseMove)

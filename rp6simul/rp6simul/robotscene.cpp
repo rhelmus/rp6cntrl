@@ -23,6 +23,80 @@ QRectF getMinRect(QRectF r, qreal minw, qreal minh)
     return r;
 }
 
+QColor intensityToColor(float intensity)
+{
+    intensity = qBound(0.0f, intensity, 2.0f);
+    const float maxc = 90;
+    const int c = qRound(intensity * maxc);
+    return QColor(c, c, c);
+}
+
+QPolygonF createShadowPolygon(const QPointF &light, float rad,
+                              const QPointF &vertex1, const QPointF &vertex2)
+{
+    /* General shadow shape is as fallows:
+
+                      -|
+                   -    |
+                -        |
+             -    (2)     |
+          |                |
+     (1)  |                 | (3)
+          |                |
+             -    (4)     |
+                -        |
+                   -    |
+                      -|
+
+
+     With (1) being the obstacle. All lines (2-4) have
+     a sufficient long length to reach much beyound the
+     lighting area to make sure everything is darkened.
+     This length is just 'brute forced' and hopefully
+     should be long enough
+    */
+
+    // To make sure everything is (hopefully) completely darkened
+    const qreal longdist = rad * 3.0;
+
+    /* line (2)
+     Start from light center towards the first vertex to
+     get line with right direction. Then extrapolate
+     towards end of light circle and use vertex and
+     end-point of line to construct line (2)
+    */
+
+    QLineF line2(light, vertex1);
+    // Extrapolate to end of light circle
+    line2.setLength(longdist);
+    line2.setP1(vertex1);
+
+    /* Line (4)
+      We need line (2) and (4) to make (3)
+    */
+    QLineF line4(light, vertex2);
+    line4.setLength(longdist);
+    line4.setP1(vertex2);
+
+    /* line (3)
+     This is a line from the light center towards the middle of
+     the end points from lines (2) and (4), which is then again
+     extrapolated beyound the light area
+    */
+
+    const QLineF tmpline(line2.p2(), line4.p2());
+    QLineF line3(light, tmpline.pointAt(0.5));
+    line3.setLength(longdist);
+
+    // Construct polygon
+    QPolygonF ret;
+    ret << line2.p1() << line2.p2() <<
+           line3.p2() <<
+           line4.p2() << line4.p1();
+    return ret;
+}
+
+
 }
 
 CRobotScene::CRobotScene(QObject *parent) :
@@ -103,6 +177,14 @@ QRectF CRobotScene::getLightDragRect(void) const
     return ret.normalized();
 }
 
+void CRobotScene::handleDirtyLighting()
+{
+    if (autoRefreshLighting)
+        updateLighting();
+    else
+        lightingDirty = true;
+}
+
 void CRobotScene::updateMouseCursor()
 {
     QWidget *vp = getGraphicsView()->viewport();
@@ -120,7 +202,10 @@ void CRobotScene::updateMapSize()
     updateGrid();
     updateStaticWalls();
     markMapEdited(true);
-    lightingDirty = true;
+
+    for (QList<SLight>::iterator it=lights.begin(); it!=lights.end(); ++it)
+        it->dirty = true;
+    handleDirtyLighting();
 }
 
 void CRobotScene::updateGrid()
@@ -185,12 +270,15 @@ void CRobotScene::addLight(const QPointF &p, float r)
     l->setPos(p - QPointF(r, r));
     l->setVisible(editModeEnabled);
     addItem(l);
-    connect(l, SIGNAL(destroyed(QObject*)), this, SLOT(removeLight(QObject*)));
-    connect(l, SIGNAL(posChanged(const QPointF &)), this, SLOT(markMapEdited()));
+    connect(l, SIGNAL(removed(CBaseGraphicsItem *)), this,
+            SLOT(removeLight(CBaseGraphicsItem *)));
+    connect(l, SIGNAL(posChanged(const QPointF &)), this,
+            SLOT(markMapEdited()));
     connect(l, SIGNAL(posChanged(const QPointF &)), this,
             SLOT(markLightingDirty(const QPointF &)));
-    connect(l, SIGNAL(radiusChanged()), this, SLOT(markMapEdited()));
-    connect(l, SIGNAL(radiusChanged()), this, SLOT(markLightingDirty()));    
+    connect(l, SIGNAL(radiusChanged(float)), this, SLOT(markMapEdited()));
+    connect(l, SIGNAL(radiusChanged(float)), this,
+            SLOT(markLightingDirty(float)));
     lights << SLight(l);
 }
 
@@ -201,14 +289,16 @@ void CRobotScene::addWall(const QRectF &rect)
     resi->setPos(rect.topLeft());
     resi->setSize(rect.size());
     addItem(resi);
-    connect(resi, SIGNAL(destroyed(QObject*)), this,
-            SLOT(removeWall(QObject*)));
+    connect(resi, SIGNAL(removed(CBaseGraphicsItem *)), this,
+            SLOT(removeWall(CBaseGraphicsItem *)));
     connect(resi, SIGNAL(posChanged(const QPointF &)),
             this, SLOT(markMapEdited()));
     connect(resi, SIGNAL(posChanged(const QPointF &)),
             this, SLOT(markLightingDirty(const QPointF &)));
-    connect(resi, SIGNAL(sizeChanged()), this, SLOT(markMapEdited()));
-    connect(resi, SIGNAL(sizeChanged()), this, SLOT(markLightingDirty()));
+    connect(resi, SIGNAL(sizeChanged(const QSizeF &)), this,
+            SLOT(markMapEdited()));
+    connect(resi, SIGNAL(sizeChanged(const QSizeF &)), this,
+            SLOT(markLightingDirty(const QSizeF &)));
     dynamicWalls << resi;
 }
 
@@ -220,7 +310,8 @@ void CRobotScene::addBox(const QRectF &rect)
     resi->setSize(rect.size());
     addItem(resi);
     connect(resi, SIGNAL(destroyed(QObject*)), this, SLOT(removeBox(QObject*)));
-    connect(resi, SIGNAL(posChanged()), this, SLOT(markMapEdited()));
+    connect(resi, SIGNAL(posChanged(const QPointF &)), this,
+            SLOT(markMapEdited()));
     boxes << resi;
 }
 
@@ -237,15 +328,14 @@ void CRobotScene::updateItemsEditMode()
     }
 }
 
-void CRobotScene::removeLight(QObject *o)
+void CRobotScene::removeLight(CBaseGraphicsItem *it)
 {
     qDebug() << "Removing light";
-    CLightGraphicsItem *l = static_cast<CLightGraphicsItem *>(o);
 
     const int size = lights.size();
     for (int i=0; i<size; ++i)
     {
-        if (lights[i].item == l)
+        if (lights[i].item == it)
         {
             lights.removeAt(i);
             break;
@@ -253,17 +343,32 @@ void CRobotScene::removeLight(QObject *o)
     }
 
     markMapEdited(true);
-    lightingDirty = true;
+    handleDirtyLighting();
 }
 
-void CRobotScene::removeWall(QObject *o)
+void CRobotScene::removeWall(CBaseGraphicsItem *it)
 {
     qDebug() << "Removing wall";
-    CResizablePixmapGraphicsItem *w =
-            static_cast<CResizablePixmapGraphicsItem *>(o);
-    dynamicWalls.removeOne(w);
+
+    const QRectF wrect(it->pos(), it->boundingRect().size());
+    const int size = lights.size();
+    for (int i=0; i<size; ++i)
+    {
+        if (lights[i].dirty)
+            continue;
+
+        const QRectF lightrect(lights[i].item->pos(),
+                               lights[i].item->boundingRect().size());
+        if (lightrect.intersects(wrect))
+        {
+            qDebug() << "marking light" << i;
+            lights[i].dirty = true;
+        }
+    }
+
+    dynamicWalls.removeOne(static_cast<CResizablePixmapGraphicsItem *>(it));
     markMapEdited(true);
-    lightingDirty = true;
+    handleDirtyLighting();
 }
 
 void CRobotScene::removeBox(QObject *o)
@@ -292,8 +397,6 @@ void CRobotScene::markLightingDirty(const QPointF &oldp)
     if (!it)
         return;
 
-    lightingDirty = true;
-
     const QRectF orect(oldp, it->boundingRect().size());
     const QRectF nrect(it->pos(), it->boundingRect().size());
 
@@ -312,7 +415,57 @@ void CRobotScene::markLightingDirty(const QPointF &oldp)
         }
     }
 
-    updateLighting();
+    handleDirtyLighting();
+}
+
+void CRobotScene::markLightingDirty(const QSizeF &olds)
+{
+    CBaseGraphicsItem *it = qobject_cast<CBaseGraphicsItem *>(sender());
+    Q_ASSERT(it);
+
+    if (!it)
+        return;
+
+    const QRectF orect(it->pos(), olds);
+    const QRectF nrect(it->pos(), it->boundingRect().size());
+
+    const int size = lights.size();
+    for (int i=0; i<size; ++i)
+    {
+        if (lights[i].dirty)
+            continue;
+
+        const QRectF lightrect(lights[i].item->pos(),
+                               lights[i].item->boundingRect().size());
+        if (lightrect.intersects(orect) || lightrect.intersects(nrect))
+        {
+            qDebug() << "marking light" << i;
+            lights[i].dirty = true;
+        }
+    }
+
+    handleDirtyLighting();
+}
+
+void CRobotScene::markLightingDirty(float)
+{
+    CLightGraphicsItem *it = qobject_cast<CLightGraphicsItem *>(sender());
+    Q_ASSERT(it);
+
+    if (!it)
+        return;
+
+    const int size = lights.size();
+    for (int i=0; i<size; ++i)
+    {
+        if (lights[i].item == it)
+        {
+            lights[i].dirty = true;
+            break;
+        }
+    }
+
+    handleDirtyLighting();
 }
 
 void CRobotScene::robotPosChanged()
@@ -339,10 +492,16 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
     painter->save();
 
-//    if (!editModeEnabled)
+    // UNDONE
+    if (/*!editModeEnabled*/!lightImage.isNull())
     {
         painter->setCompositionMode(QPainter::CompositionMode_HardLight);
         painter->drawImage(0, 0, lightImage);
+
+        /*painter->setCompositionMode(QPainter::CompositionMode_Darken);
+        painter->fillRect(0, 0, lightImage.width(), lightImage.height(),
+                          intensityToColor(1.6));*/
+
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
     }
 
@@ -428,7 +587,7 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         {
             addWall(getMinRect(getDragRect(), minsize, minsize));
             markMapEdited(true);
-            lightingDirty = true;
+            handleDirtyLighting();
         }
         else if (mouseMode == MODE_BOX)
         {
@@ -441,7 +600,7 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             const float radius = r.height()/2.0;
             addLight(r.center(), radius);
             markMapEdited(true);
-            lightingDirty = true;
+            handleDirtyLighting();
         }
     }
 
@@ -504,6 +663,8 @@ void CRobotScene::setAutoRefreshLighting(bool a)
     {
         autoRefreshLighting = a;
         markMapEdited(true);
+        if (lightingDirty && a)
+            updateLighting();
     }
 }
 
@@ -513,7 +674,10 @@ void CRobotScene::setAmbientLight(float l)
     {
         ambientLight = l;
         markMapEdited(true);
-        lightingDirty = true;
+
+        for (QList<SLight>::iterator it=lights.begin(); it!=lights.end(); ++it)
+            it->dirty = true;
+        handleDirtyLighting();
     }
 }
 
@@ -729,11 +893,11 @@ void CRobotScene::updateLighting()
     QTime startt;
     startt.start();
 
-    CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
+    /*CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
     prgdialog.setWindowTitle("Updating light map...");
     prgdialog.setRange(0, 100);
     prgdialog.setValue(33);
-    prgdialog.setLabelText("Determining lighting regions...");
+    prgdialog.setLabelText("Determining lighting regions...");*/
 //    prgdialog.show();
 
     QList<QPolygonF> obstacles;
@@ -745,49 +909,36 @@ void CRobotScene::updateLighting()
         obstacles << w->mapToScene(w->boundingRect());
 
 //    qApp->processEvents();
-    if (!prgdialog.wasCanceled())
+//    if (!prgdialog.wasCanceled())
     {
-        prgdialog.setLabelText("Performing per pixel lighting...");
-        prgdialog.setValue(66);
+        /*prgdialog.setLabelText("Performing per pixel lighting...");
+        prgdialog.setValue(66);*/
 
         const int lsize = lights.size();
         for (int i=0; i<lsize; ++i)
         {
-            if (prgdialog.wasCanceled())
-                break;
+//            if (prgdialog.wasCanceled())
+//                break;
 
             if (!lights[i].dirty)
                 continue;
 
             lights[i].dirty = false;
 
+            bool upgradient = false;
             const QSize imsize(lights[i].item->boundingRect().size().toSize());
             if (lights[i].image.isNull() || (lights[i].image.size() != imsize))
             {
                 lights[i].image = QImage(imsize, QImage::Format_RGB32);
                 lights[i].image.fill(qRgb(0, 0, 0));
+                upgradient = true;
             }
 
             QPainter painter(&lights[i].image);
             painter.setPen(Qt::NoPen);
 
             const qreal rad = lights[i].item->boundingRect().width() / 2.0;
-            QRadialGradient rg(QPointF(rad, rad), rad);
-
-            float intensity =
-                    lights[i].item->intensityAt(lights[i].item->pos() + QPointF(rad, rad),
-                                                obstacles);
-            intensity = qMin(intensity, 2.0f);
-            int c = qRound(intensity * 127.0 * 0.65);
-            rg.setColorAt(0.0, QColor(c, c, c));
-
-            intensity = lights[i].item->intensityAt(lights[i].item->pos(), obstacles);
-            intensity = qMin(intensity, 2.0f);
-            c = qRound(intensity * 127.0 * 0.65);
-            rg.setColorAt(1.0, QColor(c, c, c));
-
             QList<QPolygonF> shadowPolys;
-
             const QRectF lightrect(lights[i].item->pos(),
                                    lights[i].item->boundingRect().size());
 
@@ -834,147 +985,37 @@ void CRobotScene::updateLighting()
 
                     if (ambverts.size() == 2)
                     {
-#if 0
-                        /* General shadow shape is as fallows:
-
-                                        (3)
-                                   - - - - - -|
-                                -             |
-                             -    (2)         |
-                          |                   |
-                     (1)  |                   |   (4)
-                          |                   |
-                             -    (6)         |
-                                -             |
-                                   - - - - - -|
-                                        (5)
-
-                         With (1) being the obstacle, (2,6) lines towards
-                         end of light radius, (3,4,5) straight lines to
-                         completely cut the shadow out of the light image.
-                        */
-
-                        const QPointF rellpos(rad, rad);
-
-                        /* line (2)
-                         Start from light center towards the first vertex to
-                         get line with right direction. Then extrapolate
-                         towards end of light circle and use vertex and
-                         end-point of line to construct line (2)
-                        */
-
-                        QLineF line2(rellpos, ambverts[0]);
-                        // Extrapolate to end of light circle
-                        line2.setLength(rad);
-                        line2.setP1(ambverts[0]);
-
-                        /* line (3)
-                         Here a line is constructed with an angle depending
-                         of the angle from line (2): it is in such a way
-                         chosen that a straight horizontal/vertical line is
-                         obtained.
-                        */
-
-                        QLineF line3(line2.p2(), rellpos);
-                        qreal targetangle = ((int)line2.angle() / 90) * 90.0;
-                        line3.setLength(rad);
-                        line3.setAngle(targetangle);
-                        qDebug() << "line3:" << line3 << targetangle;
-
-                        /* Line (4)
-                          No need to construct it: automatically follows from
-                          polygon made below.
-                        */
-
-                        /* Line (6)
-                          We need this line first before line (5) can be
-                          constructed
-                        */
-                        QLineF line6(rellpos, ambverts[1]);
-                        line6.setLength(rad);
-                        line6.setP1(ambverts[1]);
-
-                        /* Line (5)
-                        */
-                        QLineF line5(line6.p2(), rellpos);
-                        targetangle = ((int)line6.angle() / 90) * 90.0;
-                        line5.setLength(rad);
-                        line5.setAngle(targetangle);
-                        qDebug() << "line5:" << line5 << targetangle;
-
-                        // Construct polygon
-                        QPolygonF p;
-                        p << line2.p1() << line2.p2() <<
-                             line3.p2() <<
-                             line5.p2() << line5.p1() <<
-                             line6.p1();
-                        shadowPolys << p;
-#endif
-                        /* General shadow shape is as fallows:
-
-                                      -|
-                                   -    |
-                                -        |
-                             -    (2)     |
-                          |                |
-                     (1)  |                 | (3)
-                          |                |
-                             -    (4)     |
-                                -        |
-                                   -    |
-                                      -|
-
-
-                         With (1) being the obstacle. All lines (2-4) have
-                         a sufficient long length to reach much beyound the
-                         lighting area to make sure everything is darkened.
-                         This length is just 'brute forced' and hopefully
-                         should be long enough
-                        */
-
-                        const QPointF rellpos(rad, rad);
-                        // to make sure everything is completely darkened
-                        const qreal longdist = rad * 3.0;
-
-                        /* line (2)
-                         Start from light center towards the first vertex to
-                         get line with right direction. Then extrapolate
-                         towards end of light circle and use vertex and
-                         end-point of line to construct line (2)
-                        */
-
-                        QLineF line2(rellpos, ambverts[0]);
-                        // Extrapolate to end of light circle
-                        line2.setLength(longdist);
-                        line2.setP1(ambverts[0]);
-
-                        /* line (3)
-                         This is a line from the light center
-                         towards the object center, which is then again
-                         extrapolated beyound the light area
-                        */
-
-                        QLineF line3(rellpos, obtr.boundingRect().center());
-                        line3.setLength(longdist);
-
-                        /* Line (4)
-                        */
-                        QLineF line4(rellpos, ambverts[1]);
-                        line4.setLength(longdist);
-                        line4.setP1(ambverts[1]);
-
-                        // Construct polygon
-                        QPolygonF p;
-                        p << line2.p1() << line2.p2() <<
-                             line3.p2() <<
-                             line4.p2() << line4.p1();
-                        shadowPolys << p;
+                        shadowPolys << createShadowPolygon(QPointF(rad, rad),
+                                                           rad, ambverts[0],
+                                                           ambverts[1]);
                     }
                 }
             }
 
+            /*
+            QRadialGradient rg(QPointF(rad, rad), rad);
+            rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
+            rg.setColorAt(1.0, intensityToColor(0.0));
             painter.setBrush(rg);
-            painter.drawEllipse(lights[i].item->boundingRect());
+            painter.drawEllipse(lights[i].item->boundingRect());*/
+
+            if (upgradient)
+            {
+                lights[i].gradientImage = QImage(100, 100,
+                                                 QImage::Format_RGB32);
+                QPainter gradp(&lights[i].gradientImage);
+                QRadialGradient rg(QPointF(50.0, 50.0), 50.0);
+                rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
+                rg.setColorAt(1.0, intensityToColor(0.0));
+                gradp.setBrush(rg);
+                gradp.drawEllipse(lights[i].item->boundingRect());
+            }
+
+            QElapsedTimer elti;
+            elti.start();
+            painter.drawImage(lights[i].item->boundingRect(),
+                              lights[i].gradientImage);
+            qDebug() << "drag grad:" << elti.elapsed();
 
             painter.setBrush(Qt::black);
             painter.setRenderHint(QPainter::Antialiasing);
@@ -989,8 +1030,7 @@ void CRobotScene::updateLighting()
             lightImage = QImage(sceneRect().size().toSize(),
                                 QImage::Format_RGB32);
 
-        const int ambc = qRound(ambientLight * 127.0 * 0.65);
-        lightImage.fill(qRgb(ambc, ambc, ambc));
+        lightImage.fill(intensityToColor(ambientLight).rgb());
 
         QPainter lipainter(&lightImage);
         lipainter.setRenderHint(QPainter::Antialiasing);
@@ -1000,9 +1040,9 @@ void CRobotScene::updateLighting()
         foreach (const SLight &l, lights)
             lipainter.drawImage(l.item->pos(), l.image);
 
-        /*mpainter.setCompositionMode(QPainter::CompositionMode_ColorDodge);
-        mpainter.fillRect(0, 0, mergedimg.width(), mergedimg.height(),
-                          QColor(50, 50, 50));*/
+        /*lipainter.setCompositionMode(QPainter::CompositionMode_Darken);
+        lipainter.fillRect(0, 0, lightImage.width(), lightImage.height(),
+                           intensityToColor(2.0));*/
 
         lipainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
         lipainter.setBrush(QColor(127, 127, 127));
@@ -1027,26 +1067,21 @@ void CRobotScene::clearMap()
 
         QGraphicsRectItem *rit = qgraphicsitem_cast<QGraphicsRectItem *>(it);
         if (rit && swalls.contains(rit))
-            continue;
+            continue; // Skip static walls
 
         if (it == robotGraphicsItem)
             continue;
-
-        CResizablePixmapGraphicsItem *reit =
-                dynamic_cast<CResizablePixmapGraphicsItem *>(it);
-        if (reit)
-        {
-            // Remove wall/box if present
-            dynamicWalls.removeOne(reit);
-            boxes.removeOne(reit);
-        }
 
         delete it;
     }
 
     markMapEdited(true);
-    lightingDirty = (lightingDirty || !lights.isEmpty());
+
+    boxes.clear();
+    dynamicWalls.clear();
     lights.clear();
+
+    handleDirtyLighting();
 }
 
 void CRobotScene::setLightItemsVisible(bool v)

@@ -16,6 +16,7 @@ class CBaseGraphicsItem : public QGraphicsObject
     QPointF mouseDragPos, oldPos;
 
     void updateMouseCursor(bool selected);
+    void removeMe(void);
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
@@ -37,6 +38,7 @@ public:
 
 signals:
     void posChanged(const QPointF &oldp);
+    void removed(CBaseGraphicsItem *);
 };
 
 #endif // BASEGRAPHICSITEM_H

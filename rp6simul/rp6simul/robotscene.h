@@ -24,7 +24,7 @@ private:
     struct SLight
     {
         CLightGraphicsItem *item;
-        QImage image;
+        QImage image, gradientImage;
         bool dirty;
         SLight(CLightGraphicsItem *it=0) : item(it), dirty(true) { }
 
@@ -63,6 +63,7 @@ private:
     void rotateView(qreal angle);
     QRectF getDragRect(void) const;
     QRectF getLightDragRect(void) const;
+    void handleDirtyLighting(void);
     void updateMouseCursor(void);
     void updateMapSize(void);
     void updateGrid(void);
@@ -74,11 +75,13 @@ private:
     void updateItemsEditMode(void);
 
 private slots:
-    void removeLight(QObject *o);
-    void removeWall(QObject *o);
+    void removeLight(CBaseGraphicsItem *it);
+    void removeWall(CBaseGraphicsItem *it);
     void removeBox(QObject *o);
     void markMapEdited(bool e=true);
     void markLightingDirty(const QPointF &oldp);
+    void markLightingDirty(const QSizeF &olds);
+    void markLightingDirty(float);
     void robotPosChanged(void);
 
 protected:
