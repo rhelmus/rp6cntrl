@@ -31,14 +31,12 @@ public:
                QWidget *widget);
 
     float getRadius(void) const { return radius; }
-    float intensityAt(const QPointF &p,
-                      const QList<QPolygonF> &obstacles) const;
 
     enum { Type = GRAPHICSITEM_TYPELIGHT };
     int type(void) const { return Type; }
 
 signals:
-    void radiusChanged(void);
+    void radiusChanged(float);
 };
 
 #endif // LIGHTGRAPHICSITEM_H

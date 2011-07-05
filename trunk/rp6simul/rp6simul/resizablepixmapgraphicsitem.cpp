@@ -100,13 +100,19 @@ void CResizablePixmapGraphicsItem::updateGeometry(const QPointF &mousepos)
     }
 
     if ((mvx != 0.0) || (mvy != 0.0))
+    {
+        const QPointF oldp(pos());
         moveBy(mvx, mvy);
+        emit posChanged(oldp);
+    }
 
     if ((expx != 0.0) || (expy != 0.0))
     {
+        const QSizeF olds(boundRect.size());
         prepareGeometryChange();
         boundRect.setRight(boundRect.right() + expx);
         boundRect.setBottom(boundRect.bottom() + expy);
+        emit sizeChanged(olds);
     }
 
     adjustHandles();
@@ -124,7 +130,7 @@ void CResizablePixmapGraphicsItem::paint(QPainter *painter,
     if (tiled)
         painter->drawTiledPixmap(boundRect, pixmap);
     else
-        painter->drawPixmap(boundRect, pixmap, boundRect);
+        painter->drawPixmap(boundRect.toRect(), pixmap);
 }
 
 bool CResizablePixmapGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
@@ -137,17 +143,9 @@ bool CResizablePixmapGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
     {
         pressedHandle = dynamic_cast<CHandleGraphicsItem *>(watched);
         Q_ASSERT(pressedHandle);
-        oldBoundRect = mapToScene(boundRect);
     }
     else if (event->type() == QEvent::GraphicsSceneMouseRelease)
-    {
-        if (pressedHandle)
-        {
-            pressedHandle = 0;
-            if (oldBoundRect != mapToScene(boundRect))
-                emit sizeChanged();
-        }
-    }
+        pressedHandle = 0;
     else if (event->type() == QEvent::GraphicsSceneMouseMove)
     {
         QGraphicsSceneMouseEvent *me =

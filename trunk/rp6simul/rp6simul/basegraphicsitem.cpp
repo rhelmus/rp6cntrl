@@ -21,6 +21,12 @@ void CBaseGraphicsItem::updateMouseCursor(bool selected)
         setCursor(Qt::SizeAllCursor);
 }
 
+void CBaseGraphicsItem::removeMe()
+{
+    emit removed(this);
+    deleteLater();
+}
+
 void CBaseGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     if (isMovable)
@@ -76,7 +82,7 @@ void CBaseGraphicsItem::keyReleaseEvent(QKeyEvent *event)
 {
     if (isDeletable && (event->key() == Qt::Key_Delete))
     {
-        deleteLater();
+        removeMe();
         event->accept();
     }
     else
@@ -122,7 +128,7 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
             }
         }
         else if (a == dela)
-            deleteLater();
+            removeMe();
     }
 
     QGraphicsItem::contextMenuEvent(event);

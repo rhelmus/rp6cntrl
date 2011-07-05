@@ -257,7 +257,8 @@ QWidget *CRP6Simulator::createMainWidget()
     QHBoxLayout *hbox = new QHBoxLayout(w);
 
     graphicsView = new QGraphicsView(robotScene);
-    graphicsView->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+    graphicsView->setRenderHints(QPainter::Antialiasing |
+                                 QPainter::SmoothPixmapTransform);
     graphicsView->setMouseTracking(true);
     hbox->addWidget(graphicsView);
 
