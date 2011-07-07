@@ -942,13 +942,17 @@ void CRobotScene::updateLighting()
             const QRectF lightrect(lights[i].item->pos(),
                                    lights[i].item->boundingRect().size());
 
+            bool darkened = false;
             foreach (QPolygonF ob, obstacles)
             {
                 QRectF obr(ob.boundingRect());
                 if (lightrect.intersects(obr))
                 {
                     if (ob.containsPoint(lightrect.center(), Qt::OddEvenFill))
-                        continue;
+                    {
+                        darkened = true;
+                        break;
+                    }
 
                     QPolygonF obtr(ob.translated(-lights[i].item->pos()));
                     obtr.pop_back(); // Remove double start/end point
@@ -992,30 +996,43 @@ void CRobotScene::updateLighting()
                 }
             }
 
-            /*
-            QRadialGradient rg(QPointF(rad, rad), rad);
-            rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
-            rg.setColorAt(1.0, intensityToColor(0.0));
-            painter.setBrush(rg);
-            painter.drawEllipse(lights[i].item->boundingRect());*/
-
-            if (upgradient)
+            if (darkened)
             {
-                lights[i].gradientImage = QImage(100, 100,
-                                                 QImage::Format_RGB32);
-                QPainter gradp(&lights[i].gradientImage);
-                QRadialGradient rg(QPointF(50.0, 50.0), 50.0);
-                rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
-                rg.setColorAt(1.0, intensityToColor(0.0));
-                gradp.setBrush(rg);
-                gradp.drawEllipse(lights[i].item->boundingRect());
+                // UNDONE: cache this?
+                painter.fillRect(lights[i].item->boundingRect(), Qt::black);
+                continue;
             }
 
             QElapsedTimer elti;
             elti.start();
+
+#if 0
+            QRadialGradient rg(QPointF(rad, rad), rad);
+            rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
+            rg.setColorAt(1.0, intensityToColor(0.0));
+            painter.setBrush(rg);
+            painter.drawEllipse(lights[i].item->boundingRect());
+            qDebug() << "draw grad:" << elti.elapsed();
+#else
+            if (upgradient)
+            {
+                const int size = 300;//lights[i].image.width();
+                lights[i].gradientImage = QImage(size, size,
+                                                 QImage::Format_RGB32);
+                lights[i].gradientImage.fill(qRgb(0, 0, 0));
+                QPainter gradp(&lights[i].gradientImage);
+                QRadialGradient rg(QPointF(size/2.0, size/2.0), size/2.0);
+                rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
+                rg.setColorAt(1.0, intensityToColor(0.0));
+                gradp.setBrush(rg);
+                gradp.drawEllipse(0, 0, size, size);
+            }
+
             painter.drawImage(lights[i].item->boundingRect(),
                               lights[i].gradientImage);
-            qDebug() << "drag grad:" << elti.elapsed();
+            qDebug() << "draw grad:" << elti.elapsed();
+#endif
+            elti.restart();
 
             painter.setBrush(Qt::black);
             painter.setRenderHint(QPainter::Antialiasing);
@@ -1023,6 +1040,7 @@ void CRobotScene::updateLighting()
                 painter.drawPolygon(p);
 
             painter.end();
+            qDebug() << "draw shadows:" << elti.elapsed();
         }
 
         if (lightImage.isNull() ||
