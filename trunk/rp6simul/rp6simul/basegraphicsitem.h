@@ -2,6 +2,7 @@
 #define BASEGRAPHICSITEM_H
 
 #include <QGraphicsObject>
+#include <QTimer>
 
 class QAction;
 class QMenu;
@@ -12,11 +13,15 @@ class CBaseGraphicsItem : public QGraphicsObject
 
     bool isMovable, snapsToGrid;
     bool isDeletable;
-    bool dragging;    
-    QPointF mouseDragPos, oldPos;
+    bool dragging;
+    QTimer dragTimer;
+    QPointF startDragPos, curDragPos, oldPos;
 
     void updateMouseCursor(bool selected);
     void removeMe(void);
+
+private slots:
+    void updateDrag(void);
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);

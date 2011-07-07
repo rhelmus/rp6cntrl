@@ -11,6 +11,10 @@ CBaseGraphicsItem::CBaseGraphicsItem(QGraphicsItem *parent)
     setFlag(ItemIsFocusable);
     setAcceptedMouseButtons(Qt::LeftButton);
     updateMouseCursor(false);
+
+    connect(&dragTimer, SIGNAL(timeout()), this, SLOT(updateDrag()));
+    dragTimer.setInterval(30);
+    dragTimer.setSingleShot(true);
 }
 
 void CBaseGraphicsItem::updateMouseCursor(bool selected)
@@ -27,11 +31,37 @@ void CBaseGraphicsItem::removeMe()
     deleteLater();
 }
 
+void CBaseGraphicsItem::updateDrag()
+{
+    QRectF r(boundingRect());
+    const QPointF offset(startDragPos - r.center());
+    r.moveCenter(mapToParent(curDragPos - offset));
+
+    QPointF newp;
+    if (snapsToGrid)
+    {
+        CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+        Q_ASSERT(rscene);
+        if (rscene->getAutoGrid())
+            newp = rscene->alignPosToGrid(r.topLeft());
+    }
+
+    if (newp.isNull())
+        newp = r.topLeft();
+
+    if (newp != pos())
+    {
+        setPos(newp);
+        emit posChanged(oldPos);
+        oldPos = newp;
+    }
+}
+
 void CBaseGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     if (isMovable)
     {
-        mouseDragPos = event->pos();
+        startDragPos = event->pos();
         oldPos = pos();
         dragging = true;
     }
@@ -43,8 +73,13 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     if (dragging)
     {
+        curDragPos = event->pos();
+        if (!dragTimer.isActive())
+            dragTimer.start();
+
+#if 0
         QRectF r(boundingRect());
-        const QPointF offset(mouseDragPos - r.center());
+        const QPointF offset(startDragPos - r.center());
         r.moveCenter(mapToParent(event->pos() - offset));
 
         QPointF newp;
@@ -65,6 +100,7 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
             emit posChanged(oldPos);
             oldPos = newp;
         }
+#endif
     }
 
     QGraphicsItem::mouseMoveEvent(event);
