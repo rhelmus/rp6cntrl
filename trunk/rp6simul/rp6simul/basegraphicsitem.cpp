@@ -13,7 +13,7 @@ CBaseGraphicsItem::CBaseGraphicsItem(QGraphicsItem *parent)
     updateMouseCursor(false);
 
     connect(&dragTimer, SIGNAL(timeout()), this, SLOT(updateDrag()));
-    dragTimer.setInterval(30);
+    dragTimer.setInterval(10);
     dragTimer.setSingleShot(true);
 }
 
@@ -55,6 +55,12 @@ void CBaseGraphicsItem::updateDrag()
         emit posChanged(oldPos);
         oldPos = newp;
     }
+    /*
+    if (oldPos != pos())
+    {
+        emit posChanged(oldPos);
+        oldPos = pos();
+    }*/
 }
 
 void CBaseGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -73,11 +79,7 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     if (dragging)
     {
-        curDragPos = event->pos();
-        if (!dragTimer.isActive())
-            dragTimer.start();
-
-#if 0
+#if 1
         QRectF r(boundingRect());
         const QPointF offset(startDragPos - r.center());
         r.moveCenter(mapToParent(event->pos() - offset));
@@ -99,6 +101,35 @@ void CBaseGraphicsItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
             setPos(newp);
             emit posChanged(oldPos);
             oldPos = newp;
+        }
+
+#elif 0
+        curDragPos = event->pos();
+        if (!dragTimer.isActive())
+            dragTimer.start();
+#else
+        QRectF r(boundingRect());
+        const QPointF offset(startDragPos - r.center());
+        r.moveCenter(mapToParent(event->pos() - offset));
+
+        QPointF newp;
+        if (snapsToGrid)
+        {
+            CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+            Q_ASSERT(rscene);
+            if (rscene->getAutoGrid())
+                newp = rscene->alignPosToGrid(r.topLeft());
+        }
+
+        if (newp.isNull())
+            newp = r.topLeft();
+
+        if (newp != pos())
+        {
+            setPos(newp);
+            curDragPos = newp;
+            if (!dragTimer.isActive())
+                dragTimer.start();
         }
 #endif
     }

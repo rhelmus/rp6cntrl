@@ -496,7 +496,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     if (/*!editModeEnabled*/!lightImage.isNull())
     {
         painter->setCompositionMode(QPainter::CompositionMode_HardLight);
-        painter->drawImage(0, 0, lightImage);
+        painter->drawPixmap(0, 0, lightImage);
 
         /*painter->setCompositionMode(QPainter::CompositionMode_Darken);
         painter->fillRect(0, 0, lightImage.width(), lightImage.height(),
@@ -848,7 +848,8 @@ void CRobotScene::loadMap(QSettings &settings)
     const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
     scaleGraphicsView(scale / curscale);
 
-    lightImage = settings.value("lightImage").value<QImage>();
+    // UNDONE!
+//    lightImage = settings.value("lightImage").value<QImage>();
 
     if (lightImage.isNull() ||
         (lightImage.size() != sceneRect().size().toSize()))
@@ -890,15 +891,10 @@ void CRobotScene::setFollowRobot(bool f)
 
 void CRobotScene::updateLighting()
 {
-    QTime startt;
-    startt.start();
+    QElapsedTimer startt;
+    QElapsedTimer elti;
 
-    /*CProgressDialog prgdialog(true, CRP6Simulator::getInstance());
-    prgdialog.setWindowTitle("Updating light map...");
-    prgdialog.setRange(0, 100);
-    prgdialog.setValue(33);
-    prgdialog.setLabelText("Determining lighting regions...");*/
-//    prgdialog.show();
+    startt.start();
 
     QList<QPolygonF> obstacles;
 
@@ -908,165 +904,164 @@ void CRobotScene::updateLighting()
     foreach (QGraphicsItem *w, dynamicWalls)
         obstacles << w->mapToScene(w->boundingRect());
 
-//    qApp->processEvents();
-//    if (!prgdialog.wasCanceled())
+    const int lsize = lights.size();
+    for (int i=0; i<lsize; ++i)
     {
-        /*prgdialog.setLabelText("Performing per pixel lighting...");
-        prgdialog.setValue(66);*/
+        if (!lights[i].dirty)
+            continue;
 
-        const int lsize = lights.size();
-        for (int i=0; i<lsize; ++i)
+        lights[i].dirty = false;
+
+        bool upgradient = false;
+        const QSize imsize(lights[i].item->boundingRect().size().toSize());
+        if (lights[i].image.isNull() || (lights[i].image.size() != imsize))
         {
-//            if (prgdialog.wasCanceled())
-//                break;
-
-            if (!lights[i].dirty)
-                continue;
-
-            lights[i].dirty = false;
-
-            bool upgradient = false;
-            const QSize imsize(lights[i].item->boundingRect().size().toSize());
-            if (lights[i].image.isNull() || (lights[i].image.size() != imsize))
-            {
-                lights[i].image = QImage(imsize, QImage::Format_RGB32);
-                lights[i].image.fill(qRgb(0, 0, 0));
-                upgradient = true;
-            }
-
-            QPainter painter(&lights[i].image);
-            painter.setPen(Qt::NoPen);
-
-            const qreal rad = lights[i].item->boundingRect().width() / 2.0;
-            QList<QPolygonF> shadowPolys;
-            const QRectF lightrect(lights[i].item->pos(),
-                                   lights[i].item->boundingRect().size());
-
-            bool darkened = false;
-            foreach (QPolygonF ob, obstacles)
-            {
-                QRectF obr(ob.boundingRect());
-                if (lightrect.intersects(obr))
-                {
-                    if (ob.containsPoint(lightrect.center(), Qt::OddEvenFill))
-                    {
-                        darkened = true;
-                        break;
-                    }
-
-                    QPolygonF obtr(ob.translated(-lights[i].item->pos()));
-                    obtr.pop_back(); // Remove double start/end point
-
-                    QList<QPointF> ambverts;
-                    foreach (QPointF v, obtr)
-                    {
-                        QLineF line(QPointF(rad, rad), v);
-                        QTransform tr;
-                        tr.translate(v.x(), v.y());
-                        tr.rotate(line.angle());
-                        tr.translate(-v.x(), -v.y());
-
-                        QPolygonF p(tr.map(obtr));
-
-                        bool hasup = false, hasdown = false;
-
-                        foreach (QPointF pv, p)
-                        {
-                            if (qFuzzyCompare(pv.y(), v.y()))
-                                continue;
-                            hasup = (hasup || (pv.y() > v.y()));
-                            hasdown = (hasdown || (pv.y() < v.y()));
-
-                            if (hasup && hasdown)
-                                break;
-                        }
-
-                        if ((hasup && !hasdown) || (!hasup && hasdown))
-                            ambverts << v;
-                    }
-
-                    Q_ASSERT(ambverts.size() == 2);
-
-                    if (ambverts.size() == 2)
-                    {
-                        shadowPolys << createShadowPolygon(QPointF(rad, rad),
-                                                           rad, ambverts[0],
-                                                           ambverts[1]);
-                    }
-                }
-            }
-
-            if (darkened)
-            {
-                // UNDONE: cache this?
-                painter.fillRect(lights[i].item->boundingRect(), Qt::black);
-                continue;
-            }
-
-            QElapsedTimer elti;
-            elti.start();
-
-#if 0
-            QRadialGradient rg(QPointF(rad, rad), rad);
-            rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
-            rg.setColorAt(1.0, intensityToColor(0.0));
-            painter.setBrush(rg);
-            painter.drawEllipse(lights[i].item->boundingRect());
-            qDebug() << "draw grad:" << elti.elapsed();
-#else
-            if (upgradient)
-            {
-                const int size = 300;//lights[i].image.width();
-                lights[i].gradientImage = QImage(size, size,
-                                                 QImage::Format_RGB32);
-                lights[i].gradientImage.fill(qRgb(0, 0, 0));
-                QPainter gradp(&lights[i].gradientImage);
-                QRadialGradient rg(QPointF(size/2.0, size/2.0), size/2.0);
-                rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
-                rg.setColorAt(1.0, intensityToColor(0.0));
-                gradp.setBrush(rg);
-                gradp.drawEllipse(0, 0, size, size);
-            }
-
-            painter.drawImage(lights[i].item->boundingRect(),
-                              lights[i].gradientImage);
-            qDebug() << "draw grad:" << elti.elapsed();
-#endif
-            elti.restart();
-
-            painter.setBrush(Qt::black);
-            painter.setRenderHint(QPainter::Antialiasing);
-            foreach (QPolygonF p, shadowPolys)
-                painter.drawPolygon(p);
-
-            painter.end();
-            qDebug() << "draw shadows:" << elti.elapsed();
+            lights[i].image = QImage(imsize, QImage::Format_RGB32);
+            lights[i].image.fill(qRgb(0, 0, 0));
+            upgradient = true;
         }
 
-        if (lightImage.isNull() ||
-            (lightImage.size() != sceneRect().size().toSize()))
-            lightImage = QImage(sceneRect().size().toSize(),
-                                QImage::Format_RGB32);
+        QPainter painter(&lights[i].image);
+        painter.setPen(Qt::NoPen);
 
-        lightImage.fill(intensityToColor(ambientLight).rgb());
+        const qreal rad = lights[i].item->boundingRect().width() / 2.0;
+        QList<QPolygonF> shadowPolys;
+        const QRectF lightrect(lights[i].item->pos(),
+                               lights[i].item->boundingRect().size());
 
-        QPainter lipainter(&lightImage);
-        lipainter.setRenderHint(QPainter::Antialiasing);
-        lipainter.setPen(Qt::NoPen);
-
-        lipainter.setCompositionMode(QPainter::CompositionMode_Plus);
-        foreach (const SLight &l, lights)
-            lipainter.drawImage(l.item->pos(), l.image);
-
-        /*lipainter.setCompositionMode(QPainter::CompositionMode_Darken);
-        lipainter.fillRect(0, 0, lightImage.width(), lightImage.height(),
-                           intensityToColor(2.0));*/
-
-        lipainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
-        lipainter.setBrush(QColor(127, 127, 127));
+        bool darkened = false;
         foreach (QPolygonF ob, obstacles)
-            lipainter.drawPolygon(ob);
-    }  
+        {
+            QRectF obr(ob.boundingRect());
+            if (lightrect.intersects(obr))
+            {
+                if (ob.containsPoint(lightrect.center(), Qt::OddEvenFill))
+                {
+                    darkened = true;
+                    break;
+                }
+
+                QPolygonF obtr(ob.translated(-lights[i].item->pos()));
+                obtr.pop_back(); // Remove double start/end point
+
+                QList<QPointF> ambverts;
+                foreach (QPointF v, obtr)
+                {
+                    QLineF line(QPointF(rad, rad), v);
+                    QTransform tr;
+                    tr.translate(v.x(), v.y());
+                    tr.rotate(line.angle());
+                    tr.translate(-v.x(), -v.y());
+
+                    QPolygonF p(tr.map(obtr));
+
+                    bool hasup = false, hasdown = false;
+
+                    foreach (QPointF pv, p)
+                    {
+                        if (qFuzzyCompare(pv.y(), v.y()))
+                            continue;
+                        hasup = (hasup || (pv.y() > v.y()));
+                        hasdown = (hasdown || (pv.y() < v.y()));
+
+                        if (hasup && hasdown)
+                            break;
+                    }
+
+                    if ((hasup && !hasdown) || (!hasup && hasdown))
+                        ambverts << v;
+                }
+
+                Q_ASSERT(ambverts.size() == 2);
+
+                if (ambverts.size() == 2)
+                {
+                    shadowPolys << createShadowPolygon(QPointF(rad, rad),
+                                                       rad, ambverts[0],
+                                                       ambverts[1]);
+                }
+            }
+        }
+
+        if (darkened)
+        {
+            // UNDONE: cache this?
+            painter.fillRect(lights[i].item->boundingRect(), Qt::black);
+            continue;
+        }
+
+        elti.start();
+
+#if 0
+        QRadialGradient rg(QPointF(rad, rad), rad);
+        rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
+        rg.setColorAt(1.0, intensityToColor(0.0));
+        painter.setBrush(rg);
+        painter.drawEllipse(lights[i].item->boundingRect());
+        qDebug() << "draw grad:" << elti.elapsed();
+#else
+        if (upgradient)
+        {
+            const int size = 300;//lights[i].image.width();
+            lights[i].gradientImage = QImage(size, size,
+                                             QImage::Format_RGB32);
+            lights[i].gradientImage.fill(qRgb(0, 0, 0));
+            QPainter gradp(&lights[i].gradientImage);
+            QRadialGradient rg(QPointF(size/2.0, size/2.0), size/2.0);
+            rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
+            rg.setColorAt(1.0, intensityToColor(0.0));
+            gradp.setBrush(rg);
+            gradp.drawEllipse(0, 0, size, size);
+        }
+
+        painter.drawImage(lights[i].item->boundingRect(),
+                          lights[i].gradientImage);
+        qDebug() << "draw grad:" << elti.elapsed();
+#endif
+        elti.restart();
+
+        painter.setBrush(Qt::black);
+        painter.setRenderHint(QPainter::Antialiasing);
+        foreach (QPolygonF p, shadowPolys)
+            painter.drawPolygon(p);
+
+        painter.drawPie(QRectF(lights[i].item->boundingRect().center(), QSizeF(40, 40)),
+                        30 * 16, 60 * 16);
+
+        painter.end();
+        qDebug() << "draw shadows:" << elti.elapsed();
+    }
+
+    elti.restart();
+
+    if (lightImage.isNull() ||
+        (lightImage.size() != sceneRect().size().toSize()))
+        lightImage = QPixmap(sceneRect().size().toSize());
+
+    lightImage.fill(intensityToColor(ambientLight).rgb());
+
+    qDebug() << "Setup lightimage:" << elti.elapsed();
+
+    QPainter lipainter(&lightImage);
+    lipainter.setRenderHint(QPainter::Antialiasing);
+    lipainter.setPen(Qt::NoPen);
+
+    elti.restart();
+
+    lipainter.setCompositionMode(QPainter::CompositionMode_Plus);
+    foreach (const SLight &l, lights)
+        lipainter.drawImage(l.item->pos(), l.image);
+
+    qDebug() << "Drawn light images:" << elti.elapsed();
+
+    elti.restart();
+
+    lipainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
+    lipainter.setBrush(QColor(127, 127, 127));
+    foreach (QPolygonF ob, obstacles)
+        lipainter.drawPolygon(ob);
+
+    qDebug() << "Drawn-over obstacles:" << elti.elapsed();
 
     lightingDirty = false;
     markMapEdited(true);
