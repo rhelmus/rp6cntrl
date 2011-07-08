@@ -17,6 +17,8 @@ class CLightGraphicsItem : public CBaseGraphicsItem
 
     void setRadiusHandlePos(void);
 
+    qreal getZValue(void) const { return 0.2; }
+
 protected:
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
     QVariant itemChange(GraphicsItemChange change, const QVariant &value);

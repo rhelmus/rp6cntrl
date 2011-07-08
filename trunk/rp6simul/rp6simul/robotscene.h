@@ -15,11 +15,12 @@ class CRobotScene : public QGraphicsScene
 {
 public:
     enum EMouseMode { MODE_POINT, MODE_WALL, MODE_BOX, MODE_LIGHT };
+    enum EShadowQuality { SH_QUALITY_LOW=0, SH_QUALITY_MED, SH_QUALITY_HIGH };
 
 private:
     Q_OBJECT
 
-    enum EStaticWall { WALL_LEFT, WALL_RIGHT, WALL_TOP, WALL_BOTTOM };
+    enum EStaticWall { WALL_LEFT, WALL_RIGHT, WALL_TOP, WALL_BOTTOM };    
 
     struct SLight
     {
@@ -34,6 +35,7 @@ private:
     QPixmap lightPixmap;
     bool lightingDirty, autoRefreshLighting;
     float ambientLight;
+    EShadowQuality shadowQuality;
 
     QHash<EStaticWall, QGraphicsRectItem *> staticWalls;
     QList<CResizablePixmapGraphicsItem *> dynamicWalls;
@@ -95,6 +97,8 @@ public:
     void setAutoRefreshLighting(bool a);
     float getAmbientLight(void) const { return ambientLight; }
     void setAmbientLight(float l);
+    EShadowQuality getShadowQuality(void) const { return shadowQuality; }
+    void setShadowQuality(EShadowQuality q);
     float getGridSize(void) const { return gridSize; }
     void setGridSize(float s);
     bool getAutoGrid(void) const { return autoGridEnabled; }
@@ -153,5 +157,7 @@ inline QDataStream &operator>>(QDataStream &in, SObjectSettings &os)
 { in >> os.pos; in >> os.size; return in; }
 
 Q_DECLARE_METATYPE(SObjectSettings)
+
+QColor intensityToColor(float intensity);
 
 #endif // ROBOTSCENE_H

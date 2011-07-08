@@ -659,6 +659,7 @@ void CRP6Simulator::editMapSettings()
     dialog.setMapSize(robotScene->sceneRect().size());
     dialog.setAutoRefreshLight(robotScene->getAutoRefreshLighting());
     dialog.setAmbientLight(robotScene->getAmbientLight());
+    dialog.setShadowQuality(robotScene->getShadowQuality());
     dialog.setGridSize(robotScene->getGridSize());
     dialog.setAutoGridSnap(robotScene->getAutoGrid());
 
@@ -668,6 +669,7 @@ void CRP6Simulator::editMapSettings()
         robotScene->setMapSize(dialog.getMapSize());
         qDebug() << "Ambient light changed:" << (robotScene->getAmbientLight() != dialog.getAmbientLight()) << robotScene->getAmbientLight() << dialog.getAmbientLight();
         robotScene->setAmbientLight(dialog.getAmbientLight());
+        robotScene->setShadowQuality(dialog.getShadowQuality());
         robotScene->setGridSize(dialog.getGridSize());
         robotScene->setAutoGrid(dialog.getAutoGridSnap());
     }
