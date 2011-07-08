@@ -32,7 +32,7 @@ private:
 
     QList<SLight> lights;
     QPixmap backGroundPixmap;
-    QImage lightImage;
+    QPixmap lightImage;
     bool lightingDirty, autoRefreshLighting;
     bool lightItemsVisible;
     float ambientLight;
