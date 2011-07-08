@@ -99,19 +99,22 @@ QPolygonF createShadowPolygon(const QPointF &light, float rad,
 
 }
 
+
+QList<QGraphicsItem *> CRobotScene::fixedSizeItems;
+
 CRobotScene::CRobotScene(QObject *parent) :
     QGraphicsScene(parent),
     backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
     lightingDirty(false), autoRefreshLighting(true),
-    lightItemsVisible(false), ambientLight(0.35),
+    ambientLight(0.35),
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
     boxPixmap("../resource/cardboard-box.png"), followRobot(false),
     viewAngle(0.0), dragging(false), draggedEnough(false),
-    mouseMode(MODE_POINT), editModeEnabled(false), mapEdited(false),
+    mouseMode(MODE_POINT), lightEditMode(false), mapEdited(false),
     gridSize(15.0), autoGridEnabled(true), gridVisible(false)
 {
     setBackgroundBrush(Qt::darkGray);
@@ -146,6 +149,15 @@ void CRobotScene::scaleGraphicsView(qreal f)
         return;
 
     view->scale(f, f);
+
+    // Keep the size fixed of certain items (ie handles).
+    // HACK: only do this when zooming out: scaling handles slightly gives
+    // them an offset, which is more noticable for zooming in.
+    if (factor <= 1.0)
+    {
+        foreach (QGraphicsItem *it, fixedSizeItems)
+            it->setTransform(QTransform().scale(1.0/f, 1.0/f), true);
+    }
 }
 
 void CRobotScene::rotateView(qreal angle)
@@ -160,26 +172,44 @@ void CRobotScene::rotateView(qreal angle)
     viewAngle = angle;
 }
 
-QRectF CRobotScene::getDragRect() const
+QRectF CRobotScene::getDragRect(bool squared) const
 {
     QRectF ret;
-    ret.setTopLeft(mouseDragStartPos);
-    ret.setBottomRight(mousePos);
-    return ret.normalized();
-}
+    QPointF p(mouseDragStartPos);
+    if (autoGridEnabled)
+        p = alignPosToGrid(p);
+    ret.setTopLeft(p);
 
-QRectF CRobotScene::getLightDragRect(void) const
-{
-    QRectF ret;
-    ret.setTopLeft(mouseDragStartPos);
-    ret.setBottom(mousePos.y());
-    ret.setWidth(ret.height());
+    p = QPointF(mousePos);
+    if (autoGridEnabled)
+        p = alignPosToGrid(p);
+    ret.setBottomRight(p);
+
+    if (squared)
+    {
+        qreal aw = qAbs(ret.width()), ah = qAbs(ret.height());
+        if (aw > ah)
+        {
+            if (ret.height() < 0.0)
+                ret.setHeight(-aw);
+            else
+                ret.setHeight(aw);
+        }
+        else
+        {
+            if (ret.width() < 0.0)
+                ret.setWidth(-ah);
+            else
+                ret.setWidth(ah);
+        }
+    }
+
     return ret.normalized();
 }
 
 void CRobotScene::handleDirtyLighting()
 {
-    if (autoRefreshLighting)
+    if (autoRefreshLighting && !lightEditMode)
         updateLighting();
     else
         lightingDirty = true;
@@ -190,7 +220,7 @@ void CRobotScene::updateMouseCursor()
     QWidget *vp = getGraphicsView()->viewport();
     Q_ASSERT(vp);
 
-    if (!editModeEnabled || (mouseMode == MODE_POINT))
+    if (mouseMode == MODE_POINT)
         vp->unsetCursor();
     else
         vp->setCursor(Qt::CrossCursor);
@@ -199,32 +229,12 @@ void CRobotScene::updateMouseCursor()
 void CRobotScene::updateMapSize()
 {
     qDebug() << "Update map size";
-    updateGrid();
     updateStaticWalls();
     markMapEdited(true);
 
     for (QList<SLight>::iterator it=lights.begin(); it!=lights.end(); ++it)
         it->dirty = true;
     handleDirtyLighting();
-}
-
-void CRobotScene::updateGrid()
-{
-    gridImage = QImage(sceneRect().size().toSize(),
-                       QImage::Format_ARGB32_Premultiplied);
-    gridImage.fill(Qt::transparent);
-    QPainter painter(&gridImage);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(Qt::blue, 0.25));
-
-    const float startx = sceneRect().left(), endx = sceneRect().right();
-    const float starty = sceneRect().top(), endy = sceneRect().bottom();
-
-    for (float x=startx; x<=endx; x+=gridSize)
-        painter.drawLine(x, starty, x, endy);
-
-    for (float y=starty; y<=endy; y+=gridSize)
-        painter.drawLine(startx, y, endx, y);
 }
 
 QGraphicsRectItem *CRobotScene::createStaticWall() const
@@ -268,7 +278,7 @@ void CRobotScene::addLight(const QPointF &p, float r)
 {
     CLightGraphicsItem *l = new CLightGraphicsItem(r);
     l->setPos(p - QPointF(r, r));
-    l->setVisible(editModeEnabled);
+    l->setVisible(lightEditMode);
     addItem(l);
     connect(l, SIGNAL(removed(CBaseGraphicsItem *)), this,
             SLOT(removeLight(CBaseGraphicsItem *)));
@@ -313,19 +323,6 @@ void CRobotScene::addBox(const QRectF &rect)
     connect(resi, SIGNAL(posChanged(const QPointF &)), this,
             SLOT(markMapEdited()));
     boxes << resi;
-}
-
-void CRobotScene::updateItemsEditMode()
-{
-    foreach (const SLight &l, lights)
-        l.item->setVisible(editModeEnabled && lightItemsVisible);
-
-    foreach (CResizablePixmapGraphicsItem *w, dynamicWalls)
-    {
-        w->setMovable(editModeEnabled);
-        w->setResizable(editModeEnabled);
-        w->setDeletable(editModeEnabled);
-    }
 }
 
 void CRobotScene::removeLight(CBaseGraphicsItem *it)
@@ -470,7 +467,7 @@ void CRobotScene::markLightingDirty(float)
 
 void CRobotScene::robotPosChanged()
 {
-    if (followRobot && !editModeEnabled)
+    if (followRobot)
     {
         rotateView(robotGraphicsItem->rotation());
         getGraphicsView()->centerOn(robotGraphicsItem);
@@ -492,8 +489,7 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
     painter->save();
 
-    // UNDONE
-    if (/*!editModeEnabled*/!lightPixmap.isNull())
+    if (!lightEditMode && !lightPixmap.isNull())
     {
         painter->setCompositionMode(QPainter::CompositionMode_HardLight);
         painter->drawPixmap(sceneRect().toRect(), lightPixmap);
@@ -507,17 +503,17 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
             painter->setPen(Qt::NoPen);
             painter->setOpacity(0.75);
             painter->setBrush(blockPixmap);
-            painter->drawRect(getDragRect());
+            painter->drawRect(getDragRect(false));
         }
         else if (mouseMode == MODE_BOX)
         {
             painter->setPen(Qt::NoPen);
             painter->setOpacity(0.75);
-            painter->drawPixmap(getDragRect().toRect(), boxPixmap);
+            painter->drawPixmap(getDragRect(false).toRect(), boxPixmap);
         }
         else if (mouseMode == MODE_LIGHT)
         {
-            const QRectF rect(getLightDragRect());
+            const QRectF rect(getDragRect(true));
             const qreal radius = rect.height()/2.0;
             QRadialGradient g(rect.center(), radius);
             g.setColorAt(0.0, QColor(255, 255, 0, 200));
@@ -527,15 +523,27 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
         }
     }
 
-    if (editModeEnabled && gridVisible)
-        painter->drawImage(0, 0, gridImage);
+    if (gridVisible)
+    {
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(QPen(Qt::blue, 0.25));
+
+        const float startx = sceneRect().left(), endx = sceneRect().right();
+        const float starty = sceneRect().top(), endy = sceneRect().bottom();
+
+        for (float x=startx; x<=endx; x+=gridSize)
+            painter->drawLine(x, starty, x, endy);
+
+        for (float y=starty; y<=endy; y+=gridSize)
+            painter->drawLine(startx, y, endx, y);
+    }
 
     painter->restore();
 }
 
 void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {    
-    if (!editModeEnabled || (mouseMode == MODE_POINT) ||
+    if ((mouseMode == MODE_POINT) ||
         (event->button() != Qt::LeftButton))
         QGraphicsScene::mousePressEvent(event);
     else if ((mouseMode == MODE_WALL) || (mouseMode == MODE_BOX) ||
@@ -550,13 +558,13 @@ void CRobotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void CRobotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     mousePos = event->scenePos();
-    if (!editModeEnabled || (mouseMode == MODE_POINT))
+    if (mouseMode == MODE_POINT)
         QGraphicsScene::mouseMoveEvent(event);
     else if (dragging)
     {
         if (!draggedEnough)
         {
-            const QSizeF s(getDragRect().size());
+            const QSizeF s(getDragRect(mouseMode == MODE_LIGHT).size());
             const qreal minsize = 7.5;
             draggedEnough = ((s.width() >= minsize) && (s.height() >= minsize));
         }
@@ -571,7 +579,7 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     if ((event->button() == Qt::RightButton))
         setMouseMode(MODE_POINT, true);
 
-    if (!editModeEnabled || (mouseMode == MODE_POINT) ||
+    if ((mouseMode == MODE_POINT) ||
         (event->button() != Qt::LeftButton))
         QGraphicsScene::mouseReleaseEvent(event);
     else if (draggedEnough)
@@ -580,18 +588,31 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
         if (mouseMode == MODE_WALL)
         {
-            addWall(getMinRect(getDragRect(), minsize, minsize));
-            markMapEdited(true);
+            const QRectF r(getMinRect(getDragRect(false), minsize, minsize));
+            addWall(r);
+
+            for (QList<SLight>::iterator it=lights.begin();
+                 it!=lights.end(); ++it)
+            {
+                if (it->dirty)
+                    continue;
+                const QRectF lightrect(it->item->pos(),
+                                       it->item->boundingRect().size());
+                if (lightrect.intersects(r))
+                    it->dirty = true;
+            }
+
             handleDirtyLighting();
+            markMapEdited(true);
         }
         else if (mouseMode == MODE_BOX)
         {
-            addBox(getMinRect(getDragRect(), minsize, minsize));
+            addBox(getMinRect(getDragRect(false), minsize, minsize));
             markMapEdited(true);
         }
         else if (mouseMode == MODE_LIGHT)
         {
-            const QRectF r(getMinRect(getLightDragRect(), minsize, minsize));
+            const QRectF r(getMinRect(getDragRect(true), minsize, minsize));
             const float radius = r.height()/2.0;
             addLight(r.center(), radius);
             markMapEdited(true);
@@ -610,6 +631,7 @@ void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
         QList<QGraphicsItem *> sitems(selectedItems());
         foreach (QGraphicsItem *it, sitems)
             it->setSelected(false);
+        setFollowRobot(false, true);
     }
 
     update();
@@ -618,32 +640,6 @@ void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
         emit mouseModeChanged(mode);
 
     updateMouseCursor();
-}
-
-void CRobotScene::setEditModeEnabled(bool e)
-{
-    if (e == editModeEnabled)
-        return;
-
-    editModeEnabled = e;
-
-    if (e)
-    {
-        rotateView(0.0);
-        setMouseMode(mouseMode); // Update mode, calls update() too
-    }
-    else
-    {
-        if (lightingDirty && autoRefreshLighting)
-            updateLighting(); // calls update() too
-        else
-            update();
-
-        dragging = false;
-        updateMouseCursor();
-    }
-
-    updateItemsEditMode();
 }
 
 void CRobotScene::setMapSize(const QSizeF &size)
@@ -681,7 +677,6 @@ void CRobotScene::setGridSize(float s)
     if (!qFuzzyCompare(s, gridSize))
     {
         gridSize = s;
-        updateGrid();
         update();
         markMapEdited(true);
     }
@@ -729,12 +724,8 @@ void CRobotScene::saveMap(QSettings &settings)
         - Robot start position
         - Scale*
         - Boxes*
-        - Light/shadow pixmaps*
         - Screenshot
     */
-
-    // UNDONE: Update lightmap if necessary?
-    // Or only save if outside edit mode?
 
     QList<QVariant> lightsvarlist;
     foreach (const SLight &l, lights)
@@ -773,19 +764,6 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.setValue("boxes", boxesvarlist);
     settings.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
 
-    QElapsedTimer etimer;
-    etimer.start();
-
-    // UNDONE!
-
-    settings.sync();
-//    settings.setValue("shadowImage", shadowImage);
-    settings.sync();
-    qDebug() << "Wrote shadow image after" << etimer.elapsed() << "ms";
-    settings.setValue("lightImage", lightPixmap);
-    settings.sync();
-    qDebug() << "Wrote light image after" << etimer.elapsed() << "ms";
-
     settings.endGroup();
 
     // UNDONE: Should be here? (ie map export)
@@ -809,9 +787,7 @@ void CRobotScene::loadMap(QSettings &settings)
                                         QSizeF(1000.0, 1000.0)).toSizeF());
 
     if (mapsize != sceneRect().size())
-        setMapSize(mapsize); // Triggers updateGrid
-    else
-        updateGrid();
+        setMapSize(mapsize);
 
     autoGridEnabled = settings.value("autoGrid", true).toBool();
 
@@ -843,26 +819,9 @@ void CRobotScene::loadMap(QSettings &settings)
     const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
     scaleGraphicsView(scale / curscale);
 
-    // UNDONE!
-//    lightImage = settings.value("lightImage").value<QImage>();
-
-    if (lightPixmap.isNull() ||
-        (lightPixmap.size() != sceneRect().size().toSize()))
-    {
-        qWarning("Failed to load light maps. Regenerating...");
-        updateLighting();
-        markMapEdited(true);
-    }
-    else
-    {
-        markMapEdited(false);
-        lightingDirty = false;
-        update();
-    }
-
     settings.endGroup();
-
-    updateItemsEditMode();
+    updateLighting();
+    markMapEdited(false);
 }
 
 void CRobotScene::zoomSceneIn()
@@ -875,13 +834,20 @@ void CRobotScene::zoomSceneOut()
     scaleGraphicsView(1/1.2);
 }
 
-void CRobotScene::setFollowRobot(bool f)
+void CRobotScene::setFollowRobot(bool f, bool sign)
 {
      followRobot = f;
      if (!f)
          rotateView(0.0);
      else
+     {
          robotPosChanged(); // Trigger initial focus in case robot doesn't move
+         if (mouseMode != MODE_POINT)
+             setMouseMode(MODE_POINT, true);
+     }
+
+     if (sign)
+         emit robotFollowingChanged(f);
 }
 
 void CRobotScene::updateLighting()
@@ -1065,7 +1031,6 @@ void CRobotScene::updateLighting()
         lipainter.drawPolygon(lighttrans.map(ob));
 
     lightingDirty = false;
-    markMapEdited(true);
     update();
 
     qDebug() << "Updated lightingMap in" << startt.elapsed() << "ms.";
@@ -1098,12 +1063,23 @@ void CRobotScene::clearMap()
     handleDirtyLighting();
 }
 
-void CRobotScene::setLightItemsVisible(bool v)
+void CRobotScene::setLightEditMode(bool v)
 {
-    lightItemsVisible = v;
-    if (editModeEnabled)
+    if (v == lightEditMode)
+        return;
+
+    lightEditMode = v;
+    foreach (const SLight &l, lights)
+        l.item->setVisible(v);
+
+    if (!v)
     {
-        foreach (const SLight &l, lights)
-            l.item->setVisible(v);
+        if (mouseMode == MODE_LIGHT)
+            setMouseMode(MODE_POINT, true);
+
+        if (lightingDirty && autoRefreshLighting)
+            updateLighting();
     }
+
+    update();
 }

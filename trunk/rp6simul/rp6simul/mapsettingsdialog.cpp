@@ -23,8 +23,8 @@ CMapSettingsDialog::CMapSettingsDialog(QWidget *parent) :
     QFormLayout *form = new QFormLayout;
     grid->addLayout(form, 0, 0);
 
-    form->addRow("Width", widthSpinBox = createSpinBox(100, 100000));
-    form->addRow("Height", heightSpinBox = createSpinBox(100, 100000));
+    form->addRow("Width", widthSpinBox = createSpinBox(100, 20000));
+    form->addRow("Height", heightSpinBox = createSpinBox(100, 20000));
     form->addRow("Auto refresh light map", refreshLightCheckBox = new QCheckBox);
     form->addRow("Ambient light", createLightSlider());
     form->addRow("Grid size", gridSizeSpinBox = createSpinBox(5, 100));

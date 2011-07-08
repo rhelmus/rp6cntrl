@@ -1,4 +1,5 @@
 #include "resizablepixmapgraphicsitem.h"
+#include "robotscene.h"
 
 #include <QtGui>
 
@@ -99,10 +100,19 @@ void CResizablePixmapGraphicsItem::updateGeometry(const QPointF &mousepos)
             expy = mousepos.y() - boundRect.bottom();
     }
 
+    CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+    Q_ASSERT(rscene);
+    const bool dosnap = (getSnapsToGrid() && rscene->getAutoGrid());
+
     if ((mvx != 0.0) || (mvy != 0.0))
     {
         const QPointF oldp(pos());
-        moveBy(mvx, mvy);
+        QPointF newp(pos() + QPointF(mvx, mvy));
+
+        if (dosnap)
+            newp = rscene->alignPosToGrid(newp);
+
+        setPos(newp);
         emit posChanged(oldp);
     }
 
@@ -110,8 +120,17 @@ void CResizablePixmapGraphicsItem::updateGeometry(const QPointF &mousepos)
     {
         const QSizeF olds(boundRect.size());
         prepareGeometryChange();
-        boundRect.setRight(boundRect.right() + expx);
-        boundRect.setBottom(boundRect.bottom() + expy);
+
+        QPointF newp(boundRect.right() + expx, 0.0);
+        if (dosnap)
+            newp = rscene->alignPosToGrid(newp);
+        boundRect.setRight(newp.x());
+
+        newp = QPointF(0.0, boundRect.bottom() + expy);
+        if (dosnap)
+            newp = rscene->alignPosToGrid(newp);
+        boundRect.setBottom(newp.y());
+
         emit sizeChanged(olds);
     }
 

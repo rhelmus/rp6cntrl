@@ -31,6 +31,7 @@ protected:
 
 public:
     CHandleGraphicsItem(EHandlePosFlags pos, QGraphicsItem *parent = 0);
+    ~CHandleGraphicsItem(void);
 
     EHandlePosFlags handlePosition(void) const { return handlePos; }
 
