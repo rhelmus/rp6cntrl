@@ -21,7 +21,6 @@
     - Import from other project files
     - Robot start
     - Manual lighting update: force complete? Or remove it?
-    - Shadow quality (scale factor) map config option
 - Robot widget
 - Check version on project loading
 - Use qRound for float/double --> int conversions

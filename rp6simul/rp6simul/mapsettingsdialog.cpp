@@ -27,10 +27,13 @@ CMapSettingsDialog::CMapSettingsDialog(QWidget *parent) :
     form->addRow("Height", heightSpinBox = createSpinBox(100, 20000));
     form->addRow("Auto refresh light map", refreshLightCheckBox = new QCheckBox);
     form->addRow("Ambient light", createLightSlider());
+    form->addRow("Shadow quality", shadowQualityComboBox = new QComboBox);
     form->addRow("Grid size", gridSizeSpinBox = createSpinBox(5, 100));
     form->addRow("Auto snap to grid", snapCheckBox = new QCheckBox);
 
     refreshLightCheckBox->setToolTip("If necessary refresh lighting automatically when leaving edit mode.");
+    shadowQualityComboBox->addItems(QStringList() << "Low (fast)" <<
+                                    "Medium (default)" << "High (slow)");
     gridSizeSpinBox->setSingleStep(5);
 
     QVBoxLayout *vbox = new QVBoxLayout;
@@ -87,6 +90,11 @@ void CMapSettingsDialog::setAmbientLight(float l)
     ambientLightSlider->setValue(qRound(l * 100.0));
 }
 
+void CMapSettingsDialog::setShadowQuality(CRobotScene::EShadowQuality q)
+{
+    shadowQualityComboBox->setCurrentIndex(static_cast<int>(q));
+}
+
 void CMapSettingsDialog::setGridSize(float s)
 {
     gridSizeSpinBox->setValue(s);
@@ -110,6 +118,11 @@ bool CMapSettingsDialog::getAutoRefreshLight() const
 float CMapSettingsDialog::getAmbientLight() const
 {
     return static_cast<float>(ambientLightSlider->value()) / 100.0;
+}
+
+CRobotScene::EShadowQuality CMapSettingsDialog::getShadowQuality() const
+{
+    return static_cast<CRobotScene::EShadowQuality>(shadowQualityComboBox->currentIndex());
 }
 
 float CMapSettingsDialog::getGridSize() const
@@ -137,27 +150,18 @@ void CMapSettingsPreviewWidget::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
 
     painter.drawPixmap(0, 0, backGroundPixmap);
 
-    if (ambientLight > 100)
-    {
-        painter.setCompositionMode(QPainter::CompositionMode_Overlay);
-        painter.setPen(Qt::NoPen);
-        const int c = ambientLight * 127 / 100;
-        painter.setBrush(QColor(c, c, c));
-        painter.drawRect(0, 0, size().width(), size().height());
-        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-    }
-    else if (ambientLight < 100)
-    {
-        const int alpha = 255 - (ambientLight * 255 / 100);
-        painter.setBrush(QColor(0, 0, 0, alpha));
-        painter.drawRect(0, 0, size().width(), size().height());
-    }
+    painter.setCompositionMode(QPainter::CompositionMode_HardLight);
+    painter.fillRect(0, 0, width(), height(),
+                     intensityToColor((float)ambientLight / 100.0));
 
     if (gridSize)
     {
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+
         painter.setPen(QPen(Qt::blue, 0.25));
         for (int x=0; x<=size().width(); x+=gridSize)
             painter.drawLine(x, 0, x, size().height());

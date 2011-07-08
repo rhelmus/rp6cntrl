@@ -137,11 +137,13 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 QVariant CBaseGraphicsItem::itemChange(GraphicsItemChange change,
                                        const QVariant &value)
 {
+    if (change == ItemSceneHasChanged)
+        setZValue(getZValue()); // Init
     if (change == ItemSelectedHasChanged)
     {
         const bool s = value.toBool();
         updateMouseCursor(s);
-        setZValue(s ? 1.0 : 0.0);
+        setZValue(s ? 1.0 : getZValue());
     }
 
     return QGraphicsItem::itemChange(change, value);

@@ -1,9 +1,12 @@
 #ifndef MAPSETTINGSDIALOG_H
 #define MAPSETTINGSDIALOG_H
 
+#include "robotscene.h"
+
 #include <QDialog>
 
 class QCheckBox;
+class QComboBox;
 class QSlider;
 class QSpinBox;
 
@@ -16,6 +19,7 @@ class CMapSettingsDialog : public QDialog
     QSpinBox *widthSpinBox, *heightSpinBox;
     QCheckBox *refreshLightCheckBox;
     QSlider *ambientLightSlider;
+    QComboBox *shadowQualityComboBox;
     QSpinBox *gridSizeSpinBox;
     QCheckBox *snapCheckBox;
     CMapSettingsPreviewWidget *previewWidget;
@@ -28,12 +32,14 @@ public:
     void setMapSize(const QSizeF &s);
     void setAutoRefreshLight(bool a);
     void setAmbientLight(float l);
+    void setShadowQuality(CRobotScene::EShadowQuality q);
     void setGridSize(float s);
     void setAutoGridSnap(bool s);
 
     QSizeF getMapSize(void) const;
     bool getAutoRefreshLight(void) const;
     float getAmbientLight(void) const;
+    CRobotScene::EShadowQuality getShadowQuality(void) const;
     float getGridSize(void) const;
     bool getAutoGridSnap(void) const;
 };

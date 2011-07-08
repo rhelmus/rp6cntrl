@@ -23,14 +23,6 @@ QRectF getMinRect(QRectF r, qreal minw, qreal minh)
     return r;
 }
 
-QColor intensityToColor(float intensity)
-{
-    intensity = qBound(0.0f, intensity, 2.0f);
-    const float maxc = 90;
-    const int c = qRound(intensity * maxc);
-    return QColor(c, c, c);
-}
-
 QPolygonF createShadowPolygon(const QPointF &light, float rad,
                               const QPointF &vertex1, const QPointF &vertex2)
 {
@@ -108,7 +100,7 @@ CRobotScene::CRobotScene(QObject *parent) :
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
     lightingDirty(false), autoRefreshLighting(true),
-    ambientLight(0.35),
+    ambientLight(0.35), shadowQuality(SH_QUALITY_MED),
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
@@ -672,6 +664,19 @@ void CRobotScene::setAmbientLight(float l)
     }
 }
 
+void CRobotScene::setShadowQuality(EShadowQuality q)
+{
+    if (q != shadowQuality)
+    {
+        shadowQuality = q;
+        markMapEdited(true);
+
+        for (QList<SLight>::iterator it=lights.begin(); it!=lights.end(); ++it)
+            it->dirty = true;
+        handleDirtyLighting();
+    }
+}
+
 void CRobotScene::setGridSize(float s)
  {
     if (!qFuzzyCompare(s, gridSize))
@@ -713,13 +718,11 @@ void CRobotScene::saveMap(QSettings &settings)
     /* Settings:
         - Version nr*
         - Map size*
-        - Grid visible?
         - Grid size*
         - Auto snap*
         - Lights*
         - Auto refresh lighting*
         - Ambient light*
-        - Lights visible (edit mode)?
         - Dynamic walls*
         - Robot start position
         - Scale*
@@ -760,6 +763,7 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.setValue("lights", lightsvarlist);
     settings.setValue("autoRefreshLighting", autoRefreshLighting);
     settings.setValue("ambientLight", ambientLight);
+    settings.setValue("shadowQuality", shadowQuality);
     settings.setValue("walls", wallsvarlist);
     settings.setValue("boxes", boxesvarlist);
     settings.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
@@ -800,6 +804,8 @@ void CRobotScene::loadMap(QSettings &settings)
 
     autoRefreshLighting = settings.value("autoRefreshLighting", true).toBool();
     ambientLight = settings.value("ambientLight", 0.35).toFloat();
+    shadowQuality =
+            static_cast<EShadowQuality>(settings.value("shadowQuality", 1).toInt());
 
     varlist = settings.value("walls").toList();
     foreach (QVariant v, varlist)
@@ -874,9 +880,17 @@ void CRobotScene::updateLighting()
 
     startt.start();
 
-    const qreal scale = 5.0; // UNDONE: Configurable?
-    QTransform lighttrans;
+    qreal scale;
 
+    switch (shadowQuality)
+    {
+    case SH_QUALITY_LOW: scale = 6.0; break;
+    default:
+    case SH_QUALITY_MED: scale = 3.0; break;
+    case SH_QUALITY_HIGH: scale = 1.0; break;
+    }
+
+    QTransform lighttrans;
     lighttrans.scale(1.0/scale, 1.0/scale);
 
     QList<QPolygonF> obstacles;
@@ -969,7 +983,7 @@ void CRobotScene::updateLighting()
 
         bool upgradient = false;
         const QSize imsize((lights[i].item->boundingRect().size() / scale).toSize());
-        if (lights[i].image.isNull())
+        if (lights[i].image.isNull() || (lights[i].image.size() != imsize))
         {
             lights[i].image = QImage(imsize, QImage::Format_RGB32);
             lights[i].image.fill(qRgb(0, 0, 0));
@@ -1082,4 +1096,13 @@ void CRobotScene::setLightEditMode(bool v)
     }
 
     update();
+}
+
+
+QColor intensityToColor(float intensity)
+{
+    intensity = qBound(0.0f, intensity, 2.0f);
+    const float maxc = 90;
+    const int c = qRound(intensity * maxc);
+    return QColor(c, c, c);
 }
