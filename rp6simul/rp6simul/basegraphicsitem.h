@@ -19,7 +19,11 @@ class CBaseGraphicsItem : public QGraphicsObject
     void updateMouseCursor(bool selected);
     void removeMe(void);
 
+    virtual qreal getZValue(void) const { return 0.0; }
+
 protected:
+    bool getSnapsToGrid(void) const { return snapsToGrid; }
+
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);

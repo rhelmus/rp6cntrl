@@ -167,36 +167,47 @@ void CRP6Simulator::createToolbars()
     a = editMapToolBar->addAction(QIcon("../resource/follow.png"),
                                   "Toggle robot following", robotScene,
                                   SLOT(setFollowRobot(bool)));
+    connect(robotScene, SIGNAL(robotFollowingChanged(bool)), a,
+            SLOT(setChecked(bool)));
     a->setCheckable(true);
+
+
+    editMapToolBar->addSeparator();
+
+
+    a = editMapToolBar->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
+                                  this, SLOT(editMapSettings()));
 
     a = editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
                                   "Save map", this, SLOT(saveMap()));
     connect(robotScene, SIGNAL(mapEditedChanged(bool)), a,
             SLOT(setEnabled(bool)));
 
+    a = editMapToolBar->addAction(QIcon("../resource/clear.png"),
+                                  "Clear map (removes all walls and items)",
+                                  robotScene, SLOT(clearMap()));
+
 
     editMapToolBar->addSeparator();
 
 
-    updateMapLightingAction =
-            editMapToolBar->addAction(QIcon("../resource/light-refresh.png"),
-                                      "Update lighting", robotScene,
-                                      SLOT(updateLighting()));
-
-    a = editMapToolBar->addAction(QIcon("../resource/tool.png"),
-                                  "Toggle edit mode", this,
-                                  SLOT(toggleEditMap(bool)));
+    a = editMapToolBar->addAction(QIcon("../resource/grid-icon.png"),
+                                  "Toggle grid visibility",
+                                  robotScene, SLOT(setGridVisible(bool)));
     a->setCheckable(true);
-    a->setShortcut(QKeySequence("Ctrl+E"));
 
-    a = editMapToolBar->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
-                                  this, SLOT(editMapSettings()));
-    editMapActionList << a;
+    a = editMapToolBar->addAction(QIcon("../resource/light-refresh.png"),
+                                  "Update lighting", robotScene,
+                                  SLOT(updateLighting()));
 
-    a = editMapToolBar->addAction(QIcon("../resource/clear.png"),
-                                  "Clear map (removes all walls and items)",
-                                  robotScene, SLOT(clearMap()));
-    editMapActionList << a;
+    QAction *lightedita =
+            editMapToolBar->addAction(QIcon("../resource/light-mode.png"),
+                                      "Toggle light edit mode",
+                                      robotScene, SLOT(setLightEditMode(bool)));
+    lightedita->setCheckable(true);
+
+
+    editMapToolBar->addSeparator();
 
     a = editMapActionGroup->addAction(QIcon("../resource/mouse-arrow.png"),
                                       "Selection mode");
@@ -204,43 +215,26 @@ void CRP6Simulator::createToolbars()
     a->setChecked(true);
     a->setData(CRobotScene::MODE_POINT);
     editMapToolBar->addAction(a);
-    editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/wall.jpg"), "Add wall");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_WALL);
     editMapToolBar->addAction(a);
-    editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/cardboard-box.png"),
                                       "Add box obstacle");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_BOX);
     editMapToolBar->addAction(a);
-    editMapActionList << a;
 
     a = editMapActionGroup->addAction(QIcon("../resource/light-add.png"),
                                       "Add light source");
     a->setCheckable(true);
+    a->setEnabled(false);
     a->setData(CRobotScene::MODE_LIGHT);
+    connect(lightedita, SIGNAL(toggled(bool)), a, SLOT(setEnabled(bool)));
     editMapToolBar->addAction(a);
-    editMapActionList << a;
 
-    toggleLightingVisibleAction =
-            editMapToolBar->addAction(QIcon("../resource/light-icon.png"),
-                                      "Toggle light item visibility",
-                                      robotScene, SLOT(setLightItemsVisible(bool)));
-    toggleLightingVisibleAction->setCheckable(true);
-    editMapActionList << toggleLightingVisibleAction;
-
-    a = editMapToolBar->addAction(QIcon("../resource/grid-icon.png"),
-                                  "Toggle grid visibility",
-                                  robotScene, SLOT(setGridVisible(bool)));
-    a->setCheckable(true);
-    editMapActionList << a;
-
-    foreach (QAction *a, editMapActionList)
-        a->setEnabled(false);
 
     setToolBarToolTips();
 }
@@ -649,11 +643,6 @@ void CRP6Simulator::changeSceneMouseMode(QAction *a)
     const CRobotScene::EMouseMode mode =
             static_cast<CRobotScene::EMouseMode>(a->data().toInt());
     robotScene->setMouseMode(mode);
-    if (mode == CRobotScene::MODE_LIGHT)
-    {
-        toggleLightingVisibleAction->setChecked(true);
-        robotScene->setLightItemsVisible(true);
-    }
 }
 
 void CRP6Simulator::sceneMouseModeChanged(CRobotScene::EMouseMode mode)
@@ -682,14 +671,6 @@ void CRP6Simulator::editMapSettings()
         robotScene->setGridSize(dialog.getGridSize());
         robotScene->setAutoGrid(dialog.getAutoGridSnap());
     }
-}
-
-void CRP6Simulator::toggleEditMap(bool checked)
-{
-    foreach (QAction *a, editMapActionList)
-        a->setEnabled(checked);
-    updateMapLightingAction->setEnabled(!checked);
-    robotScene->setEditModeEnabled(checked);
 }
 
 void CRP6Simulator::saveMap()

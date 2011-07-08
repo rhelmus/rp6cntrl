@@ -14,7 +14,7 @@ class QSettings;
 class CRobotScene : public QGraphicsScene
 {
 public:
-    enum EMouseMode { MODE_POINT, MODE_WALL, MODE_BOX, MODE_LIGHT, MODE_DELETE };
+    enum EMouseMode { MODE_POINT, MODE_WALL, MODE_BOX, MODE_LIGHT };
 
 private:
     Q_OBJECT
@@ -27,14 +27,12 @@ private:
         QImage image, gradientImage;
         bool dirty;
         SLight(CLightGraphicsItem *it=0) : item(it), dirty(true) { }
-
     };
 
     QList<SLight> lights;
     QPixmap backGroundPixmap;
     QPixmap lightPixmap;
     bool lightingDirty, autoRefreshLighting;
-    bool lightItemsVisible;
     float ambientLight;
 
     QHash<EStaticWall, QGraphicsRectItem *> staticWalls;
@@ -51,28 +49,24 @@ private:
     QPointF mousePos, mouseDragStartPos;    
     bool dragging, draggedEnough;
     EMouseMode mouseMode;
-    bool editModeEnabled;
+    bool lightEditMode;
     bool mapEdited;
 
     float gridSize;
     bool autoGridEnabled, gridVisible;
-    QImage gridImage;
 
     QGraphicsView *getGraphicsView(void) const;
     void scaleGraphicsView(qreal f);
     void rotateView(qreal angle);
-    QRectF getDragRect(void) const;
-    QRectF getLightDragRect(void) const;
+    QRectF getDragRect(bool squared) const;
     void handleDirtyLighting(void);
     void updateMouseCursor(void);
     void updateMapSize(void);
-    void updateGrid(void);
     QGraphicsRectItem *createStaticWall(void) const;
     void updateStaticWalls(void);
     void addLight(const QPointF &p, float r);
     void addWall(const QRectF &rect);
     void addBox(const QRectF &rect);
-    void updateItemsEditMode(void);
 
 private slots:
     void removeLight(CBaseGraphicsItem *it);
@@ -95,7 +89,6 @@ public:
     explicit CRobotScene(QObject *parent = 0);
 
     void setMouseMode(EMouseMode mode, bool sign=false);
-    void setEditModeEnabled(bool e);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
     void setMapSize(const QSizeF &size);
     bool getAutoRefreshLighting(void) const { return autoRefreshLighting; }
@@ -111,18 +104,21 @@ public:
     void loadMap(QSettings &settings);
     bool getMapEdited(void) const { return mapEdited; }
 
+    static QList<QGraphicsItem *> fixedSizeItems;
+
 public slots:
     void zoomSceneIn(void);
     void zoomSceneOut(void);
-    void setFollowRobot(bool f);
+    void setFollowRobot(bool f, bool sign=false);
     void updateLighting(void);
     void clearMap(void);
     void setGridVisible(bool v)
     { if (v != gridVisible) { gridVisible = v; update(); } }
-    void setLightItemsVisible(bool v);
+    void setLightEditMode(bool v);
 
 signals:
     void mouseModeChanged(CRobotScene::EMouseMode);
+    void robotFollowingChanged(bool);
     void mapEditedChanged(bool);
 };
 

@@ -36,9 +36,7 @@ class CRP6Simulator : public QMainWindow
     QList<QAction *> mapMenuActionList;
     QAction *runPluginAction, *stopPluginAction;
     QToolBar *editMapToolBar;
-    QList<QAction *> editMapActionList;
     QActionGroup *editMapActionGroup;
-    QAction *updateMapLightingAction, *toggleLightingVisibleAction;
     QStackedWidget *mainStackedWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
@@ -86,7 +84,6 @@ private slots:
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
-    void toggleEditMap(bool checked);
     void saveMap(void);
     void exportMap(void);
     void importMap(void);

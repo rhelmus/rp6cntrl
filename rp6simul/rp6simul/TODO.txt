@@ -19,10 +19,9 @@
 - Dir separators for Windows port
 - Map:
     - Import from other project files
-    - Save/Load progress
     - Robot start
-    - Map saving/loading: disable if editing is enabled?
-    - Snap to grid when resizing
+    - Manual lighting update: force complete? Or remove it?
+    - Shadow quality (scale factor) map config option
 - Robot widget
 - Check version on project loading
 - Use qRound for float/double --> int conversions
