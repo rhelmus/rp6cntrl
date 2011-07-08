@@ -493,15 +493,10 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
     painter->save();
 
     // UNDONE
-    if (/*!editModeEnabled*/!lightImage.isNull())
+    if (/*!editModeEnabled*/!lightPixmap.isNull())
     {
         painter->setCompositionMode(QPainter::CompositionMode_HardLight);
-        painter->drawPixmap(0, 0, lightImage);
-
-        /*painter->setCompositionMode(QPainter::CompositionMode_Darken);
-        painter->fillRect(0, 0, lightImage.width(), lightImage.height(),
-                          intensityToColor(1.6));*/
-
+        painter->drawPixmap(sceneRect().toRect(), lightPixmap);
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
     }
 
@@ -787,7 +782,7 @@ void CRobotScene::saveMap(QSettings &settings)
 //    settings.setValue("shadowImage", shadowImage);
     settings.sync();
     qDebug() << "Wrote shadow image after" << etimer.elapsed() << "ms";
-    settings.setValue("lightImage", lightImage);
+    settings.setValue("lightImage", lightPixmap);
     settings.sync();
     qDebug() << "Wrote light image after" << etimer.elapsed() << "ms";
 
@@ -851,8 +846,8 @@ void CRobotScene::loadMap(QSettings &settings)
     // UNDONE!
 //    lightImage = settings.value("lightImage").value<QImage>();
 
-    if (lightImage.isNull() ||
-        (lightImage.size() != sceneRect().size().toSize()))
+    if (lightPixmap.isNull() ||
+        (lightPixmap.size() != sceneRect().size().toSize()))
     {
         qWarning("Failed to load light maps. Regenerating...");
         updateLighting();
@@ -891,10 +886,32 @@ void CRobotScene::setFollowRobot(bool f)
 
 void CRobotScene::updateLighting()
 {
+    /*
+      This function creates a pixmap that is used for lighting. Several
+      composiing (blending) modes are used to graphically present lighting/
+      darking effects. The resulting lighting image is kept at a lower scale
+      to enhance performance. A small side effect is that at especially
+      high scale factors shadows around walls appear at a small offset.
+
+      For each light an image is produced (and cached) which contain the
+      lighting gradient. On each of these images shadows are casted using
+      polygons created with createShadowPolygon(). All the light images
+      are blended ("Plus compositing") to produce the final lighting pixmap.
+      By doing so multiple overlapping light sources are supported.
+
+      The lighting gradients and shadow polygons may overlap any walls,
+      therefore as a final step all the walls are drawn over to restore
+      normal lighting on each of them.
+    */
+
     QElapsedTimer startt;
-    QElapsedTimer elti;
 
     startt.start();
+
+    const qreal scale = 5.0; // UNDONE: Configurable?
+    QTransform lighttrans;
+
+    lighttrans.scale(1.0/scale, 1.0/scale);
 
     QList<QPolygonF> obstacles;
 
@@ -904,6 +921,8 @@ void CRobotScene::updateLighting()
     foreach (QGraphicsItem *w, dynamicWalls)
         obstacles << w->mapToScene(w->boundingRect());
 
+    // Loop through all lights and generate the shadow polygons. Note that
+    // these polygons are not scaled down yet
     const int lsize = lights.size();
     for (int i=0; i<lsize; ++i)
     {
@@ -911,18 +930,6 @@ void CRobotScene::updateLighting()
             continue;
 
         lights[i].dirty = false;
-
-        bool upgradient = false;
-        const QSize imsize(lights[i].item->boundingRect().size().toSize());
-        if (lights[i].image.isNull() || (lights[i].image.size() != imsize))
-        {
-            lights[i].image = QImage(imsize, QImage::Format_RGB32);
-            lights[i].image.fill(qRgb(0, 0, 0));
-            upgradient = true;
-        }
-
-        QPainter painter(&lights[i].image);
-        painter.setPen(Qt::NoPen);
 
         const qreal rad = lights[i].item->boundingRect().width() / 2.0;
         QList<QPolygonF> shadowPolys;
@@ -937,14 +944,25 @@ void CRobotScene::updateLighting()
             {
                 if (ob.containsPoint(lightrect.center(), Qt::OddEvenFill))
                 {
+                    // Light center is within an obstacle, therefore no
+                    // light can be produced.
                     darkened = true;
                     break;
                 }
 
+                // Create obstacle polygon that is positioned relative
+                // to this (unscaled) light image.
                 QPolygonF obtr(ob.translated(-lights[i].item->pos()));
                 obtr.pop_back(); // Remove double start/end point
 
-                QList<QPointF> ambverts;
+                /*
+                 For each polygon obstacle, get the two vertices that
+                 should be used for shadow casting. When the light beam
+                 towards a vertice is seen as horizontal axis, all the
+                 other vertices should either fall above or below this
+                 point.
+                */
+                QList<QPointF> shadowverts;
                 foreach (QPointF v, obtr)
                 {
                     QLineF line(QPointF(rad, rad), v);
@@ -969,99 +987,82 @@ void CRobotScene::updateLighting()
                     }
 
                     if ((hasup && !hasdown) || (!hasup && hasdown))
-                        ambverts << v;
+                        shadowverts << v;
                 }
 
-                Q_ASSERT(ambverts.size() == 2);
+                Q_ASSERT(shadowverts.size() == 2);
 
-                if (ambverts.size() == 2)
+                if (shadowverts.size() == 2)
                 {
                     shadowPolys << createShadowPolygon(QPointF(rad, rad),
-                                                       rad, ambverts[0],
-                                                       ambverts[1]);
+                                                       rad, shadowverts[0],
+                                                       shadowverts[1]);
                 }
             }
         }
 
+        bool upgradient = false;
+        const QSize imsize((lights[i].item->boundingRect().size() / scale).toSize());
+        if (lights[i].image.isNull())
+        {
+            lights[i].image = QImage(imsize, QImage::Format_RGB32);
+            lights[i].image.fill(qRgb(0, 0, 0));
+            upgradient = true;
+        }
+
+        QPainter painter(&lights[i].image);
+        painter.setPen(Qt::NoPen);
+
         if (darkened)
         {
-            // UNDONE: cache this?
-            painter.fillRect(lights[i].item->boundingRect(), Qt::black);
+            painter.fillRect(0.0, 0.0, imsize.width(), imsize.height(),
+                             Qt::black);
             continue;
         }
 
-        elti.start();
-
-#if 0
-        QRadialGradient rg(QPointF(rad, rad), rad);
-        rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
-        rg.setColorAt(1.0, intensityToColor(0.0));
-        painter.setBrush(rg);
-        painter.drawEllipse(lights[i].item->boundingRect());
-        qDebug() << "draw grad:" << elti.elapsed();
-#else
         if (upgradient)
         {
-            const int size = 300;//lights[i].image.width();
-            lights[i].gradientImage = QImage(size, size,
-                                             QImage::Format_RGB32);
+            // Create light gradient and cache it
+            lights[i].gradientImage = QImage(imsize, QImage::Format_RGB32);
             lights[i].gradientImage.fill(qRgb(0, 0, 0));
             QPainter gradp(&lights[i].gradientImage);
-            QRadialGradient rg(QPointF(size/2.0, size/2.0), size/2.0);
+            const qreal r = imsize.width() / 2.0;
+            QRadialGradient rg(QPointF(r, r), r);
             rg.setColorAt(0.0, intensityToColor(2.0 - ambientLight));
             rg.setColorAt(1.0, intensityToColor(0.0));
             gradp.setBrush(rg);
-            gradp.drawEllipse(0, 0, size, size);
+            gradp.drawEllipse(0, 0, r*2.0, r*2.0);
         }
 
-        painter.drawImage(lights[i].item->boundingRect(),
-                          lights[i].gradientImage);
-        qDebug() << "draw grad:" << elti.elapsed();
-#endif
-        elti.restart();
+        painter.drawImage(0, 0, lights[i].gradientImage);
+        painter.drawRect(QRectF(QPointF(0.0, 0.0), imsize));
 
         painter.setBrush(Qt::black);
         painter.setRenderHint(QPainter::Antialiasing);
         foreach (QPolygonF p, shadowPolys)
-            painter.drawPolygon(p);
-
-        painter.drawPie(QRectF(lights[i].item->boundingRect().center(), QSizeF(40, 40)),
-                        30 * 16, 60 * 16);
+            painter.drawPolygon(lighttrans.map(p));
 
         painter.end();
-        qDebug() << "draw shadows:" << elti.elapsed();
     }
 
-    elti.restart();
+    const QSize lisize(sceneRect().size().toSize() / scale);
+    if (lightPixmap.isNull() || (lightPixmap.size() != lisize))
+        lightPixmap = QPixmap(lisize);
 
-    if (lightImage.isNull() ||
-        (lightImage.size() != sceneRect().size().toSize()))
-        lightImage = QPixmap(sceneRect().size().toSize());
+    lightPixmap.fill(intensityToColor(ambientLight).rgb());
 
-    lightImage.fill(intensityToColor(ambientLight).rgb());
-
-    qDebug() << "Setup lightimage:" << elti.elapsed();
-
-    QPainter lipainter(&lightImage);
+    QPainter lipainter(&lightPixmap);
     lipainter.setRenderHint(QPainter::Antialiasing);
     lipainter.setPen(Qt::NoPen);
 
-    elti.restart();
-
     lipainter.setCompositionMode(QPainter::CompositionMode_Plus);
     foreach (const SLight &l, lights)
-        lipainter.drawImage(l.item->pos(), l.image);
-
-    qDebug() << "Drawn light images:" << elti.elapsed();
-
-    elti.restart();
+        lipainter.drawImage(l.item->pos() / scale, l.image);
 
     lipainter.setCompositionMode(QPainter::CompositionMode_SourceOut);
     lipainter.setBrush(QColor(127, 127, 127));
     foreach (QPolygonF ob, obstacles)
-        lipainter.drawPolygon(ob);
-
-    qDebug() << "Drawn-over obstacles:" << elti.elapsed();
+        lipainter.drawPolygon(lighttrans.map(ob));
 
     lightingDirty = false;
     markMapEdited(true);
