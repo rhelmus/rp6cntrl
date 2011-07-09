@@ -61,9 +61,9 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent)
     createToolbars();
 
     QDockWidget *statdock, *regdock;
-    addDockWidget(Qt::RightDockWidgetArea, statdock = createStatusDock(),
+    addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
                   Qt::Vertical);
-    addDockWidget(Qt::RightDockWidgetArea, regdock = createRegisterDock(),
+    addDockWidget(Qt::LeftDockWidgetArea, regdock = createRegisterDock(),
                   Qt::Vertical);
     tabifyDockWidget(statdock, regdock);
     activateDockTab(this, "Status");
@@ -148,7 +148,7 @@ void CRP6Simulator::createToolbars()
     stopPluginAction->setEnabled(false);
 
 
-    addToolBar(Qt::LeftToolBarArea, editMapToolBar = new QToolBar("Edit map"));
+    addToolBar(editMapToolBar = new QToolBar("Edit map"));
     editMapToolBar->setEnabled(false);
 
     editMapActionGroup = new QActionGroup(this);
@@ -341,13 +341,7 @@ QDockWidget *CRP6Simulator::createStatusDock()
     QVBoxLayout *vbox = new QVBoxLayout(w);
     ret->setWidget(w);
 
-    QGroupBox *group = new QGroupBox("Clock");
-    vbox->addWidget(group);
-    QFormLayout *form = new QFormLayout(group);
-
-    form->addRow("RP6 clock (MHz)", clockDisplay = new QLCDNumber);
-
-    group = new QGroupBox("Robot");
+    QGroupBox *group = new QGroupBox("Robot");
     vbox->addWidget(group);
     QVBoxLayout *subvbox = new QVBoxLayout(group);
 
@@ -356,20 +350,26 @@ QDockWidget *CRP6Simulator::createStatusDock()
     robotStatusTreeWidget->setSortingEnabled(true);
     robotStatusTreeWidget->sortByColumn(0, Qt::AscendingOrder);
 
-    group = new QGroupBox("Drivers");
+    group = new QGroupBox("Maps");
     vbox->addWidget(group);
     subvbox = new QVBoxLayout(group);
 
     QTreeWidget *tree = new QTreeWidget;
-    tree->setHeaderLabels(QStringList() << "Driver" << "Status");
-    tree->setRootIsDecorated(false);
-    QList<QTreeWidgetItem *> items;
-    items << new QTreeWidgetItem(QStringList() << "leds") <<
-             new QTreeWidgetItem(QStringList() << "timer0") <<
-             new QTreeWidgetItem(QStringList() << "timer1") <<
-             new QTreeWidgetItem(QStringList() << "timer2") <<
-             new QTreeWidgetItem(QStringList() << "motor");
-    tree->addTopLevelItems(items);
+    tree->setHeaderHidden(true);
+
+    // UNDONE
+    QTreeWidgetItem *templitem =
+            new QTreeWidgetItem(tree, QStringList() << "Templates");
+    new QTreeWidgetItem(templitem, QStringList() << "small-simple-light");
+    new QTreeWidgetItem(templitem, QStringList() << "small-simple-nolight");
+    new QTreeWidgetItem(templitem, QStringList() << "medium-simple");
+    new QTreeWidgetItem(templitem, QStringList() << "medium-complex");
+    new QTreeWidgetItem(templitem, QStringList() << "large-maze");
+    new QTreeWidgetItem(templitem, QStringList() << "large-simple");
+    templitem->sortChildren(0, Qt::AscendingOrder);
+
+    new QTreeWidgetItem(tree, QStringList() << "Custom maps");
+
     subvbox->addWidget(tree);
 
     return ret;
@@ -518,7 +518,7 @@ void CRP6Simulator::updateClockDisplay(unsigned long hz)
         s = s.leftJustified(4, '0');
     }
 
-    clockDisplay->display(s);
+    robotStatusUpdateBuffer.append(QStringList() << "AVR" << "RP6 clock (MHz)" << s);
 }
 
 void CRP6Simulator::newProject()

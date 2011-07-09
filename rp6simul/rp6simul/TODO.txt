@@ -19,7 +19,7 @@
 - Dir separators for Windows port
 - Map:
     - Import from other project files
-    - Robot start
+    - Robot start --> only update start position/rotation when modified by user
     - Manual lighting update: force complete? Or remove it?
 - Robot widget
 - Check version on project loading

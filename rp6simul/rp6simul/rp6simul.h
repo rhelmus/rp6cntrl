@@ -44,7 +44,6 @@ class CRP6Simulator : public QMainWindow
     QPlainTextEdit *serialOutputWidget;
     QLineEdit *serialInputWidget;
     QPushButton *serialSendButton;
-    QLCDNumber *clockDisplay;
     QTreeWidget *robotStatusTreeWidget;
     QTableWidget *IORegisterTableWidget;
 

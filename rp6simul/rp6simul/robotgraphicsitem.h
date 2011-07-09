@@ -7,6 +7,8 @@
 
 class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 {
+    Q_OBJECT
+
     int leftPower, rightPower;
     int skipFrames;
 
@@ -33,6 +35,9 @@ public:
 
     void setLeftMotor(int power) { leftPower = power; }
     void setRightMotor(int power) { rightPower = power; }
+
+signals:
+    void rotationChanged(qreal);
 };
 
 #endif // ROBOTGRAPHICSITEM_H
