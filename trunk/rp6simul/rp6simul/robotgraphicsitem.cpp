@@ -166,7 +166,13 @@ bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
         const QPointF end(mapToScene(mapFromItem(pressedHandle, me->pos())));
         // 90.0 - ... : Convert from counter-clockwise + 90 to clockwise + 0
         const qreal mangle = 90.0 - QLineF(start, end).angle();
-        setRotation(mangle);
+
+        if (mangle != rotation())
+        {
+            const qreal olda = rotation();
+            setRotation(mangle);
+            emit rotationChanged(olda);
+        }
     }
 
     return false; // Propegate

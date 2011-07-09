@@ -45,6 +45,8 @@ private:
     QList<CResizablePixmapGraphicsItem *> boxes;
 
     CRobotGraphicsItem *robotGraphicsItem;
+    QPointF robotStartPosition;
+    qreal robotStartRotation;
     bool followRobot;
     qreal viewAngle;
 
@@ -79,6 +81,7 @@ private slots:
     void markLightingDirty(const QSizeF &olds);
     void markLightingDirty(float);
     void robotPosChanged(void);
+    void robotRotationChanged(void);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
@@ -92,7 +95,7 @@ public:
 
     void setMouseMode(EMouseMode mode, bool sign=false);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
-    void setMapSize(const QSizeF &size);
+    void setMapSize(const QSizeF &size, bool force=false);
     bool getAutoRefreshLighting(void) const { return autoRefreshLighting; }
     void setAutoRefreshLighting(bool a);
     float getAmbientLight(void) const { return ambientLight; }

@@ -112,10 +112,11 @@ CRobotScene::CRobotScene(QObject *parent) :
     setBackgroundBrush(Qt::darkGray);
 
     robotGraphicsItem = new CRobotGraphicsItem;
-    robotGraphicsItem->setPos(50, 450); // UNDONE
     addItem(robotGraphicsItem);
     connect(robotGraphicsItem, SIGNAL(posChanged(const QPointF &)), this,
             SLOT(robotPosChanged()));
+    connect(robotGraphicsItem, SIGNAL(rotationChanged(qreal)), this,
+            SLOT(robotRotationChanged()));
 
     qRegisterMetaTypeStreamOperators<SLightSettings>("SLightSettings");
     qRegisterMetaTypeStreamOperators<SObjectSettings>("SObjectSettings");
@@ -464,6 +465,17 @@ void CRobotScene::robotPosChanged()
         rotateView(robotGraphicsItem->rotation());
         getGraphicsView()->centerOn(robotGraphicsItem);
     }
+
+    // UNDONE: Check if moved by plugin code or by user
+    robotStartPosition = robotGraphicsItem->pos();
+    markMapEdited();
+}
+
+void CRobotScene::robotRotationChanged()
+{
+    // UNDONE: Check if moved by plugin code or by user
+    robotStartRotation = robotGraphicsItem->rotation();
+    markMapEdited();
 }
 
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
@@ -634,9 +646,49 @@ void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
     updateMouseCursor();
 }
 
-void CRobotScene::setMapSize(const QSizeF &size)
+void CRobotScene::setMapSize(const QSizeF &size, bool force)
 {
-    setSceneRect(QRectF(0.0, 0.0, size.width(), size.height()));
+    const QRectF newsrect(0.0, 0.0, size.width(), size.height());
+
+    if (!force)
+    {
+        // Check for any items outside the new rect and move them to center
+        // of the map
+        bool asked = false;
+        const QList<QGraphicsRectItem *> swalls(staticWalls.values());
+        foreach (QGraphicsItem *it, items())
+        {
+            if (it->parentItem())
+                continue; // Skip child items
+
+            QGraphicsRectItem *rit = qgraphicsitem_cast<QGraphicsRectItem *>(it);
+            if (rit && swalls.contains(rit))
+                continue; // Skip static walls
+
+            QRectF r(it->mapRectToScene(it->boundingRect()));
+            if (!newsrect.contains(r)) // Not fully contained?
+            {
+                if (!asked)
+                {
+                    if (QMessageBox::question(CRP6Simulator::getInstance(),
+                                              "Items outside new map size",
+                                              "One or more items are outside the new map size.\n"
+                                              "If you proceed these will be moved to the new center.",
+                                              QMessageBox::Ok | QMessageBox::Cancel) != QMessageBox::Ok)
+                        return;
+                    asked = true;
+                }
+
+                r.moveCenter(newsrect.center());
+                it->setPos(r.topLeft());
+
+                // UNDONE: How to handle robot?
+            }
+
+        }
+    }
+
+    setSceneRect(newsrect);
     updateMapSize();
 }
 
@@ -766,6 +818,8 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.setValue("shadowQuality", shadowQuality);
     settings.setValue("walls", wallsvarlist);
     settings.setValue("boxes", boxesvarlist);
+    settings.setValue("robotStartPosition", robotStartPosition);
+    settings.setValue("robotStartRotation", robotStartRotation);
     settings.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
 
     settings.endGroup();
@@ -791,7 +845,7 @@ void CRobotScene::loadMap(QSettings &settings)
                                         QSizeF(1000.0, 1000.0)).toSizeF());
 
     if (mapsize != sceneRect().size())
-        setMapSize(mapsize);
+        setMapSize(mapsize, true);
 
     autoGridEnabled = settings.value("autoGrid", true).toBool();
 
@@ -820,6 +874,12 @@ void CRobotScene::loadMap(QSettings &settings)
         SObjectSettings s(v.value<SObjectSettings>());
         addBox(QRectF(s.pos, s.size));
     }
+
+    robotStartPosition = settings.value("robotStartPosition",
+                                        sceneRect().center()).toPointF();
+    robotStartRotation = settings.value("robotStartRotation", 0.0).toReal();
+    robotGraphicsItem->setPos(robotStartPosition);
+    robotGraphicsItem->setRotation(robotStartRotation);
 
     const qreal scale = settings.value("scale", 1.0).toReal();
     const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
