@@ -13,12 +13,13 @@
 class QActionGroup;
 class QGraphicsView;
 class QPushButton;
-class QLCDNumber;
+class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
 class QStackedWidget;
 class QTableWidget;
 class QTreeWidget;
+class QTreeWidgetItem;
 
 class CProjectWizard;
 class CSimulator;
@@ -31,12 +32,14 @@ class CRP6Simulator : public QMainWindow
 
     CSimulator *simulator;
     QString currentProjectFile;
+    QString currentMapFile;
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
     QAction *runPluginAction, *stopPluginAction;
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
+    QLabel *placeHolderLabel;
     QStackedWidget *mainStackedWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
@@ -45,6 +48,8 @@ class CRP6Simulator : public QMainWindow
     QLineEdit *serialInputWidget;
     QPushButton *serialSendButton;
     QTreeWidget *robotStatusTreeWidget;
+    QTreeWidget *mapSelectorTreeWidget;
+    QTreeWidgetItem *mapHistoryTreeItem;
     QTableWidget *IORegisterTableWidget;
 
     QString serialTextBuffer;
@@ -63,7 +68,12 @@ class CRP6Simulator : public QMainWindow
     QDockWidget *createStatusDock(void);
     QDockWidget *createRegisterDock(void);
 
+    void updateMainStackedWidget(void);
     void openProjectFile(const QString &file);
+    void loadMapFile(const QString &file);
+    void syncMapHistoryTree(const QStringList &l);
+    void loadMapHistoryTree(void);
+    void addMapHistoryFile(const QString &file);
     void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
@@ -78,14 +88,15 @@ private slots:
     void timedUpdate(void);
     void newProject(void);
     void openProject(void);
+    void newMap(void);
+    void saveMap(void);
+    void loadMap(void);
     void runPlugin(void);
     void stopPlugin(void);
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
-    void saveMap(void);
-    void exportMap(void);
-    void importMap(void);
+    void mapSelectorItemActivated(QTreeWidgetItem *item);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);

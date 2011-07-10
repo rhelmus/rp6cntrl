@@ -11,7 +11,7 @@ class CPathInput : public QWidget
     Q_PROPERTY(QString path READ getPath WRITE setPath NOTIFY pathTextChanged USER true)
 
 public:
-    enum EPathInputMode { PATH_EXISTDIR, PATH_EXISTFILE };
+    enum EPathInputMode { PATH_EXISTDIR, PATH_EXISTFILE, PATH_NEWFILE };
 
 private:
     QString pathDescription;

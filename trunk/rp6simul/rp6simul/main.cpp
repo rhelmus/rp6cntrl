@@ -13,7 +13,15 @@ int main(int argc, char *argv[])
     sigaddset(&sset, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &sset, 0);
 #endif
+
     QApplication::setGraphicsSystem("raster"); // UNDONE
+
+    QCoreApplication::setOrganizationName("rp6simul");
+    // UNDONE
+    QCoreApplication::setOrganizationDomain("code.google.com/p/rp6simul");
+    QCoreApplication::setApplicationName("rp6simul");
+    QCoreApplication::setApplicationVersion("1.0");
+
     QApplication a(argc, argv);
     CRP6Simulator w;
     w.show();
