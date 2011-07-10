@@ -765,6 +765,19 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
     return pos;
 }
 
+void CRobotScene::newMap(QSettings &settings, const QSizeF &size)
+{
+    // NOTE: Only values without proper default are written
+
+    settings.beginGroup("map");
+
+    settings.setValue("version", 1);
+    settings.setValue("mapSize", size);
+    settings.setValue("ambientLight", 0.75);
+
+    settings.endGroup();
+}
+
 void CRobotScene::saveMap(QSettings &settings)
 {
     /* Settings:
@@ -776,10 +789,9 @@ void CRobotScene::saveMap(QSettings &settings)
         - Auto refresh lighting*
         - Ambient light*
         - Dynamic walls*
-        - Robot start position
+        - Robot start position*
         - Scale*
         - Boxes*
-        - Screenshot
     */
 
     QList<QVariant> lightsvarlist;

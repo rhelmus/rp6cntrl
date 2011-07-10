@@ -17,7 +17,7 @@ CPathInput::CPathInput(const QString &desc, EPathInputMode mode,
 
     QCompleter *comp = new QCompleter(pathEdit);
     QDirModel *dm = new QDirModel(comp);
-    if (mode == PATH_EXISTDIR)
+    if ((mode == PATH_EXISTDIR) || (mode == PATH_NEWFILE))
         dm->setFilter(dm->filter() & ~QDir::Files);
     comp->setModel(dm);
     pathEdit->setCompleter(comp);
@@ -36,7 +36,10 @@ void CPathInput::openBrowser()
                                                  pathEdit->text());
     else if (pathInputMode == PATH_EXISTFILE)
         path = QFileDialog::getOpenFileName(this, pathDescription,
-                                                 pathEdit->text());
+                                            pathEdit->text());
+    else if (pathInputMode == PATH_NEWFILE)
+        path = QFileDialog::getSaveFileName(this, pathDescription,
+                                            pathEdit->text());
 
     if (!path.isEmpty())
         pathEdit->setText(path);

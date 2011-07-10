@@ -2,6 +2,7 @@
 #include "avrtimer.h"
 #include "lua.h"
 #include "mapsettingsdialog.h"
+#include "pathinput.h"
 #include "projectsettings.h"
 #include "projectwizard.h"
 #include "resizablepixmapgraphicsitem.h"
@@ -60,6 +61,8 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent)
     createMenus();
     createToolbars();
 
+    updateMainStackedWidget();
+
     QDockWidget *statdock, *regdock;
     addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
                   Qt::Vertical);
@@ -83,26 +86,32 @@ void CRP6Simulator::createMenus()
 {
     QMenu *menu = menuBar()->addMenu("&File");
     menu->addAction("New", this, SLOT(newProject()), tr("ctrl+N"));
-    menu->addAction("Open", this, SLOT(openProject()), tr("ctrl+O"));
+    menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
+                    "Open", this, SLOT(openProject()), tr("ctrl+O"));
     menu->addMenu("Open recent...")->addAction("blah");
 
     menu->addSeparator();
 
-    QAction *a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
-                                 "Save map", this, SLOT(saveMap()));
+    menu->addAction("Quit", this, SLOT(close()), tr("ctrl+Q"));
+
+
+    menu = menuBar()->addMenu("&Map");
+
+    QAction *a = menu->addAction("New map", this, SLOT(newMap()));
+    mapMenuActionList << a;
+
+    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                        "Save map", this, SLOT(saveMap()));
     connect(robotScene, SIGNAL(mapEditedChanged(bool)), a,
             SLOT(setEnabled(bool)));
     a->setEnabled(false);
-    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
-                        "Export map as template", this, SLOT(exportMap()));
-    mapMenuActionList << a;
+
     a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
-                        "Import map template", this, SLOT(importMap()));
+                        "Load map", this, SLOT(loadMap()));
     mapMenuActionList << a;
 
     menu->addSeparator();
 
-    menu->addAction("Quit", this, SLOT(close()), tr("ctrl+Q"));
 
     menu = menuBar()->addMenu("&Edit");
     menu->addAction("Project settings");
@@ -285,16 +294,11 @@ QWidget *CRP6Simulator::createMainWidget()
     hbox = new QHBoxLayout(w);
     mainStackedWidget->addWidget(w);
 
-    QLabel *label = new QLabel("<qt>Welcome to rp6sim!<br>"
-                               "You can load/create projects from the "
-                               "<b>File</b> menu.</qt>");
-    label->setFrameStyle(QFrame::Panel | QFrame::Sunken);
-    label->setAlignment(Qt::AlignCenter);
-    label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    label->setMargin(25);
-    hbox->addWidget(label);
-
-    mainStackedWidget->setCurrentIndex(1);
+    hbox->addWidget(placeHolderLabel = new QLabel);
+    placeHolderLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    placeHolderLabel->setAlignment(Qt::AlignCenter);
+    placeHolderLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    placeHolderLabel->setMargin(25);
 
     return mainStackedWidget;
 }
@@ -350,16 +354,20 @@ QDockWidget *CRP6Simulator::createStatusDock()
     robotStatusTreeWidget->setSortingEnabled(true);
     robotStatusTreeWidget->sortByColumn(0, Qt::AscendingOrder);
 
-    group = new QGroupBox("Maps");
+    group = new QGroupBox("Map selector");
     vbox->addWidget(group);
     subvbox = new QVBoxLayout(group);
 
-    QTreeWidget *tree = new QTreeWidget;
-    tree->setHeaderHidden(true);
+    subvbox->addWidget(mapSelectorTreeWidget = new QTreeWidget);
+    mapSelectorTreeWidget->setHeaderHidden(true);
+    mapSelectorTreeWidget->setSelectionMode(QTreeWidget::SingleSelection);
+    connect(mapSelectorTreeWidget, SIGNAL(itemActivated(QTreeWidgetItem*,int)),
+            SLOT(mapSelectorItemActivated(QTreeWidgetItem*)));
 
     // UNDONE
     QTreeWidgetItem *templitem =
-            new QTreeWidgetItem(tree, QStringList() << "Templates");
+            new QTreeWidgetItem(mapSelectorTreeWidget,
+                                QStringList() << "Templates");
     new QTreeWidgetItem(templitem, QStringList() << "small-simple-light");
     new QTreeWidgetItem(templitem, QStringList() << "small-simple-nolight");
     new QTreeWidgetItem(templitem, QStringList() << "medium-simple");
@@ -368,9 +376,9 @@ QDockWidget *CRP6Simulator::createStatusDock()
     new QTreeWidgetItem(templitem, QStringList() << "large-simple");
     templitem->sortChildren(0, Qt::AscendingOrder);
 
-    new QTreeWidgetItem(tree, QStringList() << "Custom maps");
-
-    subvbox->addWidget(tree);
+    mapHistoryTreeItem = new QTreeWidgetItem(mapSelectorTreeWidget,
+                                             QStringList() << "Map history");
+    loadMapHistoryTree();
 
     return ret;
 }
@@ -406,19 +414,31 @@ QDockWidget *CRP6Simulator::createRegisterDock()
     return ret;
 }
 
-void CRP6Simulator::initLua()
+void CRP6Simulator::updateMainStackedWidget()
 {
-    simulator->initLua();
+    if (!currentProjectFile.isEmpty())
+    {
+        if (!currentMapFile.isEmpty())
+            mainStackedWidget->setCurrentIndex(0);
+        else
+        {
+            mainStackedWidget->setCurrentIndex(1);
+            placeHolderLabel->setText("<qt>Currently no map is loaded.<br>"
+                                      "To load a map use the <b>Map</b> menu or "
+                                      "select a map or template from the "
+                                      "<b>Map selector</b>.</qt>");
+        }
+    }
+    else
+    {
+        mainStackedWidget->setCurrentIndex(1);
 
-    NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
-    NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
-    NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
 
-    NLua::luaInterface.exec();
+        placeHolderLabel->setText("<qt>Welcome to rp6sim!<br>"
+                                  "You can load/create projects from the "
+                                  "<b>File</b> menu.</qt>");
 
-    // UNDONE: Needed?
-    lua_getglobal(NLua::luaInterface, "init");
-    lua_call(NLua::luaInterface, 0, 0);
+    }
 }
 
 void CRP6Simulator::openProjectFile(const QString &file)
@@ -434,13 +454,107 @@ void CRP6Simulator::openProjectFile(const QString &file)
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
     editMapToolBar->setEnabled(true);
-    mainStackedWidget->setCurrentIndex(0);
-    robotScene->loadMap(prsettings);
 
     foreach (QAction *a, mapMenuActionList)
         a->setEnabled(true);
 
     currentProjectFile = file;
+
+    updateMainStackedWidget();
+}
+
+void CRP6Simulator::loadMapFile(const QString &file)
+{
+    if (file == currentMapFile)
+        return;
+
+    QSettings s(file, QSettings::IniFormat);
+    if (verifySettingsFile(s))
+    {
+        robotScene->loadMap(s);
+        currentMapFile = file;
+        updateMainStackedWidget();
+        addMapHistoryFile(file);
+    }
+}
+
+void CRP6Simulator::syncMapHistoryTree(const QStringList &l)
+{
+    while (mapHistoryTreeItem->childCount())
+        delete mapHistoryTreeItem->child(0);
+
+    foreach (QString f, l)
+        new QTreeWidgetItem(mapHistoryTreeItem, QStringList() << f);
+}
+
+void CRP6Simulator::loadMapHistoryTree()
+{
+    QSettings settings;
+    QStringList historylist =
+            settings.value("maphistory").toStringList();
+
+    bool modified = false;
+    QStringList::iterator it = historylist.begin();
+    while (it != historylist.end())
+    {
+        if (!QFile::exists(*it))
+        {
+            modified = true;
+            it = historylist.erase(it);
+        }
+        else
+            ++it;
+    }
+
+    if (modified)
+        settings.setValue("maphistory", historylist);
+
+    syncMapHistoryTree(historylist);
+}
+
+void CRP6Simulator::addMapHistoryFile(const QString &file)
+{
+    const int max = 20; // UNDONE: Configurable?
+    QSettings settings;
+    QStringList historylist =
+            settings.value("maphistory").toStringList();
+
+    historylist.removeAll(file); // Remove any existing
+    historylist.push_front(file);
+
+    if (historylist.size() > max)
+        historylist.pop_back();
+
+    settings.setValue("maphistory", historylist);
+
+    syncMapHistoryTree(historylist);
+
+    const int size = mapHistoryTreeItem->childCount();
+    for (int i=0; i<size; ++i)
+    {
+        QTreeWidgetItem *it = mapHistoryTreeItem->child(i);
+        if (it->text(0) == file)
+        {
+//            it->setSelected(true);
+            mapSelectorTreeWidget->setCurrentItem(it);
+            break;
+        }
+    }
+}
+
+void CRP6Simulator::initLua()
+{
+    simulator->initLua();
+
+    NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
+    NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
+    NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
+
+    NLua::luaInterface.exec();
+
+    // UNDONE: Needed?
+    lua_getglobal(NLua::luaInterface, "init");
+    lua_call(NLua::luaInterface, 0, 0);
 }
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
@@ -541,6 +655,119 @@ void CRP6Simulator::openProject()
     // UNDONE: Check if running
     if (!file.isEmpty())
         openProjectFile(file);
+}
+
+void CRP6Simulator::newMap()
+{
+    QDialog dialog(this);
+    dialog.setModal(true);
+
+    QFormLayout *form = new QFormLayout(&dialog);
+
+    QComboBox *sizebox = new QComboBox;
+    sizebox->addItems(QStringList() << "Small" << "Medium" << "Large");
+    sizebox->setCurrentIndex(1);
+    form->addRow("Map size", sizebox);
+
+    CProjectSettings prsettings(currentProjectFile);
+    QLineEdit *nameinput = new QLineEdit(prsettings.value("name").toString());
+    form->addRow("Map name", nameinput);
+
+    CPathInput *dirinput = new CPathInput("Select map destination directory",
+                                          CPathInput::PATH_EXISTDIR,
+                                          QFileInfo(currentProjectFile).path());
+    form->addRow("Map directory", dirinput);
+
+    QDialogButtonBox *bbox = new QDialogButtonBox(QDialogButtonBox::Ok |
+                                                  QDialogButtonBox::Cancel);
+    connect(bbox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+    connect(bbox, SIGNAL(rejected()), &dialog, SLOT(reject()));
+    form->addWidget(bbox);
+
+    while (true)
+    {
+        if (dialog.exec() != QDialog::Accepted)
+            break;
+
+        const QString dir(dirinput->getPath());
+        QFileInfo dinfo(dir);
+        if (dir.isEmpty() || !dinfo.isDir() || !dinfo.isReadable() ||
+            !dinfo.isWritable() || !dinfo.isExecutable())
+        {
+            QMessageBox::critical(this, "Invalid map directory specified",
+                                  "The directory specified is invalid or you "
+                                  "have insufficient access permissions.");
+            continue;
+        }
+
+        const QString file(nameinput->text());
+        if (file.isEmpty())
+        {
+            QMessageBox::critical(this, "Invalid map name specified",
+                                  "Please specify a valid map name.");
+            continue;
+        }
+
+        const QString path(QDir(dir).absoluteFilePath(file + ".map"));
+        if (QFileInfo(path).isFile())
+        {
+            if (QMessageBox::warning(this, "Map file exists",
+                                     "A map with the same name already exists in "
+                                     "the directory specified. Overwrite?",
+                                     QMessageBox::Yes | QMessageBox::No) ==
+                    QMessageBox::No)
+                continue;
+
+            if (!QFile(path).remove())
+            {
+                QMessageBox::critical(this, "Remove file error",
+                                      "Could not remove existing file!");
+                break;
+            }
+        }
+
+        QSettings s(path, QSettings::IniFormat);
+        if (!verifySettingsFile(s))
+            break;
+
+        qreal size;
+        switch (sizebox->currentIndex())
+        {
+        case 0: size = 500.0; break;
+        default:
+        case 1: size = 1500.0; break;
+        case 2: size = 3000.0; break;
+        }
+
+        robotScene->newMap(s, QSizeF(size, size));
+        loadMapFile(path);
+        break;
+    }
+}
+
+void CRP6Simulator::saveMap()
+{
+    Q_ASSERT(!currentMapFile.isEmpty());
+
+    // UNDONE: Handle templates
+
+    QSettings s(currentMapFile, QSettings::IniFormat);
+
+    if (!verifySettingsFile(s))
+        return;
+
+    robotScene->saveMap(s);
+}
+
+void CRP6Simulator::loadMap()
+{
+    QString file =
+            QFileDialog::getOpenFileName(this, "Open map file",
+                                         QDir::homePath(),
+                                         "RP6 map files (*.map)");
+    // UNDONE: Check if running
+    if (!file.isEmpty())
+        loadMapFile(file);
 }
 
 void CRP6Simulator::timedUpdate()
@@ -675,28 +902,13 @@ void CRP6Simulator::editMapSettings()
     }
 }
 
-void CRP6Simulator::saveMap()
+void CRP6Simulator::mapSelectorItemActivated(QTreeWidgetItem *item)
 {
-    CProjectSettings prsettings(currentProjectFile);
-
-    if (!verifySettingsFile(prsettings))
+    if (!item)
         return;
 
-    robotScene->saveMap(prsettings);
-}
-
-void CRP6Simulator::exportMap()
-{
-    // UNDONE
-    QSettings s("export-test.rp6", QSettings::IniFormat);
-    robotScene->saveMap(s);
-}
-
-void CRP6Simulator::importMap()
-{
-    // UNDONE
-    QSettings s("export-test.rp6", QSettings::IniFormat);
-    robotScene->loadMap(s);
+    if (item->parent() == mapHistoryTreeItem)
+        loadMapFile(item->text(0));
 }
 
 void CRP6Simulator::sendSerialPressed()

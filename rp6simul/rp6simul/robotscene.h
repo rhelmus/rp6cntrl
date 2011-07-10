@@ -107,6 +107,7 @@ public:
     bool getAutoGrid(void) const { return autoGridEnabled; }
     void setAutoGrid(bool a);
     QPointF alignPosToGrid(QPointF pos) const;
+    void newMap(QSettings &settings, const QSizeF &size);
     void saveMap(QSettings &settings);
     void loadMap(QSettings &settings);
     bool getMapEdited(void) const { return mapEdited; }

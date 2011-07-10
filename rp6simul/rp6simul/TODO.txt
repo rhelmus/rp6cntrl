@@ -21,6 +21,8 @@
     - Import from other project files
     - Robot start --> only update start position/rotation when modified by user
     - Manual lighting update: force complete? Or remove it?
+    - Enable/disable menu options etc when project is loaded or not
 - Robot widget
 - Check version on project loading
 - Use qRound for float/double --> int conversions
+- Stacked main widget: list recent projects if none loaded?
