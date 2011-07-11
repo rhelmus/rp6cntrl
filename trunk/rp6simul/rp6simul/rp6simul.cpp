@@ -38,7 +38,8 @@ void activateDockTab(QObject *p, const QString &tab)
 
 CRP6Simulator *CRP6Simulator::instance = 0;
 
-CRP6Simulator::CRP6Simulator(QWidget *parent) : QMainWindow(parent)
+CRP6Simulator::CRP6Simulator(QWidget *parent) :
+    QMainWindow(parent), currentMapIsTemplate(false)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -104,6 +105,11 @@ void CRP6Simulator::createMenus()
                         "Save map", this, SLOT(saveMap()));
     connect(robotScene, SIGNAL(mapEditedChanged(bool)), a,
             SLOT(setEnabled(bool)));
+    a->setEnabled(false);
+
+    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                        "Save map As...", this, SLOT(saveMapAs()));
+    mapMenuActionList << a;
     a->setEnabled(false);
 
     a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
@@ -364,20 +370,12 @@ QDockWidget *CRP6Simulator::createStatusDock()
     connect(mapSelectorTreeWidget, SIGNAL(itemActivated(QTreeWidgetItem*,int)),
             SLOT(mapSelectorItemActivated(QTreeWidgetItem*)));
 
-    // UNDONE
-    QTreeWidgetItem *templitem =
+    mapTemplatesTreeItem =
             new QTreeWidgetItem(mapSelectorTreeWidget,
                                 QStringList() << "Templates");
-    new QTreeWidgetItem(templitem, QStringList() << "small-simple-light");
-    new QTreeWidgetItem(templitem, QStringList() << "small-simple-nolight");
-    new QTreeWidgetItem(templitem, QStringList() << "medium-simple");
-    new QTreeWidgetItem(templitem, QStringList() << "medium-complex");
-    new QTreeWidgetItem(templitem, QStringList() << "large-maze");
-    new QTreeWidgetItem(templitem, QStringList() << "large-simple");
-    templitem->sortChildren(0, Qt::AscendingOrder);
-
     mapHistoryTreeItem = new QTreeWidgetItem(mapSelectorTreeWidget,
                                              QStringList() << "Map history");
+    loadMapTemplatesTree();
     loadMapHistoryTree();
 
     return ret;
@@ -463,7 +461,7 @@ void CRP6Simulator::openProjectFile(const QString &file)
     updateMainStackedWidget();
 }
 
-void CRP6Simulator::loadMapFile(const QString &file)
+void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
 {
     if (file == currentMapFile)
         return;
@@ -474,8 +472,67 @@ void CRP6Simulator::loadMapFile(const QString &file)
         robotScene->loadMap(s);
         currentMapFile = file;
         updateMainStackedWidget();
-        addMapHistoryFile(file);
+        if (!istemplate)
+            addMapHistoryFile(file);
+        currentMapIsTemplate = istemplate;
     }
+}
+
+void CRP6Simulator::loadMapTemplatesTree()
+{
+    // NOTE: add trailing backslash to nicely construct relative paths
+    const QString templpath("../map_templates/"); // UNDONE
+    QQueue<QPair<QString, QTreeWidgetItem *> > dirqueue;
+
+    dirqueue.enqueue(qMakePair(templpath, (QTreeWidgetItem*)0));
+    while (!dirqueue.isEmpty())
+    {
+        const QPair<QString, QTreeWidgetItem *> dpair(dirqueue.dequeue());
+        qDebug() << "dirpath:" << dpair.first;
+        QDirIterator dirit(dpair.first, QStringList() << "*.map",
+                           QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
+        QTreeWidgetItem *diritem = 0;
+        while (dirit.hasNext())
+        {
+            const QString subpath(dirit.next());
+            qDebug() << "subpath:" << subpath;
+
+            if (!diritem)
+            {
+                if (!dpair.second)
+                    diritem = mapTemplatesTreeItem;
+                else
+                {
+                    const QString d(QDir(dpair.first).dirName());
+                    diritem = new QTreeWidgetItem(dpair.second,
+                                                  QStringList() << d);
+                }
+            }
+
+            if (dirit.fileInfo().isDir())
+                dirqueue.enqueue(qMakePair(subpath, diritem));
+            else
+            {
+                QString f(dirit.fileName());
+                f.remove(".map");
+                QTreeWidgetItem *sit = new QTreeWidgetItem(diritem,
+                                                           QStringList() << f);
+                sit->setData(0, Qt::UserRole, subpath);
+            }
+        }
+    }
+}
+
+bool CRP6Simulator::mapItemIsTemplate(QTreeWidgetItem *item) const
+{
+    QTreeWidgetItem *pit = item->parent();
+    while (pit)
+    {
+        if (pit == mapTemplatesTreeItem)
+            return true;
+        pit = pit->parent();
+    }
+    return false;
 }
 
 void CRP6Simulator::syncMapHistoryTree(const QStringList &l)
@@ -740,7 +797,7 @@ void CRP6Simulator::newMap()
         }
 
         robotScene->newMap(s, QSizeF(size, size));
-        loadMapFile(path);
+        loadMapFile(path, false);
         break;
     }
 }
@@ -749,14 +806,42 @@ void CRP6Simulator::saveMap()
 {
     Q_ASSERT(!currentMapFile.isEmpty());
 
-    // UNDONE: Handle templates
+    if (currentMapIsTemplate)
+    {
+        // If map is saved under another name it will be cleared
+        // automatically from being a template.
+        saveMapAs();
+        return;
+    }
 
     QSettings s(currentMapFile, QSettings::IniFormat);
 
     if (!verifySettingsFile(s))
         return;
 
+    robotScene->saveMap(s);    
+}
+
+void CRP6Simulator::saveMapAs()
+{
+    Q_ASSERT(!currentMapFile.isEmpty());
+
+    const QString projdir = QFileInfo(currentProjectFile).path();
+    const QString destfile =
+            QFileDialog::getSaveFileName(this, "Save map as", projdir,
+                                         "map files (*.map)");
+    if (destfile.isEmpty())
+        return;
+
+    QSettings s(destfile, QSettings::IniFormat);
+
+    if (!verifySettingsFile(s))
+        return;
+
     robotScene->saveMap(s);
+
+    // Sets up correct file selector settings etc.
+    loadMapFile(destfile, false);
 }
 
 void CRP6Simulator::loadMap()
@@ -767,7 +852,7 @@ void CRP6Simulator::loadMap()
                                          "RP6 map files (*.map)");
     // UNDONE: Check if running
     if (!file.isEmpty())
-        loadMapFile(file);
+        loadMapFile(file, false);
 }
 
 void CRP6Simulator::timedUpdate()
@@ -908,7 +993,10 @@ void CRP6Simulator::mapSelectorItemActivated(QTreeWidgetItem *item)
         return;
 
     if (item->parent() == mapHistoryTreeItem)
-        loadMapFile(item->text(0));
+        loadMapFile(item->text(0), false);
+    // Template map items without user data are subdirectories
+    else if (mapItemIsTemplate(item) && !item->data(0, Qt::UserRole).isNull())
+        loadMapFile(item->data(0, Qt::UserRole).toString(), true);
 }
 
 void CRP6Simulator::sendSerialPressed()
