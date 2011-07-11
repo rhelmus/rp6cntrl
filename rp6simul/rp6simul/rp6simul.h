@@ -33,6 +33,7 @@ class CRP6Simulator : public QMainWindow
     CSimulator *simulator;
     QString currentProjectFile;
     QString currentMapFile;
+    bool currentMapIsTemplate;
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
@@ -49,6 +50,7 @@ class CRP6Simulator : public QMainWindow
     QPushButton *serialSendButton;
     QTreeWidget *robotStatusTreeWidget;
     QTreeWidget *mapSelectorTreeWidget;
+    QTreeWidgetItem *mapTemplatesTreeItem;
     QTreeWidgetItem *mapHistoryTreeItem;
     QTableWidget *IORegisterTableWidget;
 
@@ -70,7 +72,9 @@ class CRP6Simulator : public QMainWindow
 
     void updateMainStackedWidget(void);
     void openProjectFile(const QString &file);
-    void loadMapFile(const QString &file);
+    void loadMapFile(const QString &file, bool istemplate);
+    void loadMapTemplatesTree(void);
+    bool mapItemIsTemplate(QTreeWidgetItem *item) const;
     void syncMapHistoryTree(const QStringList &l);
     void loadMapHistoryTree(void);
     void addMapHistoryFile(const QString &file);
@@ -90,6 +94,7 @@ private slots:
     void openProject(void);
     void newMap(void);
     void saveMap(void);
+    void saveMapAs(void);
     void loadMap(void);
     void runPlugin(void);
     void stopPlugin(void);

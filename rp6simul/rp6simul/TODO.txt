@@ -18,10 +18,10 @@
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
 - Map:
-    - Import from other project files
     - Robot start --> only update start position/rotation when modified by user
     - Manual lighting update: force complete? Or remove it?
     - Enable/disable menu options etc when project is loaded or not
+    - Map selector etc: check if valid file type?
 - Robot widget
 - Check version on project loading
 - Use qRound for float/double --> int conversions
