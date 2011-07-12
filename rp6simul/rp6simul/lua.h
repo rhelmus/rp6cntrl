@@ -34,7 +34,7 @@ void registerClassFunction(lua_CFunction func, const char *name, const char *typ
 void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr = NULL);
 void setVariable(int val, const char *var, const char *tab);
 bool checkBoolean(lua_State *l, int index);
-QMap<QString, QVariant> convertLuaTable(lua_State *l, int index);
+QHash<QString, QVariant> convertLuaTable(lua_State *l, int index);
 inline int luaAbsIndex(lua_State *l, int i)
 { return ((i < 0) && (i > LUA_REGISTRYINDEX)) ? (lua_gettop(l)+1)+i : i; }
 void pushStringList(lua_State *l, const QStringList &list);

@@ -168,8 +168,8 @@ void CNewProjectSettingsPage::getDriverList()
     luaL_checktype(NLua::luaInterface, -2, LUA_TTABLE);
     luaL_checktype(NLua::luaInterface, -1, LUA_TTABLE);
 
-    QMap<QString, QVariant> list = NLua::convertLuaTable(NLua::luaInterface, -2);
-    for(QMap<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
+    QHash<QString, QVariant> list = NLua::convertLuaTable(NLua::luaInterface, -2);
+    for(QHash<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
     {
         driverList[it.key()] = it.value().toString();
         QAction *a = new QAction(it.key(), addDriverButton->menu());

@@ -7,6 +7,7 @@
 #include "projectwizard.h"
 #include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
+#include "robotwidget.h"
 #include "simulator.h"
 #include "utils.h"
 
@@ -256,14 +257,67 @@ void CRP6Simulator::createToolbars()
 
 QWidget *CRP6Simulator::createMainWidget()
 {
+    mainStackedWidget = new QStackedWidget;
+
+    mainStackedWidget->addWidget(createProjectPlaceHolderWidget());
+    mainStackedWidget->addWidget(createRobotWidget());
+    mainStackedWidget->addWidget(createRobotSceneWidget());
+
+    return mainStackedWidget;
+}
+
+QWidget *CRP6Simulator::createProjectPlaceHolderWidget()
+{
+    // Place holder when no project is loaded
+
+    QWidget *ret = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    QLabel *label = new QLabel("<qt>Welcome to rp6sim!<br>"
+                               "You can load/create projects from the "
+                               "<b>File</b> menu.</qt>");
+    label->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    label->setAlignment(Qt::AlignCenter);
+    label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    label->setMargin(15);
+    vbox->addWidget(label, 0, Qt::AlignHCenter);
+
+    return ret;
+}
+
+QWidget *CRP6Simulator::createRobotWidget()
+{
+    // Robot widget shown when no map is loaded
+
+    QWidget *ret = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    QLabel *label = new QLabel("<qt>Currently no map is loaded.<br>"
+                              "To load a map use the <b>Map</b> menu or "
+                              "select a map or template from the "
+                              "<b>Map selector</b>.</qt>");
+    label->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    label->setAlignment(Qt::AlignCenter);
+    label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    label->setMargin(15);
+    vbox->addWidget(label, 0, Qt::AlignHCenter);
+
+    CRobotWidget *rwidget = new CRobotWidget;
+    vbox->addWidget(rwidget);
+
+    return ret;
+}
+
+QWidget *CRP6Simulator::createRobotSceneWidget()
+{
+    // Robot map scene widget shown when a map is loaded
+
+    QWidget *ret = new QWidget;
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+
     robotScene = new CRobotScene(this);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
-
-    mainStackedWidget = new QStackedWidget;
-    QWidget *w = new QWidget;
-    mainStackedWidget->addWidget(w);
-    QHBoxLayout *hbox = new QHBoxLayout(w);
 
     graphicsView = new QGraphicsView(robotScene);
     graphicsView->setRenderHints(QPainter::Antialiasing |
@@ -294,19 +348,7 @@ QWidget *CRP6Simulator::createMainWidget()
     QObject::connect(timer, SIGNAL(timeout()), robotScene, SLOT(advance()));
     timer->start(1000 / 33);
 
-
-    // Place holder when no project is loaded
-    w = new QWidget;
-    hbox = new QHBoxLayout(w);
-    mainStackedWidget->addWidget(w);
-
-    hbox->addWidget(placeHolderLabel = new QLabel);
-    placeHolderLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
-    placeHolderLabel->setAlignment(Qt::AlignCenter);
-    placeHolderLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    placeHolderLabel->setMargin(25);
-
-    return mainStackedWidget;
+    return ret;
 }
 
 QWidget *CRP6Simulator::createLogWidgets()
@@ -417,26 +459,12 @@ void CRP6Simulator::updateMainStackedWidget()
     if (!currentProjectFile.isEmpty())
     {
         if (!currentMapFile.isEmpty())
-            mainStackedWidget->setCurrentIndex(0);
+            mainStackedWidget->setCurrentIndex(2);
         else
-        {
             mainStackedWidget->setCurrentIndex(1);
-            placeHolderLabel->setText("<qt>Currently no map is loaded.<br>"
-                                      "To load a map use the <b>Map</b> menu or "
-                                      "select a map or template from the "
-                                      "<b>Map selector</b>.</qt>");
-        }
     }
     else
-    {
-        mainStackedWidget->setCurrentIndex(1);
-
-
-        placeHolderLabel->setText("<qt>Welcome to rp6sim!<br>"
-                                  "You can load/create projects from the "
-                                  "<b>File</b> menu.</qt>");
-
-    }
+        mainStackedWidget->setCurrentIndex(0);
 }
 
 void CRP6Simulator::openProjectFile(const QString &file)
@@ -480,7 +508,6 @@ void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
 
 void CRP6Simulator::loadMapTemplatesTree()
 {
-    // NOTE: add trailing backslash to nicely construct relative paths
     const QString templpath("../map_templates/"); // UNDONE
     QQueue<QPair<QString, QTreeWidgetItem *> > dirqueue;
 
@@ -592,7 +619,6 @@ void CRP6Simulator::addMapHistoryFile(const QString &file)
         QTreeWidgetItem *it = mapHistoryTreeItem->child(i);
         if (it->text(0) == file)
         {
-//            it->setSelected(true);
             mapSelectorTreeWidget->setCurrentItem(it);
             break;
         }
@@ -612,6 +638,112 @@ void CRP6Simulator::initLua()
     // UNDONE: Needed?
     lua_getglobal(NLua::luaInterface, "init");
     lua_call(NLua::luaInterface, 0, 0);
+
+    loadRobotProperties();
+}
+
+void CRP6Simulator::loadRobotProperties()
+{
+    // Load robot properties set in lua
+
+    lua_getglobal(NLua::luaInterface, "robotProperties");
+    const int propind = luaAbsIndex(NLua::luaInterface, -1);
+
+    // Loop through properties table
+    lua_pushnil(NLua::luaInterface);
+    while (lua_next(NLua::luaInterface, propind))
+    {
+        const int fieldind = NLua::luaAbsIndex(NLua::luaInterface, -1);
+
+        // According to manual we cannot use tostring directly on keys.
+        // Therefore duplicate the key first
+        lua_pushvalue(NLua::luaInterface, -2);
+        const QString key = luaL_checkstring(NLua::luaInterface, -1);
+        lua_pop(NLua::luaInterface, 1);
+
+        if (key == "scale")
+        {
+            lua_getfield(NLua::luaInterface, fieldind, "pixelsPerCm");
+            robotProperties["scale"]["radius"] =
+                    (float)luaL_checknumber(NLua::luaInterface, -1);
+            lua_pop(NLua::luaInterface, 1);
+        }
+        else
+        {
+            lua_getfield(NLua::luaInterface, fieldind, "shape");
+            const QString shape = luaL_checkstring(NLua::luaInterface, -1);
+            lua_pop(NLua::luaInterface, 1);
+
+            qDebug() << "key/shape:" << key << shape;
+
+            TRobotPropertyFields fields;
+
+            if ((shape == "point") || (shape == "ellips"))
+            {
+                lua_getfield(NLua::luaInterface, fieldind, "pos");
+
+                lua_rawgeti(NLua::luaInterface, -1, 1);
+                const int x = luaL_checkinteger(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                lua_rawgeti(NLua::luaInterface, -1, 2);
+                const int y = luaL_checkinteger(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                fields["pos"] = QPoint(x, y);
+
+                lua_pop(NLua::luaInterface, 1); // Pop "pos" table
+            }
+
+            if (shape == "ellips")
+            {
+                lua_getfield(NLua::luaInterface, fieldind, "radius");
+                fields["radius"] = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+            }
+            else if (shape == "polygon")
+            {
+                lua_getfield(NLua::luaInterface, fieldind, "points");
+                QPolygon polygon;
+                const int size = lua_objlen(NLua::luaInterface, -1);
+                for (int i=1; i<=size; ++i)
+                {
+                    lua_rawgeti(NLua::luaInterface, -1, i);
+
+                    lua_rawgeti(NLua::luaInterface, -1, 1);
+                    const int x = luaL_checkinteger(NLua::luaInterface, -1);
+                    lua_pop(NLua::luaInterface, 1);
+
+                    lua_rawgeti(NLua::luaInterface, -1, 2);
+                    const int y = luaL_checkinteger(NLua::luaInterface, -1);
+                    lua_pop(NLua::luaInterface, 1);
+
+                    lua_pop(NLua::luaInterface, 1); // Pop polygon table
+
+                    polygon << QPoint(x, y);
+                }
+
+                fields["polygon"] = polygon;
+
+                lua_pop(NLua::luaInterface, 1); // Pop points table
+            }
+
+            robotProperties[key] = fields;
+        }
+
+        lua_pop(NLua::luaInterface, 1); // Remove value, keep original key
+    }
+
+    lua_pop(NLua::luaInterface, 1); // Pop properties table
+
+    for (TRobotProperties::iterator it=robotProperties.begin();
+         it!=robotProperties.end(); ++it)
+    {
+        qDebug() << "Property:" << it.key();
+        for (TRobotPropertyFields::iterator fit=it.value().begin();
+             fit!=it.value().end(); ++fit)
+            qDebug() << "\tfield/value:" << fit.key() << fit.value().toString();
+    }
 }
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const

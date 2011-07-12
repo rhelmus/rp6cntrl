@@ -30,17 +30,20 @@ class CRP6Simulator : public QMainWindow
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
+    typedef QHash<QString, QVariant> TRobotPropertyFields;
+    typedef QHash<QString, TRobotPropertyFields> TRobotProperties;
+
     CSimulator *simulator;
+    TRobotProperties robotProperties;
     QString currentProjectFile;
     QString currentMapFile;
-    bool currentMapIsTemplate;
+    bool currentMapIsTemplate;    
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
     QAction *runPluginAction, *stopPluginAction;
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
-    QLabel *placeHolderLabel;
     QStackedWidget *mainStackedWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
@@ -66,6 +69,9 @@ class CRP6Simulator : public QMainWindow
     void setToolBarToolTips(void);
     void createToolbars(void);
     QWidget *createMainWidget(void);
+    QWidget *createProjectPlaceHolderWidget(void);
+    QWidget *createRobotWidget(void);
+    QWidget *createRobotSceneWidget(void);
     QWidget *createLogWidgets(void);
     QDockWidget *createStatusDock(void);
     QDockWidget *createRegisterDock(void);
@@ -79,6 +85,7 @@ class CRP6Simulator : public QMainWindow
     void loadMapHistoryTree(void);
     void addMapHistoryFile(const QString &file);
     void initLua(void);
+    void loadRobotProperties(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
 
