@@ -58,7 +58,8 @@ SOURCES += main.cpp\
     ../lua/lauxlib.c \
     ../lua/lapi.c \
     clock.cpp \
-    progressdialog.cpp
+    progressdialog.cpp \
+    robotwidget.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -103,7 +104,8 @@ HEADERS  += rp6simul.h \
     ../lua/lua.hpp \
     clock.h \
     graphicsitemtypes.h \
-    progressdialog.h
+    progressdialog.h \
+    robotwidget.h
 
 OTHER_FILES += \
     TODO.txt \
@@ -116,6 +118,7 @@ OTHER_FILES += \
     lua/drivers/portlog.lua \
     lua/drivers/led.lua \
     lua/drivers/adc.lua \
-    lua/drivers/acs.lua
+    lua/drivers/acs.lua \
+    lua/properties.lua
 
 INCLUDEPATH += ../lua

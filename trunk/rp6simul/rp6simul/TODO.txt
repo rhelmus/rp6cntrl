@@ -22,6 +22,8 @@
     - Manual lighting update: force complete? Or remove it?
     - Enable/disable menu options etc when project is loaded or not
     - Map selector etc: check if valid file type?
+    - Ask save file when opening another map
+    - Center view on robot after map load
 - Robot widget
 - Check version on project loading
 - Use qRound for float/double --> int conversions

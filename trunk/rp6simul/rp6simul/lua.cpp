@@ -232,9 +232,9 @@ bool checkBoolean(lua_State *l, int index)
     return lua_toboolean(luaInterface, index);
 }
 
-QMap<QString, QVariant> convertLuaTable(lua_State *l, int index)
+QHash<QString, QVariant> convertLuaTable(lua_State *l, int index)
 {
-    QMap<QString, QVariant> ret;
+    QHash<QString, QVariant> ret;
     const int tabind = luaAbsIndex(l, index);
 
     lua_pushnil(l);

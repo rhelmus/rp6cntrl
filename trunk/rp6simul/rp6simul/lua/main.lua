@@ -186,3 +186,5 @@ function driver(name)
     setfenv(2, ret)
     return ret
 end
+
+dofile("lua/properties.lua")
