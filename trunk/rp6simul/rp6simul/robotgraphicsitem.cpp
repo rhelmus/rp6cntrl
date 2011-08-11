@@ -1,6 +1,7 @@
 #include "handlegraphicsitem.h"
 #include "lightgraphicsitem.h"
 #include "robotgraphicsitem.h"
+#include "utils.h"
 
 #include <QtGui>
 
@@ -21,9 +22,13 @@ bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles)
 }
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
-    : CResizablePixmapGraphicsItem(QPixmap("../resource/rp6-top.png"), false, parent),
+    : CResizablePixmapGraphicsItem(parent),
       leftPower(0), rightPower(0), skipFrames(0), pressedHandle(0)
 {
+    QPixmap pm("../resource/rp6-top.png");
+    origRobotSize = pm.size();
+    setPixmap(pm.scaledToWidth(120, Qt::SmoothTransformation), false);
+
     setTransformOriginPoint(boundingRect().center());
     setResizable(false);
     setDeletable(false);
@@ -201,6 +206,25 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 {
     CResizablePixmapGraphicsItem::paint(painter, option, widget);
 
+    // Equal aspect ratio, so scaling equals for width and height
+    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
+    const QPoint base(0, 0);
+
+    if (enabledLEDs[LED1])
+        drawLED(*painter, "led1", base, scale);
+    if (enabledLEDs[LED2])
+        drawLED(*painter, "led2", base, scale);
+    if (enabledLEDs[LED3])
+        drawLED(*painter, "led3", base, scale);
+    if (enabledLEDs[LED4])
+        drawLED(*painter, "led4", base, scale);
+    if (enabledLEDs[LED5])
+        drawLED(*painter, "led5", base, scale);
+    if (enabledLEDs[LED6])
+        drawLED(*painter, "led6", base, scale);
+
+#if 0
+    // UNDONE
     QPointF c(boundingRect().center());
     QLineF line(c.x(), 0.0, c.x(), -100.0);
 
@@ -227,4 +251,5 @@ void CRobotGraphicsItem::paint(QPainter *painter,
     }
 
     painter->drawLine(line);
+#endif
 }

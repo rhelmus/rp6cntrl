@@ -10,6 +10,8 @@
 #include "lua.h"
 #include "robotscene.h"
 
+enum ELEDType { LED1, LED2, LED3, LED4, LED5, LED6, ACSL, ACSR };
+
 class QActionGroup;
 class QGraphicsView;
 class QPushButton;
@@ -22,6 +24,7 @@ class QTreeWidget;
 class QTreeWidgetItem;
 
 class CProjectWizard;
+class CRobotWidget;
 class CSimulator;
 
 class CRP6Simulator : public QMainWindow
@@ -30,11 +33,7 @@ class CRP6Simulator : public QMainWindow
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
-    typedef QHash<QString, QVariant> TRobotPropertyFields;
-    typedef QHash<QString, TRobotPropertyFields> TRobotProperties;
-
     CSimulator *simulator;
-    TRobotProperties robotProperties;
     QString currentProjectFile;
     QString currentMapFile;
     bool currentMapIsTemplate;    
@@ -45,6 +44,7 @@ class CRP6Simulator : public QMainWindow
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
     QStackedWidget *mainStackedWidget;
+    CRobotWidget *robotWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     QPlainTextEdit *logWidget;
@@ -85,7 +85,6 @@ class CRP6Simulator : public QMainWindow
     void loadMapHistoryTree(void);
     void addMapHistoryFile(const QString &file);
     void initLua(void);
-    void loadRobotProperties(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
 
@@ -93,6 +92,7 @@ class CRP6Simulator : public QMainWindow
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
+    static int luaEnableLED(lua_State *l);
 
 private slots:
     void updateClockDisplay(unsigned long hz);

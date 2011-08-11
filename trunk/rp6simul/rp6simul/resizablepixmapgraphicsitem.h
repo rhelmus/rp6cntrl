@@ -20,6 +20,7 @@ class CResizablePixmapGraphicsItem : public CBaseGraphicsItem
     mutable bool hasShape;
 
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
+    void createHandles(void);
     void adjustHandles(void);
     void updateGeometry(const QPointF &mousepos);
 
@@ -32,10 +33,12 @@ protected:
 public:
     CResizablePixmapGraphicsItem(const QPixmap &pm, bool t,
                                  QGraphicsItem *parent = 0);
+    CResizablePixmapGraphicsItem(QGraphicsItem *parent = 0);
 
     QRectF boundingRect(void) const { return boundRect; }
     QPainterPath shape(void) const;
 
+    void setPixmap(const QPixmap &pm, bool t);
     void setSize(const QSizeF &s);
     void setSize(qreal w, qreal h) { setSize(QSizeF(w, h)); }
     void setResizable(bool r);

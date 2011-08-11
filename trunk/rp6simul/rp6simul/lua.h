@@ -18,14 +18,13 @@ public:
     CLuaInterface(void);
     ~CLuaInterface(void);
 
-    void exec(void);
-
     operator lua_State*(void) { return luaState; }
 };
 
 extern CLuaInterface luaInterface;
 
 void stackDump(lua_State *l);
+void luaError(lua_State *l, bool fatal);
 void registerFunction(lua_CFunction func, const char *name, void *d=0);
 void registerFunction(lua_CFunction func, const char *name, const char *tab,
                       void *d=0);

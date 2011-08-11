@@ -9,17 +9,16 @@ CResizablePixmapGraphicsItem::CResizablePixmapGraphicsItem(const QPixmap &pm,
     : CBaseGraphicsItem(parent), pixmap(pm), tiled(t), isResizable(true),
       pressedHandle(0), hasShape(false)
 {
-    addHandle(CHandleGraphicsItem::HANDLE_LEFT);
-    addHandle(CHandleGraphicsItem::HANDLE_RIGHT);
-    addHandle(CHandleGraphicsItem::HANDLE_TOP);
-    addHandle(CHandleGraphicsItem::HANDLE_BOTTOM);
-    addHandle(CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_TOP);
-    addHandle(CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_BOTTOM);
-    addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_TOP);
-    addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_BOTTOM);
-
+    createHandles();
     boundRect.setSize(pm.size()); // Default size to pixmap size
     adjustHandles();
+}
+
+CResizablePixmapGraphicsItem::CResizablePixmapGraphicsItem(QGraphicsItem *parent)
+    : CBaseGraphicsItem(parent), isResizable(true), pressedHandle(0),
+      hasShape(false)
+{
+    createHandles();
 }
 
 void CResizablePixmapGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -41,6 +40,18 @@ void CResizablePixmapGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlag
         handle->setCursor(Qt::SizeBDiagCursor);
 
     handles[pos] = handle;
+}
+
+void CResizablePixmapGraphicsItem::createHandles()
+{
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT);
+    addHandle(CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_BOTTOM);
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_LEFT | CHandleGraphicsItem::HANDLE_BOTTOM);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_TOP);
+    addHandle(CHandleGraphicsItem::HANDLE_RIGHT | CHandleGraphicsItem::HANDLE_BOTTOM);
 }
 
 void CResizablePixmapGraphicsItem::adjustHandles()
@@ -216,6 +227,19 @@ QPainterPath CResizablePixmapGraphicsItem::shape() const
     }
 
     return pmShape;
+}
+
+void CResizablePixmapGraphicsItem::setPixmap(const QPixmap &pm, bool t)
+{
+    pixmap = pm;
+    tiled = t;
+    if (boundingRect().isNull())
+    {
+        prepareGeometryChange();
+        boundRect.setSize(pm.size()); // Default
+    }
+    adjustHandles();
+    hasShape = false;
 }
 
 void CResizablePixmapGraphicsItem::setSize(const QSizeF &s)

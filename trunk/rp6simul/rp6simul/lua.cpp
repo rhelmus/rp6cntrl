@@ -21,15 +21,6 @@ const luaL_Reg libTable[] = {
     { NULL, NULL }
 };
 
-void luaError(lua_State *l, bool fatal)
-{
-    const char *errmsg = lua_tostring(l, -1);
-    if (!fatal)
-        qCritical() << "Lua error: " << errmsg << "\n";
-    else
-        qFatal("Lua error: %s\n", errmsg);
-}
-
 // Set global variable at stack
 void setGlobalVar(const char *var, const char *tab)
 {
@@ -106,14 +97,6 @@ CLuaInterface::~CLuaInterface()
     }
 }
 
-void CLuaInterface::exec()
-{
-    const QString p = QDir::toNativeSeparators("lua/main.lua");
-    if (luaL_dofile(luaState, qPrintable(p)))
-        luaError(luaState, true);
-}
-
-
 // Based from a example in the book "Programming in Lua"
 void stackDump(lua_State *l)
 {
@@ -139,6 +122,16 @@ void stackDump(lua_State *l)
         }
     }
     qDebug("---------------\n");  /* end the listing */
+}
+
+void luaError(lua_State *l, bool fatal)
+{
+    // UNDONE
+    const char *errmsg = lua_tostring(l, -1);
+    if (!fatal)
+        qCritical() << "Lua error: " << errmsg << "\n";
+    else
+        qFatal("Lua error: %s\n", errmsg);
 }
 
 void registerFunction(lua_CFunction func, const char *name, void *d)
