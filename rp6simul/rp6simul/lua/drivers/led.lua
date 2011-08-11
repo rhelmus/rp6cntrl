@@ -34,6 +34,7 @@ local function updateLEDs(port)
             log(string.format("LED %d %s\n", l, (e and "enabled") or "disabled"))
             LEDInfo.LEDStatus[l] = e
             updateRobotStatus("leds", tostring(l), (e and "ON") or "OFF")
+            enableLED("led" .. tostring(l), e)
         end
     end
 

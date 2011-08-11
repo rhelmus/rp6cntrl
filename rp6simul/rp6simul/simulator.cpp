@@ -371,6 +371,128 @@ void CSimulator::setLuaAVRConstants()
 #undef SET_LUA_CONSTANT
 }
 
+void CSimulator::loadRobotProperties()
+{
+    // Load robot properties set in lua
+
+    lua_getglobal(NLua::luaInterface, "robotProperties");
+    const int propind = luaAbsIndex(NLua::luaInterface, -1);
+
+    // Loop through properties table
+    lua_pushnil(NLua::luaInterface);
+    while (lua_next(NLua::luaInterface, propind))
+    {
+        const int fieldind = NLua::luaAbsIndex(NLua::luaInterface, -1);
+
+        // According to manual we cannot use tostring directly on keys.
+        // Therefore duplicate the key first
+        lua_pushvalue(NLua::luaInterface, -2);
+        const QString key = luaL_checkstring(NLua::luaInterface, -1);
+        lua_pop(NLua::luaInterface, 1);
+
+        if (key == "scale")
+        {
+            lua_getfield(NLua::luaInterface, fieldind, "cmPerPixel");
+            robotProperties["scale"]["cmPerPixel"] =
+                    (float)luaL_checknumber(NLua::luaInterface, -1);
+            lua_pop(NLua::luaInterface, 1);
+        }
+        else
+        {
+            lua_getfield(NLua::luaInterface, fieldind, "shape");
+            const QString shape = luaL_checkstring(NLua::luaInterface, -1);
+            lua_pop(NLua::luaInterface, 1);
+
+            qDebug() << "key/shape:" << key << shape;
+
+            TRobotPropertyFields fields;
+
+            if ((shape == "point") || (shape == "ellips"))
+            {
+                lua_getfield(NLua::luaInterface, fieldind, "pos");
+
+                lua_rawgeti(NLua::luaInterface, -1, 1);
+                const int x = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                lua_rawgeti(NLua::luaInterface, -1, 2);
+                const int y = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                fields["pos"] = QPoint(x, y);
+
+                lua_pop(NLua::luaInterface, 1); // Pop "pos" table
+            }
+
+            if (shape == "ellips")
+            {
+                lua_getfield(NLua::luaInterface, fieldind, "radius");
+                fields["radius"] = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                lua_getfield(NLua::luaInterface, fieldind, "color");
+
+                lua_rawgeti(NLua::luaInterface, -1, 1);
+                const int r = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                lua_rawgeti(NLua::luaInterface, -1, 2);
+                const int g = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                lua_rawgeti(NLua::luaInterface, -1, 3);
+                const int b = luaL_checkint(NLua::luaInterface, -1);
+                lua_pop(NLua::luaInterface, 1);
+
+                fields["color"] = QColor(r, g, b);
+
+                lua_pop(NLua::luaInterface, 1); // Pop "color" table
+            }
+            else if (shape == "polygon")
+            {
+                lua_getfield(NLua::luaInterface, fieldind, "points");
+                QPolygon polygon;
+                const int size = lua_objlen(NLua::luaInterface, -1);
+                for (int i=1; i<=size; ++i)
+                {
+                    lua_rawgeti(NLua::luaInterface, -1, i);
+
+                    lua_rawgeti(NLua::luaInterface, -1, 1);
+                    const int x = luaL_checkint(NLua::luaInterface, -1);
+                    lua_pop(NLua::luaInterface, 1);
+
+                    lua_rawgeti(NLua::luaInterface, -1, 2);
+                    const int y = luaL_checkint(NLua::luaInterface, -1);
+                    lua_pop(NLua::luaInterface, 1);
+
+                    lua_pop(NLua::luaInterface, 1); // Pop polygon table
+
+                    polygon << QPoint(x, y);
+                }
+
+                fields["polygon"] = polygon;
+
+                lua_pop(NLua::luaInterface, 1); // Pop points table
+            }
+
+            robotProperties[key] = fields;
+        }
+
+        lua_pop(NLua::luaInterface, 1); // Remove value, keep original key
+    }
+
+    lua_pop(NLua::luaInterface, 1); // Pop properties table
+
+    for (TRobotProperties::iterator it=robotProperties.begin();
+         it!=robotProperties.end(); ++it)
+    {
+        qDebug() << "Property:" << it.key();
+        for (TRobotPropertyFields::iterator fit=it.value().begin();
+             fit!=it.value().end(); ++fit)
+            qDebug() << "\tfield/value:" << fit.key() << fit.value().toString();
+    }
+}
+
 void CSimulator::terminateAVRClock()
 {
     qDebug() << "Terminating AVR clock thread";
@@ -806,6 +928,7 @@ void CSimulator::initLua()
 {
     setLuaIOTypes();
     setLuaAVRConstants();
+    loadRobotProperties();
 
     // avr
     NLua::registerFunction(luaAvrGetIORegister, "getIORegister", "avr");

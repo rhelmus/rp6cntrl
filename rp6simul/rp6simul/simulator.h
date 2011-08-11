@@ -67,11 +67,16 @@ class CSimulator : public QObject
     QStringList currentDriverList;
     QLibrary RP6Plugin;
 
+    typedef QHash<QString, QVariant> TRobotPropertyFields;
+    typedef QHash<QString, TRobotPropertyFields> TRobotProperties;
+    TRobotProperties robotProperties;
+
     static CSimulator *instance;
 
     void initAVRClock(void);
     void setLuaIOTypes(void);
     void setLuaAVRConstants(void);
+    void loadRobotProperties(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     bool initPlugin(void);
@@ -115,6 +120,8 @@ public:
     void stopPlugin(void);
     const TIORegisterData *getIORegisterArray(void) const { return IORegisterData; }
     QReadWriteLock &getIORegisterLock(void) { return IORegisterReadWriteLock; }
+    QVariant getRobotProperty(const QString &prop, const QString &field) const
+    { return robotProperties[prop][field]; }
 
     static CSimulator *getInstance(void) { return instance; }
 

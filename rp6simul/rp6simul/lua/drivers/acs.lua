@@ -78,12 +78,14 @@ function handleIOData(type, data)
         if e ~= ACSInfo.leftEnabled then
             ACSInfo.leftEnabled = e
             log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
+            enableLED("acsl", e)
         end
     elseif type == avr.IO_PORTC then
         local e = not bit.isSet(data, ACSFlags.ACS_R)
         if e ~= ACSInfo.rightEnabled then
             ACSInfo.rightEnabled = e
             log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
+            enableLED("acsr", e)
         end
     end
 end

@@ -302,8 +302,7 @@ QWidget *CRP6Simulator::createRobotWidget()
     label->setMargin(15);
     vbox->addWidget(label, 0, Qt::AlignHCenter);
 
-    CRobotWidget *rwidget = new CRobotWidget;
-    vbox->addWidget(rwidget);
+    vbox->addWidget(robotWidget = new CRobotWidget);
 
     return ret;
 }
@@ -627,123 +626,22 @@ void CRP6Simulator::addMapHistoryFile(const QString &file)
 
 void CRP6Simulator::initLua()
 {
+    // Execute main lua file. Do this before initializing simulator, as it
+    // needs the lua definitions (ie properties).
+    const QString p = QDir::toNativeSeparators("lua/main.lua");
+    if (luaL_dofile(NLua::luaInterface, qPrintable(p)))
+        luaError(NLua::luaInterface, true);
+
     simulator->initLua();
 
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
     NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
-
-    NLua::luaInterface.exec();
+    NLua::registerFunction(luaEnableLED, "enableLED");
 
     // UNDONE: Needed?
     lua_getglobal(NLua::luaInterface, "init");
     lua_call(NLua::luaInterface, 0, 0);
-
-    loadRobotProperties();
-}
-
-void CRP6Simulator::loadRobotProperties()
-{
-    // Load robot properties set in lua
-
-    lua_getglobal(NLua::luaInterface, "robotProperties");
-    const int propind = luaAbsIndex(NLua::luaInterface, -1);
-
-    // Loop through properties table
-    lua_pushnil(NLua::luaInterface);
-    while (lua_next(NLua::luaInterface, propind))
-    {
-        const int fieldind = NLua::luaAbsIndex(NLua::luaInterface, -1);
-
-        // According to manual we cannot use tostring directly on keys.
-        // Therefore duplicate the key first
-        lua_pushvalue(NLua::luaInterface, -2);
-        const QString key = luaL_checkstring(NLua::luaInterface, -1);
-        lua_pop(NLua::luaInterface, 1);
-
-        if (key == "scale")
-        {
-            lua_getfield(NLua::luaInterface, fieldind, "pixelsPerCm");
-            robotProperties["scale"]["radius"] =
-                    (float)luaL_checknumber(NLua::luaInterface, -1);
-            lua_pop(NLua::luaInterface, 1);
-        }
-        else
-        {
-            lua_getfield(NLua::luaInterface, fieldind, "shape");
-            const QString shape = luaL_checkstring(NLua::luaInterface, -1);
-            lua_pop(NLua::luaInterface, 1);
-
-            qDebug() << "key/shape:" << key << shape;
-
-            TRobotPropertyFields fields;
-
-            if ((shape == "point") || (shape == "ellips"))
-            {
-                lua_getfield(NLua::luaInterface, fieldind, "pos");
-
-                lua_rawgeti(NLua::luaInterface, -1, 1);
-                const int x = luaL_checkinteger(NLua::luaInterface, -1);
-                lua_pop(NLua::luaInterface, 1);
-
-                lua_rawgeti(NLua::luaInterface, -1, 2);
-                const int y = luaL_checkinteger(NLua::luaInterface, -1);
-                lua_pop(NLua::luaInterface, 1);
-
-                fields["pos"] = QPoint(x, y);
-
-                lua_pop(NLua::luaInterface, 1); // Pop "pos" table
-            }
-
-            if (shape == "ellips")
-            {
-                lua_getfield(NLua::luaInterface, fieldind, "radius");
-                fields["radius"] = luaL_checkint(NLua::luaInterface, -1);
-                lua_pop(NLua::luaInterface, 1);
-            }
-            else if (shape == "polygon")
-            {
-                lua_getfield(NLua::luaInterface, fieldind, "points");
-                QPolygon polygon;
-                const int size = lua_objlen(NLua::luaInterface, -1);
-                for (int i=1; i<=size; ++i)
-                {
-                    lua_rawgeti(NLua::luaInterface, -1, i);
-
-                    lua_rawgeti(NLua::luaInterface, -1, 1);
-                    const int x = luaL_checkinteger(NLua::luaInterface, -1);
-                    lua_pop(NLua::luaInterface, 1);
-
-                    lua_rawgeti(NLua::luaInterface, -1, 2);
-                    const int y = luaL_checkinteger(NLua::luaInterface, -1);
-                    lua_pop(NLua::luaInterface, 1);
-
-                    lua_pop(NLua::luaInterface, 1); // Pop polygon table
-
-                    polygon << QPoint(x, y);
-                }
-
-                fields["polygon"] = polygon;
-
-                lua_pop(NLua::luaInterface, 1); // Pop points table
-            }
-
-            robotProperties[key] = fields;
-        }
-
-        lua_pop(NLua::luaInterface, 1); // Remove value, keep original key
-    }
-
-    lua_pop(NLua::luaInterface, 1); // Pop properties table
-
-    for (TRobotProperties::iterator it=robotProperties.begin();
-         it!=robotProperties.end(); ++it)
-    {
-        qDebug() << "Property:" << it.key();
-        for (TRobotPropertyFields::iterator fit=it.value().begin();
-             fit!=it.value().end(); ++fit)
-            qDebug() << "\tfield/value:" << fit.key() << fit.value().toString();
-    }
 }
 
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
@@ -808,6 +706,38 @@ int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
         strtree << luaL_checkstring(l, i);
 
     instance->robotStatusUpdateBuffer.append(strtree);
+    return 0;
+}
+
+int CRP6Simulator::luaEnableLED(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    const char *led = luaL_checkstring(l, 1);
+    const bool e = NLua::checkBoolean(l, 2);
+
+    ELEDType ledtype;
+
+    if (!strcmp(led, "led1"))
+        ledtype = LED1;
+    else if (!strcmp(led, "led2"))
+        ledtype = LED2;
+    else if (!strcmp(led, "led3"))
+        ledtype = LED3;
+    else if (!strcmp(led, "led4"))
+        ledtype = LED4;
+    else if (!strcmp(led, "led5"))
+        ledtype = LED5;
+    else if (!strcmp(led, "led6"))
+        ledtype = LED6;
+    else if (!strcmp(led, "acsl"))
+        ledtype = ACSL;
+    else if (!strcmp(led, "acsr"))
+        ledtype = ACSR;
+
+    instance->robotWidget->enableLED(ledtype, e);
+    instance->robotScene->getRobotItem()->enableLED(ledtype, e);
+
     return 0;
 }
 

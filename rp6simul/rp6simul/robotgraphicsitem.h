@@ -2,13 +2,15 @@
 #define ROBOTGRAPHICSITEM_H
 
 #include "handlegraphicsitem.h"
-
 #include "resizablepixmapgraphicsitem.h"
+#include "rp6simul.h"
 
 class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 {
     Q_OBJECT
 
+    QSize origRobotSize;
+    QMap<ELEDType, bool> enabledLEDs;
     int leftPower, rightPower;
     int skipFrames;
 
@@ -33,6 +35,7 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
+    void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
     void setLeftMotor(int power) { leftPower = power; }
     void setRightMotor(int power) { rightPower = power; }
 
