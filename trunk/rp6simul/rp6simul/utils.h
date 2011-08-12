@@ -6,9 +6,9 @@
 #include <time.h>
 
 class QPainter;
-class QPoint;
 class QSettings;
 class QString;
+class QTransform;
 
 inline unsigned long getUSDiff(const timespec &start, const timespec &end)
 {
@@ -18,6 +18,6 @@ inline unsigned long getUSDiff(const timespec &start, const timespec &end)
 
 bool verifySettingsFile(QSettings &file);
 void drawLED(QPainter &painter, const char *propname,
-             const QPoint &base, qreal scale);
+             const QTransform &tr, qreal scale);
 
 #endif // UTILS_H

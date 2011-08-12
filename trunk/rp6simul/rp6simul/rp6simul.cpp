@@ -666,6 +666,37 @@ void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
     logWidget->appendHtml(getLogOutput(type, text));
 }
 
+void CRP6Simulator::appendRobotStatusUpdate(const QStringList &strtree)
+{
+    QMutexLocker statlocker(&robotStatusMutex);
+
+    // Check for earlier appearences
+    const int size = strtree.size();
+    bool present = false;
+    for (QList<QStringList>::iterator it=robotStatusUpdateBuffer.begin();
+         it!=robotStatusUpdateBuffer.end(); ++it)
+    {
+        const int othersize = it->size();
+        if (size == othersize)
+        {
+            for (int i=0; i<(size-1); ++i)
+            {
+                present = (strtree[i] == (*it)[i]);
+                if (!present)
+                    break;
+            }
+            if (present)
+            {
+                (*it)[size-1] = strtree[size-1]; // Update value (ie last entry)
+                break;
+            }
+        }
+    }
+
+    if (!present)
+        robotStatusUpdateBuffer.append(strtree);
+}
+
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
@@ -697,7 +728,6 @@ int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
 
 int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
 {
-    QMutexLocker statlocker(&instance->robotStatusMutex);
     NLua::CLuaLocker lualocker;
     const int nargs = lua_gettop(l);
     QStringList strtree;
@@ -705,7 +735,7 @@ int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
     for (int i=1; i<=nargs; ++i)
         strtree << luaL_checkstring(l, i);
 
-    instance->robotStatusUpdateBuffer.append(strtree);
+    instance->appendRobotStatusUpdate(strtree);
     return 0;
 }
 
@@ -751,7 +781,7 @@ void CRP6Simulator::updateClockDisplay(unsigned long hz)
         s = s.leftJustified(4, '0');
     }
 
-    robotStatusUpdateBuffer.append(QStringList() << "AVR" << "RP6 clock (MHz)" << s);
+    appendRobotStatusUpdate(QStringList() << "AVR" << "RP6 clock (MHz)" << s);
 }
 
 void CRP6Simulator::newProject()
@@ -945,6 +975,7 @@ void CRP6Simulator::timedUpdate()
     }
 
     QMutexLocker statlocker(&robotStatusMutex);
+    qDebug() << "buffer size:" << robotStatusUpdateBuffer.size();
     foreach (QStringList stritems, robotStatusUpdateBuffer)
     {
         QList<QTreeWidgetItem *> items =
