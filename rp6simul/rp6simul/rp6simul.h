@@ -87,6 +87,7 @@ class CRP6Simulator : public QMainWindow
     void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendLogOutput(ELogType type, const QString &text);
+    void appendRobotStatusUpdate(const QStringList &strtree);
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);

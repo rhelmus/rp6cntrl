@@ -35,9 +35,10 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
-    void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
+    void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; }
     void setLeftMotor(int power) { leftPower = power; }
     void setRightMotor(int power) { rightPower = power; }
+    void drawLEDs(QPainter *painter) const;
 
 signals:
     void rotationChanged(qreal);

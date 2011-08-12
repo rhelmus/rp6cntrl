@@ -206,23 +206,6 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 {
     CResizablePixmapGraphicsItem::paint(painter, option, widget);
 
-    // Equal aspect ratio, so scaling equals for width and height
-    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
-    const QPoint base(0, 0);
-
-    if (enabledLEDs[LED1])
-        drawLED(*painter, "led1", base, scale);
-    if (enabledLEDs[LED2])
-        drawLED(*painter, "led2", base, scale);
-    if (enabledLEDs[LED3])
-        drawLED(*painter, "led3", base, scale);
-    if (enabledLEDs[LED4])
-        drawLED(*painter, "led4", base, scale);
-    if (enabledLEDs[LED5])
-        drawLED(*painter, "led5", base, scale);
-    if (enabledLEDs[LED6])
-        drawLED(*painter, "led6", base, scale);
-
 #if 0
     // UNDONE
     QPointF c(boundingRect().center());
@@ -252,4 +235,25 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 
     painter->drawLine(line);
 #endif
+}
+
+void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
+{
+    const QTransform tr(sceneTransform());
+
+    // Equal aspect ratio, so scaling equals for width and height
+    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
+
+    if (enabledLEDs[LED1])
+        drawLED(*painter, "led1", tr, scale);
+    if (enabledLEDs[LED2])
+        drawLED(*painter, "led2", tr, scale);
+    if (enabledLEDs[LED3])
+        drawLED(*painter, "led3", tr, scale);
+    if (enabledLEDs[LED4])
+        drawLED(*painter, "led4", tr, scale);
+    if (enabledLEDs[LED5])
+        drawLED(*painter, "led5", tr, scale);
+    if (enabledLEDs[LED6])
+        drawLED(*painter, "led6", tr, scale);
 }

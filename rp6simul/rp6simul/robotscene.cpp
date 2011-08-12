@@ -542,6 +542,8 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
             painter->drawLine(startx, y, endx, y);
     }
 
+    robotGraphicsItem->drawLEDs(painter);
+
     painter->restore();
 }
 

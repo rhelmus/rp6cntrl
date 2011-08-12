@@ -23,26 +23,27 @@ void CRobotWidget::paintEvent(QPaintEvent *)
     const int y = (height() - robotPixmap.height()) / 2;
     painter.drawPixmap(x, y, robotPixmap);
 
-    // NOTE: drawLED() alters brush
-    const QPoint base(x, y);
+    QTransform tr;
+    tr.translate(x, y);
 
     // Equal aspect ratio, so scaling equals for width and height
     const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
 
+    // NOTE: drawLED() alters brush
     if (enabledLEDs[LED1])
-        drawLED(painter, "led1", base, scale);
+        drawLED(painter, "led1", tr, scale);
     if (enabledLEDs[LED2])
-        drawLED(painter, "led2", base, scale);
+        drawLED(painter, "led2", tr, scale);
     if (enabledLEDs[LED3])
-        drawLED(painter, "led3", base, scale);
+        drawLED(painter, "led3", tr, scale);
     if (enabledLEDs[LED4])
-        drawLED(painter, "led4", base, scale);
+        drawLED(painter, "led4", tr, scale);
     if (enabledLEDs[LED5])
-        drawLED(painter, "led5", base, scale);
+        drawLED(painter, "led5", tr, scale);
     if (enabledLEDs[LED6])
-        drawLED(painter, "led6", base, scale);
+        drawLED(painter, "led6", tr, scale);
     if (enabledLEDs[ACSL])
-        drawLED(painter, "ACSLeft", base, scale);
+        drawLED(painter, "ACSLeft", tr, scale);
     if (enabledLEDs[ACSR])
-        drawLED(painter, "ACSRight", base, scale);
+        drawLED(painter, "ACSRight", tr, scale);
 }
