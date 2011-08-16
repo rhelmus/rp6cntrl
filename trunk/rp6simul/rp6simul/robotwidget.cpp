@@ -4,6 +4,34 @@
 
 #include <QtGui>
 
+namespace {
+
+void drawBumper(QPainter &painter, const char *propname,
+             const QTransform &tr, qreal scale)
+{
+    QPolygonF points =
+            CSimulator::getInstance()->getRobotProperty(propname, "points").value<QPolygon>();
+
+    // Account for scaling/transformation
+    for (QPolygonF::iterator it=points.begin(); it!=points.end(); ++it)
+    {
+        it->rx() *= scale;
+        it->ry() *= scale;
+        *it = tr.map(*it);
+    }
+
+    QColor c =
+            CSimulator::getInstance()->getRobotProperty(propname, "color").value<QColor>();
+
+    c.setAlpha(127);
+
+    painter.setBrush(c);
+    painter.setPen(Qt::NoPen);
+    painter.drawPolygon(points);
+}
+
+}
+
 CRobotWidget::CRobotWidget(QWidget *parent) :
     QWidget(parent), widgetExtraSize(100, 0)
 {
@@ -46,4 +74,9 @@ void CRobotWidget::paintEvent(QPaintEvent *)
         drawLED(painter, "ACSLeft", tr, scale);
     if (enabledLEDs[ACSR])
         drawLED(painter, "ACSRight", tr, scale);
+
+    if (hitBumpers[BUMPER_LEFT])
+        drawBumper(painter, "bumperLeft", tr, scale);
+    if (hitBumpers[BUMPER_RIGHT])
+        drawBumper(painter, "bumperRight", tr, scale);
 }

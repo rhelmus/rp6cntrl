@@ -14,6 +14,7 @@ Using GIMP's ruler tool this should equal 565 px from the rp6-top.png image.
 local green = { 0, 255, 0 }
 local red = { 255, 0, 0 }
 local darkblue = { 0, 0, 192 }
+local blue = { 0, 0, 255 }
 
 robotProperties =
 {
@@ -32,11 +33,13 @@ robotProperties =
     bumperLeft =
     {
         shape = "polygon",
-        points = { { 121, 4 }, { 128, 1 }, { 201, 2 }, { 318, 26 }, { 128, 25 } }
+        points = { { 121, 4 }, { 128, 1 }, { 201, 2 }, { 318, 26 }, { 128, 25 } },
+        color = blue
     },
     bumperRight =
     {
         shape = "polygon",
-        points = { { 322, 26 }, { 446, 8 }, { 516, 18 }, { 518, 28 }, { 510, 40 } }
+        points = { { 322, 26 }, { 446, 8 }, { 516, 18 }, { 518, 28 }, { 510, 40 } },
+        color = blue
     },
 }

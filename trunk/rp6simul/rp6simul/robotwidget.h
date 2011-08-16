@@ -14,6 +14,7 @@ class CRobotWidget : public QWidget
     const QSize widgetExtraSize;
     QPixmap robotPixmap;
     QMap<ELEDType, bool> enabledLEDs;
+    QMap<EBumper, bool> hitBumpers;
 
 protected:
     void paintEvent(QPaintEvent *);
@@ -25,6 +26,7 @@ public:
     { return robotPixmap.size() + widgetExtraSize; }
 
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
+    void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
 };
 
 #endif // ROBOTWIDGET_H

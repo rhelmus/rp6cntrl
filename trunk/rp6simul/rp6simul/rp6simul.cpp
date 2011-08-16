@@ -74,8 +74,15 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     activateDockTab(this, "Status");
 
     pluginUpdateUITimer = new QTimer(this);
-    connect(pluginUpdateUITimer, SIGNAL(timeout()), this, SLOT(timedUpdate()));
+    connect(pluginUpdateUITimer, SIGNAL(timeout()), this,
+            SLOT(timedUIUpdate()));
     pluginUpdateUITimer->setInterval(250);
+
+    // Faster timer for LEDs
+    pluginUpdateLEDsTimer = new QTimer(this);
+    connect(pluginUpdateLEDsTimer, SIGNAL(timeout()), this,
+            SLOT(timedLEDUpdate()));
+    pluginUpdateLEDsTimer->setInterval(50);
 
     initLua();
 
@@ -358,8 +365,6 @@ QWidget *CRP6Simulator::createLogWidgets()
     ret->addTab(logWidget = new QPlainTextEdit, "log");
     logWidget->setReadOnly(true);
     logWidget->setCenterOnScroll(true);
-    connect(this, SIGNAL(logTextReady(const QString &)), logWidget,
-            SLOT(appendHtml(const QString &)));
 
     QWidget *w = new QWidget(ret);
     ret->addTab(w, "serial");
@@ -657,13 +662,8 @@ QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
     case LOG_ERROR: fs = QString("<FONT color=#FF0000><strong>ERROR: </strong></FONT> %1").arg(text); break;
     }
 
-    return QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2")
+    return QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2<br>")
             .arg(QTime::currentTime().toString()).arg(fs);
-}
-
-void CRP6Simulator::appendLogOutput(ELogType type, const QString &text)
-{
-    logWidget->appendHtml(getLogOutput(type, text));
 }
 
 void CRP6Simulator::appendRobotStatusUpdate(const QStringList &strtree)
@@ -700,6 +700,8 @@ void CRP6Simulator::appendRobotStatusUpdate(const QStringList &strtree)
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
+    QMutexLocker loglocker(&instance->logBufferMutex);
+
     const char *type = luaL_checkstring(l, 1);
     const char *text = luaL_checkstring(l, 2);
 
@@ -713,8 +715,8 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
     else
         luaL_argerror(l, 1, "Wrong log type.");
 
-    // Emit: function called outside main thread
-    instance->emit logTextReady(instance->getLogOutput(t, text));
+    instance->logTextBuffer += instance->getLogOutput(t, text);
+
     return 0;
 }
 
@@ -765,8 +767,8 @@ int CRP6Simulator::luaEnableLED(lua_State *l)
     else if (!strcmp(led, "acsr"))
         ledtype = ACSR;
 
-    instance->robotWidget->enableLED(ledtype, e);
-    instance->robotScene->getRobotItem()->enableLED(ledtype, e);
+    QMutexLocker LEDlocker(&instance->robotLEDMutex);
+    instance->changedLEDs[ledtype] = e;
 
     return 0;
 }
@@ -947,7 +949,7 @@ void CRP6Simulator::loadMap()
         loadMapFile(file, false);
 }
 
-void CRP6Simulator::timedUpdate()
+void CRP6Simulator::timedUIUpdate()
 {
     QReadLocker iolocker(&simulator->getIORegisterLock());
     const TIORegisterData *ioregisters = simulator->getIORegisterArray();
@@ -963,6 +965,15 @@ void CRP6Simulator::timedUpdate()
 
     IORegisterTableWidget->resizeColumnsToContents();
 
+    // UNDONE: Double check to avoid mutexes?
+
+    QMutexLocker loglocker(&instance->logBufferMutex);
+    if (!logTextBuffer.isEmpty())
+    {
+        logWidget->appendHtml(logTextBuffer);
+        logTextBuffer.clear();
+    }
+
     QMutexLocker serialocker(&instance->serialBufferMutex);
     if (!serialTextBuffer.isEmpty())
     {
@@ -975,7 +986,6 @@ void CRP6Simulator::timedUpdate()
     }
 
     QMutexLocker statlocker(&robotStatusMutex);
-    qDebug() << "buffer size:" << robotStatusUpdateBuffer.size();
     foreach (QStringList stritems, robotStatusUpdateBuffer)
     {
         QList<QTreeWidgetItem *> items =
@@ -1017,6 +1027,18 @@ void CRP6Simulator::timedUpdate()
     robotStatusUpdateBuffer.clear();
 }
 
+void CRP6Simulator::timedLEDUpdate()
+{
+    QMutexLocker LEDlocker(&robotLEDMutex);
+    for (QMap<ELEDType, bool>::iterator it=changedLEDs.begin();
+         it!=changedLEDs.end(); ++it)
+    {
+        robotWidget->enableLED(it.key(), it.value());
+        robotScene->getRobotItem()->enableLED(it.key(), it.value());
+    }
+    changedLEDs.clear();
+}
+
 void CRP6Simulator::runPlugin()
 {
     if (!simulator->runPlugin())
@@ -1025,6 +1047,7 @@ void CRP6Simulator::runPlugin()
     serialOutputWidget->clear();
     robotStatusTreeWidget->clear();
     pluginUpdateUITimer->start();
+    pluginUpdateLEDsTimer->start();
 
     runPluginAction->setEnabled(false);
     stopPluginAction->setEnabled(true);
@@ -1036,7 +1059,11 @@ void CRP6Simulator::stopPlugin()
     simulator->stopPlugin();
 
     pluginUpdateUITimer->stop();
-    timedUpdate(); // Dump any remaining buffered data
+    pluginUpdateLEDsTimer->stop();
+
+    // Dump any remaining buffered data
+    timedUIUpdate();
+    timedLEDUpdate();
 
     runPluginAction->setEnabled(true);
     stopPluginAction->setEnabled(false);

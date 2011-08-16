@@ -11,6 +11,7 @@
 #include "robotscene.h"
 
 enum ELEDType { LED1, LED2, LED3, LED4, LED5, LED6, ACSL, ACSR };
+enum EBumper { BUMPER_LEFT, BUMPER_RIGHT };
 
 class QActionGroup;
 class QGraphicsView;
@@ -57,11 +58,16 @@ class CRP6Simulator : public QMainWindow
     QTreeWidgetItem *mapHistoryTreeItem;
     QTableWidget *IORegisterTableWidget;
 
+    QString logTextBuffer;
+    QMutex logBufferMutex;
     QString serialTextBuffer;
     QMutex serialBufferMutex;
     QList<QStringList> robotStatusUpdateBuffer;
     QMutex robotStatusMutex;
+    QMap<ELEDType, bool> changedLEDs;
+    QMutex robotLEDMutex;
     QTimer *pluginUpdateUITimer;
+    QTimer *pluginUpdateLEDsTimer;
 
     static CRP6Simulator *instance;
 
@@ -86,7 +92,6 @@ class CRP6Simulator : public QMainWindow
     void addMapHistoryFile(const QString &file);
     void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
-    void appendLogOutput(ELogType type, const QString &text);
     void appendRobotStatusUpdate(const QStringList &strtree);
 
     // Lua bindings
@@ -97,7 +102,8 @@ class CRP6Simulator : public QMainWindow
 
 private slots:
     void updateClockDisplay(unsigned long hz);
-    void timedUpdate(void);
+    void timedUIUpdate(void);
+    void timedLEDUpdate(void);
     void newProject(void);
     void openProject(void);
     void newMap(void);
@@ -118,9 +124,6 @@ public:
     CRP6Simulator(QWidget *parent = 0);
 
     static CRP6Simulator *getInstance(void) { return instance; }
-
-signals:
-    void logTextReady(const QString &text);
 };
 
 #endif // RP6SIMUL_H
