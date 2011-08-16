@@ -902,6 +902,7 @@ void CRobotScene::loadMap(QSettings &settings)
     settings.endGroup();
     updateLighting();
     markMapEdited(false);
+    getGraphicsView()->centerOn(robotGraphicsItem);
 }
 
 void CRobotScene::zoomSceneIn()

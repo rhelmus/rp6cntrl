@@ -429,7 +429,10 @@ void CSimulator::loadRobotProperties()
                 lua_getfield(NLua::luaInterface, fieldind, "radius");
                 fields["radius"] = luaL_checkint(NLua::luaInterface, -1);
                 lua_pop(NLua::luaInterface, 1);
+            }
 
+            if ((shape == "ellips") || (shape == "polygon"))
+            {
                 lua_getfield(NLua::luaInterface, fieldind, "color");
 
                 lua_rawgeti(NLua::luaInterface, -1, 1);
@@ -448,7 +451,8 @@ void CSimulator::loadRobotProperties()
 
                 lua_pop(NLua::luaInterface, 1); // Pop "color" table
             }
-            else if (shape == "polygon")
+
+            if (shape == "polygon")
             {
                 lua_getfield(NLua::luaInterface, fieldind, "points");
                 QPolygon polygon;
@@ -470,7 +474,7 @@ void CSimulator::loadRobotProperties()
                     polygon << QPoint(x, y);
                 }
 
-                fields["polygon"] = polygon;
+                fields["points"] = polygon;
 
                 lua_pop(NLua::luaInterface, 1); // Pop points table
             }
