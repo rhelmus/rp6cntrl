@@ -12,7 +12,8 @@ handledIORegisters = {
     avr.IO_OCR1BL,
     avr.IO_OCR1BH,
     avr.IO_ICR1,
-    avr.IO_TIMSK
+    avr.IO_TIMSK,
+    avr.IO_PORTC
 }
 
 local motorInfo = {
@@ -94,13 +95,24 @@ local function setCompareRegisterA(data)
             clock.enableTimer(rightEncTimer, false)
         end
     else
-        -- UNDONE: cpu speed, comments
+        -- Every 200 msec (ie. SPEED_TIMER_BASE) a counter is read and reset.
+        -- This counter is incremented from the callback functions of the
+        -- motor encoders (ie. INT0_vect/INT1_vect ISRs). For simulation the
+        -- encoders are each simply coupled to a timer. The update frequency
+        -- (compare value) of these 'encoder timers' are set using the
+        -- following formula: CV = MHz / (power * 5)
+        -- (1000 msec/200 msec = 5)
+        -- Thus the motor power and resulting speed calculated from the RP6
+        -- lib code is (mostly) equalized.
+        -- UNDONE: cpu speed configurable
+        -- UNDONE: 200 msec configurable?
         rightEncTimer:setCompareValue(8000000 / (data * 5))
         if not rightEncTimer:isEnabled() then
             clock.enableTimer(rightEncTimer, true)
         end
     end
     updateRobotStatus("motor", "power", "right", data)
+    setMotorPower("right", data)
     return true
 end
 
@@ -112,13 +124,14 @@ local function setCompareRegisterB(data)
             clock.enableTimer(leftEncTimer, false)
         end
     else
-        -- UNDONE: cpu speed, comments
+        -- Comments: see setCompareRegisterA
         leftEncTimer:setCompareValue((8000000 / (data * 5)))
         if not leftEncTimer:isEnabled() then
             clock.enableTimer(leftEncTimer, true)
         end
     end
     updateRobotStatus("motor", "power", "left", data)
+    setMotorPower("left", data)
     return true
 end
 
@@ -127,6 +140,13 @@ local function setInputRegister(data)
     motorInfo.inputRegister = data
     return true
 end
+
+local function setMotorDirection(data)
+    local ldir = (bit.isSet(data, avr.PINC2) and "BWD") or "FWD"
+    local rdir = (bit.isSet(data, avr.PINC3) and "BWD") or "FWD"
+    setMotorDir(ldir, rdir)
+end
+
 
 
 function initPlugin()
@@ -175,6 +195,8 @@ function handleIOData(type, data)
             avr.setIORegister(avr.IO_OCR1B, v)
         elseif type == avr.IO_ICR1 then
             setInputRegister(data)
+        elseif type == avr.IO_PORTC then
+            setMotorDirection(data)
         end
     end
 end
