@@ -28,8 +28,16 @@
 - Stacked main widget: list recent projects if none loaded?
 - IR transmitter for robot widget and property
 - check leds: colors, positions
+- Proper initialization after restart of plugin
+    - default values registers
+    - default values drivers
+    - default values widgets
+    - ...
+  move UI Lua function to separate package?
 - patch RP6Lib
     - C++ support
     - no anonymous unions (gives compile errors + no duplicate variables)
     - Check changes made on kubuntu
     - ...
+- BUG: Lua destruction happens too later?
+- BUG: update() called from separate thread

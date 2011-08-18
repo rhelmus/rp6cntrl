@@ -73,6 +73,11 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     tabifyDockWidget(statdock, regdock);
     activateDockTab(this, "Status");
 
+    // Do this after toolbars and dockedwidgets are created, as the
+    // tabViewChanged slot needs some.
+    connect(projectTabWidget, SIGNAL(currentChanged(int)),
+            SLOT(tabViewChanged(int)));
+
     pluginUpdateUITimer = new QTimer(this);
     connect(pluginUpdateUITimer, SIGNAL(timeout()), this,
             SLOT(timedUIUpdate()));
@@ -267,8 +272,11 @@ QWidget *CRP6Simulator::createMainWidget()
     mainStackedWidget = new QStackedWidget;
 
     mainStackedWidget->addWidget(createProjectPlaceHolderWidget());
-    mainStackedWidget->addWidget(createRobotWidget());
-    mainStackedWidget->addWidget(createRobotSceneWidget());
+
+    mainStackedWidget->addWidget(projectTabWidget = new QTabWidget);
+
+    projectTabWidget->addTab(createRobotWidget(), "Robot");
+    projectTabWidget->addTab(createRobotSceneWidget(), "Map");
 
     return mainStackedWidget;
 }
@@ -294,10 +302,22 @@ QWidget *CRP6Simulator::createProjectPlaceHolderWidget()
 
 QWidget *CRP6Simulator::createRobotWidget()
 {
-    // Robot widget shown when no map is loaded
-
     QWidget *ret = new QWidget;
     QVBoxLayout *vbox = new QVBoxLayout(ret);
+
+    vbox->addWidget(robotWidget = new CRobotWidget);
+
+    return ret;
+}
+
+QWidget *CRP6Simulator::createRobotSceneWidget()
+{
+    mapStackedWidget = new QStackedWidget;
+
+    // Widget shown when no map is loaded
+    QWidget *w = new QWidget;
+    mapStackedWidget->addWidget(w);
+    QVBoxLayout *vbox = new QVBoxLayout(w);
 
     QLabel *label = new QLabel("<qt>Currently no map is loaded.<br>"
                               "To load a map use the <b>Map</b> menu or "
@@ -309,17 +329,11 @@ QWidget *CRP6Simulator::createRobotWidget()
     label->setMargin(15);
     vbox->addWidget(label, 0, Qt::AlignHCenter);
 
-    vbox->addWidget(robotWidget = new CRobotWidget);
 
-    return ret;
-}
-
-QWidget *CRP6Simulator::createRobotSceneWidget()
-{
     // Robot map scene widget shown when a map is loaded
-
-    QWidget *ret = new QWidget;
-    QHBoxLayout *hbox = new QHBoxLayout(ret);
+    w = new QWidget;
+    mapStackedWidget->addWidget(w);
+    QHBoxLayout *hbox = new QHBoxLayout(w);
 
     robotScene = new CRobotScene(this);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
@@ -331,7 +345,7 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     graphicsView->setMouseTracking(true);
     hbox->addWidget(graphicsView);
 
-    QVBoxLayout *vbox = new QVBoxLayout;
+    vbox = new QVBoxLayout;
     hbox->addLayout(vbox);
 
     QSpinBox *spinbox = new QSpinBox;
@@ -354,7 +368,7 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     QObject::connect(timer, SIGNAL(timeout()), robotScene, SLOT(advance()));
     timer->start(1000 / 33);
 
-    return ret;
+    return mapStackedWidget;
 }
 
 QWidget *CRP6Simulator::createLogWidgets()
@@ -413,6 +427,7 @@ QDockWidget *CRP6Simulator::createStatusDock()
     subvbox->addWidget(mapSelectorTreeWidget = new QTreeWidget);
     mapSelectorTreeWidget->setHeaderHidden(true);
     mapSelectorTreeWidget->setSelectionMode(QTreeWidget::SingleSelection);
+    mapSelectorTreeWidget->setEnabled(false);
     connect(mapSelectorTreeWidget, SIGNAL(itemActivated(QTreeWidgetItem*,int)),
             SLOT(mapSelectorItemActivated(QTreeWidgetItem*)));
 
@@ -460,15 +475,21 @@ QDockWidget *CRP6Simulator::createRegisterDock()
 
 void CRP6Simulator::updateMainStackedWidget()
 {
-    if (!currentProjectFile.isEmpty())
-    {
-        if (!currentMapFile.isEmpty())
-            mainStackedWidget->setCurrentIndex(2);
-        else
-            mainStackedWidget->setCurrentIndex(1);
-    }
-    else
+    if (currentProjectFile.isEmpty())
         mainStackedWidget->setCurrentIndex(0);
+    else
+        mainStackedWidget->setCurrentIndex(1);
+}
+
+void CRP6Simulator::updateMapStackedWidget()
+{
+    if (currentMapFile.isEmpty())
+        mapStackedWidget->setCurrentIndex(0);
+    else
+        mapStackedWidget->setCurrentIndex(1);
+
+    editMapToolBar->setEnabled(!currentMapFile.isEmpty() &&
+                               (projectTabWidget->currentIndex() == 1));
 }
 
 void CRP6Simulator::openProjectFile(const QString &file)
@@ -483,7 +504,6 @@ void CRP6Simulator::openProjectFile(const QString &file)
 
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
-    editMapToolBar->setEnabled(true);
 
     foreach (QAction *a, mapMenuActionList)
         a->setEnabled(true);
@@ -503,7 +523,7 @@ void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
     {
         robotScene->loadMap(s);
         currentMapFile = file;
-        updateMainStackedWidget();
+        updateMapStackedWidget();
         if (!istemplate)
             addMapHistoryFile(file);
         currentMapIsTemplate = istemplate;
@@ -643,6 +663,8 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
     NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
     NLua::registerFunction(luaEnableLED, "enableLED");
+    NLua::registerFunction(luaSetMotorPower, "setMotorPower");
+    NLua::registerFunction(luaSetMotorDir, "setMotorDir");
 
     // UNDONE: Needed?
     lua_getglobal(NLua::luaInterface, "init");
@@ -769,6 +791,49 @@ int CRP6Simulator::luaEnableLED(lua_State *l)
 
     QMutexLocker LEDlocker(&instance->robotLEDMutex);
     instance->changedLEDs[ledtype] = e;
+
+    return 0;
+}
+
+int CRP6Simulator::luaSetMotorPower(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    const char *motor = luaL_checkstring(l, 1);
+    const int power = luaL_checkinteger(l, 2);
+
+    EMotor mtype;
+
+    if (!strcmp(motor, "left"))
+        mtype = MOTOR_LEFT;
+    else if (!strcmp(motor, "right"))
+        mtype = MOTOR_RIGHT;
+
+    instance->robotWidget->setMotorPower(mtype, power);
+
+    return 0;
+}
+
+int CRP6Simulator::luaSetMotorDir(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    const char *ldir = luaL_checkstring(l, 1);
+    const char *rdir = luaL_checkstring(l, 2);
+
+    EMotorDirection ld, rd;
+
+    if (!strcmp(ldir, "FWD"))
+        ld = MOTORDIR_FWD;
+    else if (!strcmp(ldir, "BWD"))
+        ld = MOTORDIR_BWD;
+
+    if (!strcmp(rdir, "FWD"))
+        rd = MOTORDIR_FWD;
+    else if (!strcmp(rdir, "BWD"))
+        rd = MOTORDIR_BWD;
+
+    instance->robotWidget->setMotorDirection(ld, rd);
 
     return 0;
 }
@@ -1068,6 +1133,13 @@ void CRP6Simulator::stopPlugin()
     runPluginAction->setEnabled(true);
     stopPluginAction->setEnabled(false);
     serialSendButton->setEnabled(false);
+}
+
+void CRP6Simulator::tabViewChanged(int index)
+{
+    const bool e = (index != 0);
+    mapSelectorTreeWidget->setEnabled(e);
+    editMapToolBar->setEnabled(e && !currentMapFile.isEmpty());
 }
 
 void CRP6Simulator::changeSceneMouseMode(QAction *a)

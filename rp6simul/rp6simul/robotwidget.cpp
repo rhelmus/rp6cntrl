@@ -30,14 +30,57 @@ void drawBumper(QPainter &painter, const char *propname,
     painter.drawPolygon(points);
 }
 
+void drawMotorIndicator(QPainter &painter, const QRect &rect, int gradh,
+                        EMotorDirection dir)
+{
+    // UNDONE: Direction
+
+    const int tailwidth = 0.5 * (float)rect.width();
+    const int tailx = rect.left() + ((rect.width()-tailwidth) / 2);
+    const int headheight = 0.25 * rect.height();
+
+    QPolygon arrowp;
+    arrowp << QPoint(tailx, rect.bottom());
+    arrowp << QPoint(tailx, rect.top() + headheight);
+    arrowp << QPoint(rect.left(), arrowp.last().y());
+    arrowp << QPoint(rect.center().x(), rect.top());
+    arrowp << QPoint(rect.right(), rect.top() + headheight);
+    arrowp << QPoint(tailx + tailwidth, arrowp.last().y());
+    arrowp << QPoint(arrowp.last().x(), rect.bottom());
+
+    // NOTE: drawn from bottom to top
+    // gradh is used here to have a constant gradient, regardless of the
+    // height (power) of the indicator. Thus a high arrow (high power)
+    // has a more redish head.
+    QLinearGradient lg(rect.center().x(), rect.bottom(), rect.center().x(),
+                       rect.bottom() - gradh);
+    lg.setColorAt(0.0, Qt::yellow);
+    lg.setColorAt(1.0, Qt::red);
+    painter.setBrush(lg);
+    painter.setPen(Qt::NoPen);
+
+    if (dir == MOTORDIR_FWD)
+        painter.drawPolygon(arrowp);
+    else
+    {
+        QTransform tr;
+        tr.translate(rect.center().x(), rect.center().y());
+        tr.rotate(180);
+        tr.translate(-rect.center().x(), -rect.center().y());
+        painter.drawPolygon(tr.map(arrowp));
+    }
+}
+
 }
 
 CRobotWidget::CRobotWidget(QWidget *parent) :
-    QWidget(parent), widgetExtraSize(100, 0)
+    QWidget(parent), motorArrowWidth(25), motorArrowXSpacing(10)
 {
     const QPixmap p("../resource/rp6-top.png");
     origRobotSize = p.size();
     robotPixmap = p.scaledToWidth(250, Qt::SmoothTransformation);
+    widgetMinSize = robotPixmap.size();
+    widgetMinSize.rwidth() += (2 * (motorArrowWidth + motorArrowXSpacing));
 }
 
 void CRobotWidget::paintEvent(QPaintEvent *)
@@ -47,12 +90,12 @@ void CRobotWidget::paintEvent(QPaintEvent *)
     painter.setPen(Qt::NoPen);
 
     // center
-    const int x = (width() - robotPixmap.width()) / 2;
-    const int y = (height() - robotPixmap.height()) / 2;
-    painter.drawPixmap(x, y, robotPixmap);
+    const int imgx = (width() - robotPixmap.width()) / 2;
+    const int imgy = (height() - robotPixmap.height()) / 2;
+    painter.drawPixmap(imgx, imgy, robotPixmap);
 
     QTransform tr;
-    tr.translate(x, y);
+    tr.translate(imgx, imgy);
 
     // Equal aspect ratio, so scaling equals for width and height
     const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
@@ -79,4 +122,42 @@ void CRobotWidget::paintEvent(QPaintEvent *)
         drawBumper(painter, "bumperLeft", tr, scale);
     if (hitBumpers[BUMPER_RIGHT])
         drawBumper(painter, "bumperRight", tr, scale);
+
+    const int arrowyoffset = robotPixmap.height() * 0.2;
+    const int arrowmaxheight = robotPixmap.height() - (2 * arrowyoffset);
+    const int arrowtexth = painter.fontMetrics().height();
+
+    if (motorPower[MOTOR_LEFT] != 0)
+    {
+        const int arrowheight = motorPower[MOTOR_LEFT] * arrowmaxheight / 200;
+        const int bottom = (imgy + robotPixmap.height()) - arrowyoffset;
+        const int y = bottom - arrowheight;
+        QRect rect(imgx - (motorArrowWidth + motorArrowXSpacing), y,
+                   motorArrowWidth, arrowheight);
+        drawMotorIndicator(painter, rect, arrowmaxheight,
+                           motorDirection[MOTOR_LEFT]);
+
+        const QString text(QString::number(motorPower[MOTOR_LEFT]));
+        QRect trect(rect.left(), rect.top() - arrowtexth, rect.width(),
+                    arrowtexth);
+        painter.setPen(Qt::blue);
+        painter.drawText(trect, Qt::AlignCenter, text);
+    }
+
+    if (motorPower[MOTOR_RIGHT] != 0)
+    {
+        const int arrowheight = motorPower[MOTOR_RIGHT] * arrowmaxheight / 200;
+        const int bottom = (imgy + robotPixmap.height()) - arrowyoffset;
+        const int y = bottom - arrowheight;
+        QRect rect(imgx + robotPixmap.width() + motorArrowXSpacing, y,
+                   motorArrowWidth, arrowheight);
+        drawMotorIndicator(painter, rect, arrowmaxheight,
+                           motorDirection[MOTOR_RIGHT]);
+
+        QRect trect(rect.left(), rect.top() - arrowtexth, rect.width(),
+                    arrowtexth);
+        painter.setPen(Qt::blue);
+        painter.drawText(trect, Qt::AlignCenter,
+                         QString::number(motorPower[MOTOR_RIGHT]));
+    }
 }

@@ -12,6 +12,8 @@
 
 enum ELEDType { LED1, LED2, LED3, LED4, LED5, LED6, ACSL, ACSR };
 enum EBumper { BUMPER_LEFT, BUMPER_RIGHT };
+enum EMotor { MOTOR_LEFT, MOTOR_RIGHT };
+enum EMotorDirection { MOTORDIR_FWD, MOTORDIR_BWD };
 
 class QActionGroup;
 class QGraphicsView;
@@ -21,6 +23,7 @@ class QLineEdit;
 class QPlainTextEdit;
 class QStackedWidget;
 class QTableWidget;
+class QTabWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -45,6 +48,8 @@ class CRP6Simulator : public QMainWindow
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
     QStackedWidget *mainStackedWidget;
+    QTabWidget *projectTabWidget;
+    QStackedWidget *mapStackedWidget;
     CRobotWidget *robotWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
@@ -83,6 +88,7 @@ class CRP6Simulator : public QMainWindow
     QDockWidget *createRegisterDock(void);
 
     void updateMainStackedWidget(void);
+    void updateMapStackedWidget(void);
     void openProjectFile(const QString &file);
     void loadMapFile(const QString &file, bool istemplate);
     void loadMapTemplatesTree(void);
@@ -99,6 +105,8 @@ class CRP6Simulator : public QMainWindow
     static int luaAppendSerialOutput(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
     static int luaEnableLED(lua_State *l);
+    static int luaSetMotorPower(lua_State *l);
+    static int luaSetMotorDir(lua_State *l);
 
 private slots:
     void updateClockDisplay(unsigned long hz);
@@ -112,6 +120,7 @@ private slots:
     void loadMap(void);
     void runPlugin(void);
     void stopPlugin(void);
+    void tabViewChanged(int index);
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);

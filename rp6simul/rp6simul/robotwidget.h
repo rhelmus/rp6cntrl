@@ -11,10 +11,13 @@ class CRobotWidget : public QWidget
     Q_OBJECT   
 
     QSize origRobotSize;
-    const QSize widgetExtraSize;
+    const int motorArrowWidth, motorArrowXSpacing;
+    QSize widgetMinSize;
     QPixmap robotPixmap;
     QMap<ELEDType, bool> enabledLEDs;
     QMap<EBumper, bool> hitBumpers;
+    QMap<EMotor, int> motorPower;
+    QMap<EMotor, EMotorDirection> motorDirection;
 
 protected:
     void paintEvent(QPaintEvent *);
@@ -22,11 +25,13 @@ protected:
 public:
     explicit CRobotWidget(QWidget *parent = 0);
 
-    QSize minimumSizeHint(void) const
-    { return robotPixmap.size() + widgetExtraSize; }
+    QSize minimumSizeHint(void) const { return widgetMinSize; }
 
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
     void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
+    void setMotorPower(EMotor m, int p) { motorPower[m] = p; update(); }
+    void setMotorDirection(EMotorDirection l, EMotorDirection r)
+    { motorDirection[MOTOR_LEFT] = l; motorDirection[MOTOR_RIGHT] = r; update(); }
 };
 
 #endif // ROBOTWIDGET_H
