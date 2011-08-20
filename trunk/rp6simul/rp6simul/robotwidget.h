@@ -30,8 +30,8 @@ public:
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
     void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
     void setMotorPower(EMotor m, int p) { motorPower[m] = p; update(); }
-    void setMotorDirection(EMotorDirection l, EMotorDirection r)
-    { motorDirection[MOTOR_LEFT] = l; motorDirection[MOTOR_RIGHT] = r; update(); }
+    void setMotorDirection(EMotor m, EMotorDirection d)
+    { motorDirection[m] = d; update(); }
 };
 
 #endif // ROBOTWIDGET_H

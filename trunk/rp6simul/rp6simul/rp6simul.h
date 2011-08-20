@@ -15,6 +15,9 @@ enum EBumper { BUMPER_LEFT, BUMPER_RIGHT };
 enum EMotor { MOTOR_LEFT, MOTOR_RIGHT };
 enum EMotorDirection { MOTORDIR_FWD, MOTORDIR_BWD };
 
+Q_DECLARE_METATYPE(EMotor)
+Q_DECLARE_METATYPE(EMotorDirection)
+
 class QActionGroup;
 class QGraphicsView;
 class QPushButton;
@@ -71,6 +74,10 @@ class CRP6Simulator : public QMainWindow
     QMutex robotStatusMutex;
     QMap<ELEDType, bool> changedLEDs;
     QMutex robotLEDMutex;
+    QMap<EMotor, int> changedMotorPower;
+    QMutex motorPowerMutex;
+    QMap<EMotor, EMotorDirection> changedMotorDirection;
+    QMutex motorDirectionMutex;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -131,8 +138,15 @@ private slots:
 
 public:
     CRP6Simulator(QWidget *parent = 0);
+    ~CRP6Simulator(void);
 
     static CRP6Simulator *getInstance(void) { return instance; }
+
+signals:
+    // These are emitted by the class itself to easily thread-synchronize
+    // function calls
+    void motorPowerChanged(EMotor, int);
+    void motorDirectionChanged(EMotor, EMotorDirection);
 };
 
 #endif // RP6SIMUL_H

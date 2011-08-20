@@ -1,7 +1,10 @@
 #include "handlegraphicsitem.h"
 #include "lightgraphicsitem.h"
 #include "robotgraphicsitem.h"
+#include "simulator.h"
 #include "utils.h"
+
+#include <math.h>
 
 #include <QtGui>
 
@@ -22,8 +25,7 @@ bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles)
 }
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
-    : CResizablePixmapGraphicsItem(parent),
-      leftPower(0), rightPower(0), skipFrames(0), pressedHandle(0)
+    : CResizablePixmapGraphicsItem(parent), skipFrames(0), pressedHandle(0)
 {
     QPixmap pm("../resource/rp6-top.png");
     origRobotSize = pm.size();
@@ -74,14 +76,71 @@ QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
     return (mapToParent(x, y) - mapToParent(0.0, 0.0));
 }
 
-void CRobotGraphicsItem::tryMove(float lpower, float rpower)
+void CRobotGraphicsItem::tryMove()
 {
-    const float lspeed = lpower / 10.0;
-    const float rspeed = rpower / 10.0;
+    const float encresolution = 0.25; // UNDONE
+    const float speedtimerbase = 200.0; // UNDONE
+    // Correction: see motor driver
+    const float effspeedtimerbase = 1.1 * (speedtimerbase + 2.0);
+    const float speedfreq = 1000.0 / effspeedtimerbase;
+    const float lcounts_s = (float)motorPower[MOTOR_LEFT] * speedfreq;
+    const float rcounts_s = (float)motorPower[MOTOR_RIGHT] * speedfreq;
+    const float lmm_s = lcounts_s * encresolution;
+    const float rmm_s = rcounts_s * encresolution;
+
+    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
+    const float cmperpx =
+            CSimulator::getInstance()->getRobotProperty("scale", "cmPerPixel").toFloat() / scale;
+
+    const float lpx_s = lmm_s / (cmperpx * 10.0);
+    const float rpx_s = rmm_s / (cmperpx * 10.0);
+
+    const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+    Q_ASSERT(rscene);
+    const float advdelay = rscene->getRobotAdvanceDelay();
+
+    float lspeed = lpx_s / 1000.0 * advdelay;
+    float rspeed = rpx_s / 1000.0 * advdelay;
+
+    if (motorDirection[MOTOR_LEFT] == MOTORDIR_BWD)
+        lspeed = -lspeed;
+    if (motorDirection[MOTOR_RIGHT] == MOTORDIR_BWD)
+        rspeed = -rspeed;
+
+     // UNDONE
+    if (!motorPower[MOTOR_LEFT])
+        lspeed = 0.0;
+    if (!motorPower[MOTOR_RIGHT])
+        rspeed = 0.0;
+
+    const float movespeed = (lspeed + rspeed) / 2.0;
+
+    // UNDONE: Property
+    const float chassismm = 165.0;
+    const float chassispx = chassismm / (cmperpx * 10.0);
+    const float perimeter = chassispx * M_PI;
+    const float pxperdeg = perimeter / 360.0;
+    const float rotspeed = (lspeed - rspeed) / 2.0;
+    float angspeed = rotspeed / pxperdeg;
+
+    // UNDONE
+    if (rotspeed == 0.0)
+        angspeed = 0.0;
+
+#if 0
+    float lspeed = (float)motorPower[MOTOR_LEFT] / 10.0;
+    float rspeed = (float)motorPower[MOTOR_RIGHT] / 10.0;
+
+    if (motorDirection[MOTOR_LEFT] == MOTORDIR_BWD)
+        lspeed = -lspeed;
+    if (motorDirection[MOTOR_RIGHT] == MOTORDIR_BWD)
+        rspeed = -rspeed;
+
     const float movespeed = (lspeed + rspeed) / 5.0;
     const float rotspeed = (lspeed - rspeed) / 15.0;
+#endif
 
-    if (!tryDoMove(rotspeed, mapDeltaPos(0.0, -movespeed)))
+    if (!tryDoMove(angspeed, mapDeltaPos(0.0, -movespeed)))
     {
         skipFrames = 3;
 
@@ -147,7 +206,7 @@ void CRobotGraphicsItem::advance(int phase)
     }
 
     const QPointF prepos(pos());
-    tryMove(leftPower, rightPower);
+    tryMove();
 
     if (pos() != prepos)
         emit posChanged(prepos);

@@ -11,7 +11,8 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 
     QSize origRobotSize;
     QMap<ELEDType, bool> enabledLEDs;
-    int leftPower, rightPower;
+    QMap<EMotor, int> motorPower;
+    QMap<EMotor, EMotorDirection> motorDirection;
     int skipFrames;
 
     typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
@@ -21,7 +22,7 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
-    void tryMove(float lpower, float rpower);
+    void tryMove(void);
     bool tryDoMove(float rotspeed, QPointF dpos);
 
 protected:
@@ -36,9 +37,12 @@ public:
                QWidget *widget);
 
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; }
-    void setLeftMotor(int power) { leftPower = power; }
-    void setRightMotor(int power) { rightPower = power; }
     void drawLEDs(QPainter *painter) const;
+
+
+public slots:
+    void setMotorPower(EMotor m, int p) { motorPower[m] = p; }
+    void setMotorDirection(EMotor m, EMotorDirection d) { motorDirection[m] = d; }
 
 signals:
     void rotationChanged(qreal);

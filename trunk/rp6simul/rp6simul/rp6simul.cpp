@@ -45,6 +45,9 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     Q_ASSERT(!instance);
     instance = this;
 
+    qRegisterMetaType<EMotor>("EMotor");
+    qRegisterMetaType<EMotorDirection>("EMotorDirection");
+
     simulator = new CSimulator(this);
     connect(simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
             SLOT(updateClockDisplay(unsigned long)));
@@ -94,6 +97,15 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
 
     // UNDONE
     openProjectFile("/home/rick/test.rp6");
+}
+
+CRP6Simulator::~CRP6Simulator()
+{
+    // Stop plugin manually: ensures safe thread destruction before anything
+    // else is destroyed
+    simulator->stopPlugin();
+    simulator = 0; // Destruction happens automaticallty by Qt's parent system
+    instance = 0;
 }
 
 void CRP6Simulator::createMenus()
@@ -338,6 +350,11 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     robotScene = new CRobotScene(this);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
+    connect(this, SIGNAL(motorPowerChanged(EMotor, int)),
+            robotScene->getRobotItem(), SLOT(setMotorPower(EMotor, int)));
+    connect(this, SIGNAL(motorDirectionChanged(EMotor, EMotorDirection)),
+            robotScene->getRobotItem(),
+            SLOT(setMotorDirection(EMotor, EMotorDirection)));
 
     graphicsView = new QGraphicsView(robotScene);
     graphicsView->setRenderHints(QPainter::Antialiasing |
@@ -363,10 +380,6 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     new QShortcut(QKeySequence("A"), spinbox, SLOT(stepDown()));
     new QShortcut(QKeySequence("S"), spinbox, SLOT(stepUp()));
     vbox->addWidget(spinbox);
-
-    QTimer *timer = new QTimer(this);
-    QObject::connect(timer, SIGNAL(timeout()), robotScene, SLOT(advance()));
-    timer->start(1000 / 33);
 
     return mapStackedWidget;
 }
@@ -809,7 +822,10 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
     else if (!strcmp(motor, "right"))
         mtype = MOTOR_RIGHT;
 
-    instance->robotWidget->setMotorPower(mtype, power);
+    QMutexLocker mlock(&instance->motorPowerMutex);
+    instance->changedMotorPower[mtype] = power;
+
+    instance->emit motorPowerChanged(mtype, power);
 
     return 0;
 }
@@ -833,7 +849,12 @@ int CRP6Simulator::luaSetMotorDir(lua_State *l)
     else if (!strcmp(rdir, "BWD"))
         rd = MOTORDIR_BWD;
 
-    instance->robotWidget->setMotorDirection(ld, rd);
+    QMutexLocker mlock(&instance->motorDirectionMutex);
+    instance->changedMotorDirection[MOTOR_LEFT] = ld;
+    instance->changedMotorDirection[MOTOR_RIGHT] = rd;
+
+    instance->emit motorDirectionChanged(MOTOR_LEFT, ld);
+    instance->emit motorDirectionChanged(MOTOR_RIGHT, rd);
 
     return 0;
 }
@@ -1090,6 +1111,22 @@ void CRP6Simulator::timedUIUpdate()
         parent->setText(1, stritems.last());
     }
     robotStatusUpdateBuffer.clear();
+
+    QMutexLocker mpowerlocker(&motorPowerMutex);
+    for (QMap<EMotor, int>::iterator it=changedMotorPower.begin();
+         it!=changedMotorPower.end(); ++it)
+    {
+        robotWidget->setMotorPower(it.key(), it.value());
+    }
+    changedMotorPower.clear();
+
+    QMutexLocker mdirlocker(&motorDirectionMutex);
+    for (QMap<EMotor, EMotorDirection>::iterator it=changedMotorDirection.begin();
+         it!=changedMotorDirection.end(); ++it)
+    {
+        robotWidget->setMotorDirection(it.key(), it.value());
+    }
+    changedMotorDirection.clear();
 }
 
 void CRP6Simulator::timedLEDUpdate()
@@ -1205,10 +1242,18 @@ void CRP6Simulator::sendSerialPressed()
 
 void CRP6Simulator::debugSetRobotLeftPower(int power)
 {
-    robotScene->getRobotItem()->setLeftMotor(power);
+    robotScene->getRobotItem()->setMotorPower(MOTOR_LEFT, abs(power));
+    if (power >= 0)
+        robotScene->getRobotItem()->setMotorDirection(MOTOR_LEFT, MOTORDIR_FWD);
+    else
+        robotScene->getRobotItem()->setMotorDirection(MOTOR_LEFT, MOTORDIR_BWD);
 }
 
 void CRP6Simulator::debugSetRobotRightPower(int power)
 {
-    robotScene->getRobotItem()->setRightMotor(power);
+    robotScene->getRobotItem()->setMotorPower(MOTOR_RIGHT, abs(power));
+    if (power >= 0)
+        robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_FWD);
+    else
+        robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_BWD);
 }

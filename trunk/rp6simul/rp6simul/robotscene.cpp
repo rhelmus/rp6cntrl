@@ -104,11 +104,14 @@ CRobotScene::CRobotScene(QObject *parent) :
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
-    boxPixmap("../resource/cardboard-box.png"), followRobot(false),
-    viewAngle(0.0), dragging(false), draggedEnough(false),
+    boxPixmap("../resource/cardboard-box.png"), robotAdvanceDelay(1000.0 / 33.0),
+    followRobot(false), viewAngle(0.0), dragging(false), draggedEnough(false),
     mouseMode(MODE_POINT), lightEditMode(false), mapEdited(false),
     gridSize(15.0), autoGridEnabled(true), gridVisible(false)
 {
+    qRegisterMetaTypeStreamOperators<SLightSettings>("SLightSettings");
+    qRegisterMetaTypeStreamOperators<SObjectSettings>("SObjectSettings");
+
     setBackgroundBrush(Qt::darkGray);
 
     robotGraphicsItem = new CRobotGraphicsItem;
@@ -118,8 +121,9 @@ CRobotScene::CRobotScene(QObject *parent) :
     connect(robotGraphicsItem, SIGNAL(rotationChanged(qreal)), this,
             SLOT(robotRotationChanged()));
 
-    qRegisterMetaTypeStreamOperators<SLightSettings>("SLightSettings");
-    qRegisterMetaTypeStreamOperators<SObjectSettings>("SObjectSettings");
+    QTimer *timer = new QTimer(this);
+    connect(timer, SIGNAL(timeout()), SLOT(advance()));
+    timer->start(robotAdvanceDelay);
 }
 
 QGraphicsView *CRobotScene::getGraphicsView() const
