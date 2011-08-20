@@ -45,6 +45,7 @@ private:
     QList<CResizablePixmapGraphicsItem *> boxes;
 
     CRobotGraphicsItem *robotGraphicsItem;
+    const float robotAdvanceDelay;
     QPointF robotStartPosition;
     qreal robotStartRotation;
     bool followRobot;
@@ -102,6 +103,7 @@ public:
     void setAmbientLight(float l);
     EShadowQuality getShadowQuality(void) const { return shadowQuality; }
     void setShadowQuality(EShadowQuality q);
+    float getRobotAdvanceDelay(void) const { return robotAdvanceDelay; }
     float getGridSize(void) const { return gridSize; }
     void setGridSize(float s);
     bool getAutoGrid(void) const { return autoGridEnabled; }

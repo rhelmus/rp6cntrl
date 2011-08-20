@@ -22,9 +22,50 @@ local motorInfo = {
     compareValueA = 0,
     compareValueB = 0,
     inputRegister = 0,
+    leftEncCounter = 0,
+    rightEncCounter = 0,
 }
 
-local LeftEncTimer, rightEncTimer
+local LeftEncTimer, rightEncTimer, encReadoutTimer
+
+local function getSpeedTimerBase()
+    -- This function should return the same value, defined as
+    -- 'SPEED_TIMER_BASE' in the plugin (defined in RP6Config.h shipped
+    -- with the RP6 library)
+    -- UNDONE: Get this from plugin/setting?
+    return 200
+end
+
+local function getEffectiveSpeedTimerBase()
+    --[[
+        There is a small bug/glitch in the shipped RP6 library by Arexx
+        wrt. to obtaining the motor speed. Although it seems that the
+        intention was to obtain the speed every 'SPEED_TIMER_BASE'
+        (default 200) msec, this infact happens at a slight (but significant)
+        lower frequency. The library code keeps for each motor a counter that
+        is incremented after an encoder ISR is executed. By reading and
+        resetting these counters after 'SPEED_TIMER_BASE' msec passed, the
+        motor speeds are obtained. For this a timer with approx. 100 us
+        resolution is used. Within this timer two counters are used, the first
+        is incremented each 100 us, the second every ms. It is this code that
+        is wrong: the first counter is used to see if one ms has passed, this
+        can be done if it has incremented ten times (ie. 10*100 us =  1ms),
+        however due the wrong usage of the post increment operator it is infact
+        tested if it is incremented eleven times (1.1 ms).
+        Similarly the second counter is used to see if 'SPEED_TIMER_BASE' ms
+        have elapsed. Besides the same problem with post increment, the if
+        test also uses '>' instead of '>=', thus the check is in reality
+        if 'SPEED_TIMER_BASE' + 2 ms have passed. Furthermore as the second
+        counter depends on the first counter for increments,
+        the deviations become significant.
+
+        Normal AVR programs are not really affected by this subtle bug,
+        however for accurate motor speed determination we need to correct
+        for this, hence this function.
+    --]]
+
+    return 1.1 * (getSpeedTimerBase() + 2)
+end
 
 -- Essentially same function from timer1.lua
 local function getPrescaler(data)
@@ -69,7 +110,7 @@ local function setControlRegisterB(data)
     local cond = ((bit.unSet(data, avr.WGM13, avr.CS10, avr.CS11, avr.CS12) == 0) and
                   bit.isSet(data, avr.WGM13))
 
-    if ret then
+    if cond then
         local ps = getPrescaler(data)
         if ps and ps ~= motorInfo.prescaler then
             motorInfo.prescaler = ps
@@ -78,8 +119,8 @@ local function setControlRegisterB(data)
             rightEncTimer:setPrescaler(ps)
         end
 
-        ret = (ps ~= nil)
-        if not ret then
+        cond = (ps ~= nil)
+        if not cond then
             warning("Unsupported PWM prescaler set for timer1\n")
         end
     end
@@ -93,22 +134,29 @@ local function setCompareRegisterA(data)
     if data == 0 then
         if rightEncTimer:isEnabled() then
             clock.enableTimer(rightEncTimer, false)
+            if not leftEncTimer:isEnabled() then
+                clock.enableTimer(encReadoutTimer, false)
+            end
         end
     else
-        -- Every 200 msec (ie. SPEED_TIMER_BASE) a counter is read and reset.
-        -- This counter is incremented from the callback functions of the
-        -- motor encoders (ie. INT0_vect/INT1_vect ISRs). For simulation the
-        -- encoders are each simply coupled to a timer. The update frequency
-        -- (compare value) of these 'encoder timers' are set using the
-        -- following formula: CV = MHz / (power * 5)
-        -- (1000 msec/200 msec = 5)
-        -- Thus the motor power and resulting speed calculated from the RP6
-        -- lib code is (mostly) equalized.
+        --[[
+            In the RP6 library motor code, the motor speeds are determined
+            every 'SPEED_TIMER_BASE' ms (see comments in
+            getEffectiveSpeedTimerBase()). To simulate the encoders, timers are
+            used for each motor. These call the ISR that normally is executed by
+            the encoders. Although not strictly necessary, the compare value (CV)
+            from these timers are set in such a way that motor power and motor
+            speed are roughly the same. For this the following formula is used:
+            CV = CPU_MHz / (power * effective_encoder_read_frequency)
+        --]]
         -- UNDONE: cpu speed configurable
-        -- UNDONE: 200 msec configurable?
-        rightEncTimer:setCompareValue(8000000 / (data * 5))
+        local freq = 1000 / getEffectiveSpeedTimerBase()
+        rightEncTimer:setCompareValue(8000000 / (data * freq))
         if not rightEncTimer:isEnabled() then
             clock.enableTimer(rightEncTimer, true)
+        end
+        if not encReadoutTimer:isEnabled() then
+            clock.enableTimer(encReadoutTimer, true)
         end
     end
     updateRobotStatus("motor", "power", "right", data)
@@ -122,12 +170,19 @@ local function setCompareRegisterB(data)
     if data == 0 then
         if leftEncTimer:isEnabled() then
             clock.enableTimer(leftEncTimer, false)
+            if not rightEncTimer:isEnabled() then
+                clock.enableTimer(encReadoutTimer, false)
+            end
         end
     else
         -- Comments: see setCompareRegisterA
-        leftEncTimer:setCompareValue((8000000 / (data * 5)))
+        local freq = 1000 / getEffectiveSpeedTimerBase()
+        leftEncTimer:setCompareValue(8000000 / (data * freq))
         if not leftEncTimer:isEnabled() then
             clock.enableTimer(leftEncTimer, true)
+        end
+        if not encReadoutTimer:isEnabled() then
+            clock.enableTimer(encReadoutTimer, true)
         end
     end
     updateRobotStatus("motor", "power", "left", data)
@@ -144,16 +199,55 @@ end
 local function setMotorDirection(data)
     local ldir = (bit.isSet(data, avr.PINC2) and "BWD") or "FWD"
     local rdir = (bit.isSet(data, avr.PINC3) and "BWD") or "FWD"
+    updateRobotStatus("motor", "direction", "left", ldir)
+    updateRobotStatus("motor", "direction", "right", rdir)
     setMotorDir(ldir, rdir)
 end
 
 
-
 function initPlugin()
+    --[[
+        For simulation of each encoder a timer is used that executes the
+        encoder ISR at such intervals that motor power and speed are roughly
+        equal (see comments in setCompareRegisterA()). A third timer is used
+        to determine the simulated motor speed. In a similar way as the RP6
+        library code, at every 'SPEED_TIMER_BASE' ms the speeds are determined
+        from counters that are incremented by the encoders (see comments in
+        getEffectiveSpeedTimerBase()). In the library code timer0 is used,
+        which has a compare value of 99 and a prescaler of 8, resulting in
+        a resolution of approx 100 us. To simulate readings every 200 ms, we
+        therefore could use a timer with a compare value of:
+        CV = 8 * 99 * 10 * SPEED_TIMER_BASE
+        However due some subtle bugs (see getEffectiveSpeedTimerBase()), a small
+        correction is needed:
+        CV = 8 * 99 * 10 * SPEED_TIMER_BASE
+    --]]
+
     leftEncTimer = clock.createTimer()
-    leftEncTimer:setTimeOut(avr.ISR_INT0_vect)
+    leftEncTimer:setTimeOut(function()
+        avr.execISR(avr.ISR_INT0_vect)
+        motorInfo.leftEncCounter = motorInfo.leftEncCounter + 1
+    end)
+
     rightEncTimer = clock.createTimer()
-    rightEncTimer:setTimeOut(avr.ISR_INT1_vect)
+    rightEncTimer:setTimeOut(function()
+        avr.execISR(avr.ISR_INT1_vect)
+        motorInfo.rightEncCounter = motorInfo.rightEncCounter + 1
+    end)
+
+    encReadoutTimer = clock.createTimer()
+    encReadoutTimer:setTimeOut(function()
+        motorInfo.leftSpeed = motorInfo.leftEncCounter
+        motorInfo.leftEncCounter = 0
+        updateRobotStatus("motor", "speed", "left", motorInfo.leftSpeed)
+
+        motorInfo.rightSpeed = motorInfo.rightEncCounter
+        motorInfo.rightEncCounter = 0
+        updateRobotStatus("motor", "speed", "right", motorInfo.rightSpeed)
+    end)
+
+    -- See top
+    encReadoutTimer:setCompareValue(8 * 99 * 11 * 202)
 end
 
 function handleIOData(type, data)

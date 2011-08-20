@@ -125,6 +125,7 @@ CSimulator::~CSimulator()
     terminateAVRClock();
     delete AVRClock;
     terminatePluginMainThread();
+    instance = 0;
 }
 
 void CSimulator::initAVRClock()

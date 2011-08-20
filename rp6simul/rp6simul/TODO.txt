@@ -33,11 +33,13 @@
     - default values drivers
     - default values widgets
     - ...
-  move UI Lua function to separate package?
+- move UI Lua function to separate package?
+- lock robot when selected?
+- robot context menu option to lock robot
 - patch RP6Lib
     - C++ support
     - no anonymous unions (gives compile errors + no duplicate variables)
     - Check changes made on kubuntu
     - ...
-- BUG: Lua destruction happens too later?
-- BUG: update() called from separate thread
+- reset plugin action (stop+start)
+- BUG: lua timer destroyed after CSimulator is
