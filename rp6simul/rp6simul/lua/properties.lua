@@ -19,6 +19,7 @@ local blue = { 0, 0, 255 }
 robotProperties =
 {
     scale = { cmPerPixel = 11.3 / 565 }, -- See top comments
+    robotLength = { length = 18.9 }, -- in cm, used for rotation
 
     led1 = { pos = { 458, 209 }, shape = "ellips", radius = 10, color = green },
     led2 = { pos = { 458, 184 }, shape = "ellips", radius = 10, color = red },

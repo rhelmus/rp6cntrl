@@ -134,9 +134,6 @@ local function setCompareRegisterA(data)
     if data == 0 then
         if rightEncTimer:isEnabled() then
             clock.enableTimer(rightEncTimer, false)
-            if not leftEncTimer:isEnabled() then
-                clock.enableTimer(encReadoutTimer, false)
-            end
         end
     else
         --[[
@@ -170,9 +167,6 @@ local function setCompareRegisterB(data)
     if data == 0 then
         if leftEncTimer:isEnabled() then
             clock.enableTimer(leftEncTimer, false)
-            if not rightEncTimer:isEnabled() then
-                clock.enableTimer(encReadoutTimer, false)
-            end
         end
     else
         -- Comments: see setCompareRegisterA
@@ -220,7 +214,7 @@ function initPlugin()
         CV = 8 * 99 * 10 * SPEED_TIMER_BASE
         However due some subtle bugs (see getEffectiveSpeedTimerBase()), a small
         correction is needed:
-        CV = 8 * 99 * 10 * SPEED_TIMER_BASE
+        CV = 8 * 99 * 11 * (SPEED_TIMER_BASE+2)
     --]]
 
     leftEncTimer = clock.createTimer()
@@ -240,14 +234,16 @@ function initPlugin()
         motorInfo.leftSpeed = motorInfo.leftEncCounter
         motorInfo.leftEncCounter = 0
         updateRobotStatus("motor", "speed", "left", motorInfo.leftSpeed)
+        setMotorSpeed("left", motorInfo.leftSpeed)
 
         motorInfo.rightSpeed = motorInfo.rightEncCounter
         motorInfo.rightEncCounter = 0
         updateRobotStatus("motor", "speed", "right", motorInfo.rightSpeed)
+        setMotorSpeed("right", motorInfo.rightSpeed)
     end)
 
     -- See top
-    encReadoutTimer:setCompareValue(8 * 99 * 11 * 202)
+    encReadoutTimer:setCompareValue(8 * 99 * 11 * (getSpeedTimerBase()+2))
 end
 
 function handleIOData(type, data)

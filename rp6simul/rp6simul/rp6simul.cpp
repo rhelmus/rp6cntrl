@@ -352,6 +352,8 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
     connect(this, SIGNAL(motorPowerChanged(EMotor, int)),
             robotScene->getRobotItem(), SLOT(setMotorPower(EMotor, int)));
+    connect(this, SIGNAL(motorSpeedChanged(EMotor, int)),
+            robotScene->getRobotItem(), SLOT(setMotorSpeed(EMotor, int)));
     connect(this, SIGNAL(motorDirectionChanged(EMotor, EMotorDirection)),
             robotScene->getRobotItem(),
             SLOT(setMotorDirection(EMotor, EMotorDirection)));
@@ -391,7 +393,6 @@ QWidget *CRP6Simulator::createLogWidgets()
 
     ret->addTab(logWidget = new QPlainTextEdit, "log");
     logWidget->setReadOnly(true);
-    logWidget->setCenterOnScroll(true);
 
     QWidget *w = new QWidget(ret);
     ret->addTab(w, "serial");
@@ -399,7 +400,6 @@ QWidget *CRP6Simulator::createLogWidgets()
 
     grid->addWidget(serialOutputWidget = new QPlainTextEdit, 0, 0, 1, 3);
     serialOutputWidget->setReadOnly(true);
-    serialOutputWidget->setCenterOnScroll(true);
 
     grid->addWidget(serialInputWidget = new QLineEdit, 1, 0);
 
@@ -449,6 +449,7 @@ QDockWidget *CRP6Simulator::createStatusDock()
                                 QStringList() << "Templates");
     mapHistoryTreeItem = new QTreeWidgetItem(mapSelectorTreeWidget,
                                              QStringList() << "Map history");
+    mapHistoryTreeItem->setExpanded(true);
     loadMapTemplatesTree();
     loadMapHistoryTree();
 
@@ -677,6 +678,7 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
     NLua::registerFunction(luaEnableLED, "enableLED");
     NLua::registerFunction(luaSetMotorPower, "setMotorPower");
+    NLua::registerFunction(luaSetMotorSpeed, "setMotorSpeed");
     NLua::registerFunction(luaSetMotorDir, "setMotorDir");
 
     // UNDONE: Needed?
@@ -689,6 +691,7 @@ QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
     text = Qt::escape(text);
     // Html doesn't like tabs too much
     text = text.replace('\t', QString("&nbsp;").repeated(4));
+    text = text.replace('\n', "<br>");
     QString fs;
     switch (type)
     {
@@ -697,7 +700,7 @@ QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
     case LOG_ERROR: fs = QString("<FONT color=#FF0000><strong>ERROR: </strong></FONT> %1").arg(text); break;
     }
 
-    return QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2<br>")
+    return QString("<FONT color=#0000FF><strong>[%1]</strong></FONT> %2")
             .arg(QTime::currentTime().toString()).arg(fs);
 }
 
@@ -826,6 +829,28 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
     instance->changedMotorPower[mtype] = power;
 
     instance->emit motorPowerChanged(mtype, power);
+
+    return 0;
+}
+
+int CRP6Simulator::luaSetMotorSpeed(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    const char *motor = luaL_checkstring(l, 1);
+    const int speed = luaL_checkinteger(l, 2);
+
+    EMotor mtype;
+
+    if (!strcmp(motor, "left"))
+        mtype = MOTOR_LEFT;
+    else if (!strcmp(motor, "right"))
+        mtype = MOTOR_RIGHT;
+
+    QMutexLocker mlock(&instance->motorSpeedMutex);
+    instance->changedMotorSpeed[mtype] = speed;
+
+    instance->emit motorSpeedChanged(mtype, speed);
 
     return 0;
 }
@@ -1119,6 +1144,14 @@ void CRP6Simulator::timedUIUpdate()
         robotWidget->setMotorPower(it.key(), it.value());
     }
     changedMotorPower.clear();
+
+    QMutexLocker mspeedlocker(&motorSpeedMutex);
+    for (QMap<EMotor, int>::iterator it=changedMotorSpeed.begin();
+         it!=changedMotorSpeed.end(); ++it)
+    {
+        robotWidget->setMotorSpeed(it.key(), it.value());
+    }
+    changedMotorSpeed.clear();
 
     QMutexLocker mdirlocker(&motorDirectionMutex);
     for (QMap<EMotor, EMotorDirection>::iterator it=changedMotorDirection.begin();

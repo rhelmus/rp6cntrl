@@ -11,7 +11,7 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 
     QSize origRobotSize;
     QMap<ELEDType, bool> enabledLEDs;
-    QMap<EMotor, int> motorPower;
+    QMap<EMotor, int> motorPower, motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
     int skipFrames;
 
@@ -42,6 +42,7 @@ public:
 
 public slots:
     void setMotorPower(EMotor m, int p) { motorPower[m] = p; }
+    void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; }
     void setMotorDirection(EMotor m, EMotorDirection d) { motorDirection[m] = d; }
 
 signals:

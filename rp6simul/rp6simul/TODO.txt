@@ -18,7 +18,12 @@
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
 - Map:
-    - Robot start --> only update start position/rotation when modified by user
+    - Robot start
+        - only update start position/rotation when modified by user
+        - Different gfx? (colour?, image?)
+            - Hide when plugin is running and show real robot and vice versa
+              when plugins stops.
+        - Reset when plugin stops
     - Manual lighting update: force complete? Or remove it?
     - Enable/disable menu options etc when project is loaded or not
     - Map selector etc: check if valid file type?
@@ -35,7 +40,10 @@
     - ...
 - move UI Lua function to separate package?
 - lock robot when selected?
-- robot context menu option to lock robot
+- robot context menu:
+    - option to lock robot
+    - reset angle
+    - turn robot by XX degrees
 - patch RP6Lib
     - C++ support
     - no anonymous unions (gives compile errors + no duplicate variables)
