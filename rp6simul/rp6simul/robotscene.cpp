@@ -116,10 +116,12 @@ CRobotScene::CRobotScene(QObject *parent) :
 
     robotGraphicsItem = new CRobotGraphicsItem;
     addItem(robotGraphicsItem);
+    connect(robotGraphicsItem, SIGNAL(robotMoved(const QPointF &, qreal)),
+            this, SLOT(updateRobotFollowing()));
     connect(robotGraphicsItem, SIGNAL(posChanged(const QPointF &)), this,
-            SLOT(robotPosChanged()));
+            SLOT(updateRobotStartPosition()));
     connect(robotGraphicsItem, SIGNAL(rotationChanged(qreal)), this,
-            SLOT(robotRotationChanged()));
+            SLOT(updateRobotStartRotation()));
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), SLOT(advance()));
@@ -462,22 +464,23 @@ void CRobotScene::markLightingDirty(float)
     handleDirtyLighting();
 }
 
-void CRobotScene::robotPosChanged()
+void CRobotScene::updateRobotFollowing()
 {
     if (followRobot)
     {
         rotateView(robotGraphicsItem->rotation());
         getGraphicsView()->centerOn(robotGraphicsItem);
     }
+}
 
-    // UNDONE: Check if moved by plugin code or by user
+void CRobotScene::updateRobotStartPosition()
+{
     robotStartPosition = robotGraphicsItem->pos();
     markMapEdited();
 }
 
-void CRobotScene::robotRotationChanged()
+void CRobotScene::updateRobotStartRotation()
 {
-    // UNDONE: Check if moved by plugin code or by user
     robotStartRotation = robotGraphicsItem->rotation();
     markMapEdited();
 }
@@ -926,7 +929,7 @@ void CRobotScene::setFollowRobot(bool f, bool sign)
          rotateView(0.0);
      else
      {
-         robotPosChanged(); // Trigger initial focus in case robot doesn't move
+         updateRobotFollowing(); // Trigger initial focus in case robot doesn't move
          if (mouseMode != MODE_POINT)
              setMouseMode(MODE_POINT, true);
      }

@@ -287,6 +287,8 @@ QWidget *CRP6Simulator::createMainWidget()
 
     mainStackedWidget->addWidget(projectTabWidget = new QTabWidget);
 
+    // NOTE: createRobotWidget() needs to be called before
+    //       createRobotSceneWidget()
     projectTabWidget->addTab(createRobotWidget(), "Robot");
     projectTabWidget->addTab(createRobotSceneWidget(), "Map");
 
@@ -350,13 +352,15 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     robotScene = new CRobotScene(this);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
-    connect(this, SIGNAL(motorPowerChanged(EMotor, int)),
-            robotScene->getRobotItem(), SLOT(setMotorPower(EMotor, int)));
     connect(this, SIGNAL(motorSpeedChanged(EMotor, int)),
             robotScene->getRobotItem(), SLOT(setMotorSpeed(EMotor, int)));
     connect(this, SIGNAL(motorDirectionChanged(EMotor, EMotorDirection)),
             robotScene->getRobotItem(),
             SLOT(setMotorDirection(EMotor, EMotorDirection)));
+    connect(robotScene->getRobotItem(), SIGNAL(bumperChanged(EBumper, bool)),
+            robotWidget, SLOT(setBumperHit(EBumper, bool)));
+    connect(robotScene->getRobotItem(), SIGNAL(bumperChanged(EBumper, bool)),
+            SLOT(setLuaBumper(EBumper, bool)));
 
     graphicsView = new QGraphicsView(robotScene);
     graphicsView->setRenderHints(QPainter::Antialiasing |
@@ -370,7 +374,7 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     QSpinBox *spinbox = new QSpinBox;
     connect(spinbox, SIGNAL(valueChanged(int)), this,
             SLOT(debugSetRobotLeftPower(int)));
-    spinbox->setRange(-100, 100);
+    spinbox->setRange(-210, 210);
     new QShortcut(QKeySequence("Q"), spinbox, SLOT(stepDown()));
     new QShortcut(QKeySequence("W"), spinbox, SLOT(stepUp()));
     vbox->addWidget(spinbox);
@@ -378,7 +382,7 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     spinbox = new QSpinBox;
     connect(spinbox, SIGNAL(valueChanged(int)), this,
             SLOT(debugSetRobotRightPower(int)));
-    spinbox->setRange(-100, 100);
+    spinbox->setRange(-210, 210);
     new QShortcut(QKeySequence("A"), spinbox, SLOT(stepDown()));
     new QShortcut(QKeySequence("S"), spinbox, SLOT(stepUp()));
     vbox->addWidget(spinbox);
@@ -406,7 +410,8 @@ QWidget *CRP6Simulator::createLogWidgets()
     grid->addWidget(serialSendButton = new QPushButton("Send"), 1, 1);
     serialSendButton->setEnabled(false);
     connect(serialSendButton, SIGNAL(clicked()), this, SLOT(sendSerialPressed()));
-    connect(serialInputWidget, SIGNAL(returnPressed()), serialSendButton, SLOT(click()));
+    connect(serialInputWidget, SIGNAL(returnPressed()), serialSendButton,
+            SLOT(click()));
 
     QPushButton *button = new QPushButton("Clear");
     connect(button, SIGNAL(clicked()), serialOutputWidget, SLOT(clear()));
@@ -672,6 +677,7 @@ void CRP6Simulator::initLua()
         luaError(NLua::luaInterface, true);
 
     simulator->initLua();
+    robotScene->getRobotItem()->initLua();
 
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
@@ -827,8 +833,6 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
 
     QMutexLocker mlock(&instance->motorPowerMutex);
     instance->changedMotorPower[mtype] = power;
-
-    instance->emit motorPowerChanged(mtype, power);
 
     return 0;
 }
@@ -1261,11 +1265,27 @@ void CRP6Simulator::mapSelectorItemActivated(QTreeWidgetItem *item)
         loadMapFile(item->data(0, Qt::UserRole).toString(), true);
 }
 
+void CRP6Simulator::setLuaBumper(EBumper b, bool e)
+{
+    NLua::CLuaLocker lualocker;
+    lua_getglobal(NLua::luaInterface, "setBumper");
+
+    if (b == BUMPER_LEFT)
+        lua_pushstring(NLua::luaInterface, "left");
+    else if (b == BUMPER_RIGHT)
+        lua_pushstring(NLua::luaInterface, "right");
+
+    lua_pushboolean(NLua::luaInterface, e);
+
+    lua_call(NLua::luaInterface, 2, 0);
+}
+
 void CRP6Simulator::sendSerialPressed()
 {
     NLua::CLuaLocker lualocker;
     lua_getglobal(NLua::luaInterface, "sendSerial");
-    lua_pushstring(NLua::luaInterface, qPrintable(serialInputWidget->text() + "\n"));
+    lua_pushstring(NLua::luaInterface,
+                   qPrintable(serialInputWidget->text() + "\n"));
     lua_call(NLua::luaInterface, 1, 0);
 
     serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));
@@ -1275,7 +1295,7 @@ void CRP6Simulator::sendSerialPressed()
 
 void CRP6Simulator::debugSetRobotLeftPower(int power)
 {
-    robotScene->getRobotItem()->setMotorPower(MOTOR_LEFT, abs(power));
+    robotScene->getRobotItem()->setMotorSpeed(MOTOR_LEFT, abs(power));
     if (power >= 0)
         robotScene->getRobotItem()->setMotorDirection(MOTOR_LEFT, MOTORDIR_FWD);
     else
@@ -1284,7 +1304,7 @@ void CRP6Simulator::debugSetRobotLeftPower(int power)
 
 void CRP6Simulator::debugSetRobotRightPower(int power)
 {
-    robotScene->getRobotItem()->setMotorPower(MOTOR_RIGHT, abs(power));
+    robotScene->getRobotItem()->setMotorSpeed(MOTOR_RIGHT, abs(power));
     if (power >= 0)
         robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_FWD);
     else

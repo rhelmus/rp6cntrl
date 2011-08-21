@@ -28,11 +28,13 @@ public:
     QSize minimumSizeHint(void) const { return widgetMinSize; }
 
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
-    void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
     void setMotorPower(EMotor m, int p) { motorPower[m] = p; update(); }
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; update(); }
     void setMotorDirection(EMotor m, EMotorDirection d)
     { motorDirection[m] = d; update(); }
+
+public slots:
+    void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
 };
 
 #endif // ROBOTWIDGET_H

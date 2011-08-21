@@ -455,7 +455,11 @@ void CSimulator::loadRobotProperties()
                 const int b = luaL_checkint(NLua::luaInterface, -1);
                 lua_pop(NLua::luaInterface, 1);
 
-                fields["color"] = QColor(r, g, b);
+                lua_rawgeti(NLua::luaInterface, -1, 4);
+                const int a = luaL_optinteger(NLua::luaInterface, -1, 255);
+                lua_pop(NLua::luaInterface, 1);
+
+                fields["color"] = QColor(r, g, b, a);
 
                 lua_pop(NLua::luaInterface, 1); // Pop "color" table
             }
@@ -577,6 +581,7 @@ void CSimulator::terminatePluginMainThread()
 
         delete pluginMainThread;
         pluginMainThread = 0;
+        quitPlugin = false;
     }
 }
 
@@ -757,7 +762,8 @@ int CSimulator::luaClockCreateTimer(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
     CAVRTimer *timer = instance->AVRClock->createTimer();
-    NLua::createClass(l, timer, "timer", luaTimerDestr);
+    // UNDONE: Still need Lua destructor?
+    NLua::createClass(l, timer, "timer"/*, luaTimerDestr*/);
     return 1;
 }
 
@@ -776,7 +782,9 @@ int CSimulator::luaTimerDestr(lua_State *l)
 
     NLua::CLuaLocker lualocker;
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
-    instance->AVRClock->removeTimer(timer);
+    // HACK: instance may already be destroyed
+    if (instance)
+        instance->AVRClock->removeTimer(timer);
     delete timer;
     return 0;
 }
@@ -1036,6 +1044,19 @@ void CSimulator::stopPlugin()
     // UNDONE: Thread safe?
     while (AVRClock->isActive())
         ;
+
+    // Remove any remaining timers.
+    // NOTE: This is very important, since a timer may hold a reference
+    // to a lua function, which in turn may prevent garbage collection of
+    // drivers.
+    // NOTE: This means that closePlugin() cannot access any timers!
+    CAVRClock::TTimerList timers = AVRClock->getTimers();
+    while (!timers.isEmpty())
+    {
+        CAVRTimer *t = timers.takeLast();
+        AVRClock->removeTimer(t);
+        delete t;
+    }
 
     lua_getglobal(NLua::luaInterface, "closePlugin");
     lua_call(NLua::luaInterface, 0, 0);

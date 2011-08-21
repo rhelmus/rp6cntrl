@@ -154,6 +154,8 @@ CAVRTimer *CAVRClock::createTimer()
 {
     CAVRTimer *ret = new CAVRTimer;
     timerList << ret;
+    qDebug() << "Added new timer: " << (void *)ret <<
+                "(" << timerList.count() << "registered)";
     return ret;
 }
 
@@ -169,7 +171,7 @@ void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
 
 void CAVRClock::removeTimer(CAVRTimer *timer)
 {
-    qDebug() << "Removed timer from clock";
+    qDebug() << "Removed timer from clock:" << (void *)timer;
     timerList.removeOne(timer);
 }
 

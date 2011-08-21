@@ -10,10 +10,16 @@
 
 namespace {
 
-bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles)
+// Check if one of the obstacles actually causes a collision
+bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles,
+                         QGraphicsItem *parent)
 {
     foreach (QGraphicsItem *it, obstacles)
     {
+        if (parent &&
+            ((it->parentItem() == parent) || (it == parent)))
+            continue;
+
         if (!qgraphicsitem_cast<CLightGraphicsItem *>(it) &&
             !qgraphicsitem_cast<CHandleGraphicsItem *>(it))
             return true;
@@ -71,6 +77,8 @@ CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
               CHandleGraphicsItem::HANDLE_TOP);
     addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
               CHandleGraphicsItem::HANDLE_BOTTOM);
+
+    connect(this, SIGNAL(posChanged(const QPointF &)), SLOT(updateBumpers()));
 }
 
 void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -97,10 +105,52 @@ void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
 
     handles[pos] = handle;
 }
+void CRobotGraphicsItem::createBumperItems()
+{
+    const QPolygonF lp(CSimulator::getInstance()->getRobotProperty("bumperLeft", "points").value<QPolygon>());
+    const QPolygonF rp(CSimulator::getInstance()->getRobotProperty("bumperRight", "points").value<QPolygon>());
+    const QColor lc =
+            CSimulator::getInstance()->getRobotProperty("bumperLeft", "color").value<QColor>();
+    const QColor rc =
+            CSimulator::getInstance()->getRobotProperty("bumperRight", "color").value<QColor>();
+
+    const qreal scale = getPixmapScale();
+    QTransform tr;
+    tr.scale(scale, scale);
+
+    QGraphicsPolygonItem *pi = new QGraphicsPolygonItem(tr.map(lp), this);
+    pi->setPen(Qt::NoPen);
+    pi->setBrush(lc);
+    pi->setVisible(false);
+    bumperItems[BUMPER_LEFT] = pi;
+
+    pi = new QGraphicsPolygonItem(tr.map(rp), this);
+    pi->setPen(Qt::NoPen);
+    pi->setBrush(rc);
+    pi->setVisible(false);
+    bumperItems[BUMPER_RIGHT] = pi;
+}
+
 
 QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
 {
     return (mapToParent(x, y) - mapToParent(0.0, 0.0));
+}
+
+qreal CRobotGraphicsItem::getPixmapScale() const
+{
+    // Equal aspect ratio, so scaling equals for width and height
+    return boundingRect().width() / (qreal)origRobotSize.width();
+}
+
+bool CRobotGraphicsItem::handleObstacles(bool checkbumpers)
+{
+    const bool ret = checkCollidingItems(collidingItems(), this);
+
+    if (checkbumpers)
+        updateBumpers();
+
+    return ret;
 }
 
 void CRobotGraphicsItem::tryMove()
@@ -134,7 +184,7 @@ void CRobotGraphicsItem::tryMove()
     const float advdelay = rscene->getRobotAdvanceDelay();
 
     // Correct real distance calculations for different image scale
-    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
+    const qreal scale = getPixmapScale();
     const float cmperpx =
             CSimulator::getInstance()->getRobotProperty("scale", "cmPerPixel").toFloat() / scale;
 
@@ -145,48 +195,6 @@ void CRobotGraphicsItem::tryMove()
             getRobotFrameSpeed(motorSpeed[MOTOR_RIGHT], advdelay,
                                motorDirection[MOTOR_RIGHT], cmperpx);
 
-#if 0
-    // UNDONE: Make this configurable/load from plugin
-    const float encresolution = 0.24;
-    const float speedtimerbase = 200.0;
-
-    // Necessary correction for RP6 library bug: see motor driver
-    const float effspeedtimerbase = 1.1 * (speedtimerbase + 2.0);
-
-    const float speedfreq = 1000.0 / effspeedtimerbase;
-    const float lcounts_s = (float)motorSpeed[MOTOR_LEFT] * speedfreq;
-    const float rcounts_s = (float)motorSpeed[MOTOR_RIGHT] * speedfreq;
-    const float lmm_s = lcounts_s * encresolution;
-    const float rmm_s = rcounts_s * encresolution;
-
-    // Correct real distance calculations for different image scale
-    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
-    const float cmperpx =
-            CSimulator::getInstance()->getRobotProperty("scale", "cmPerPixel").toFloat() / scale;
-
-    const float lpx_s = lmm_s / (cmperpx * 10.0);
-    const float rpx_s = rmm_s / (cmperpx * 10.0);
-
-    const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
-    Q_ASSERT(rscene);
-    // Delay between calls to this function (frame time)
-    const float advdelay = rscene->getRobotAdvanceDelay();
-
-    // Amount of pixels moved during this frame
-    float lspeed = lpx_s / 1000.0 * advdelay;
-    float rspeed = rpx_s / 1000.0 * advdelay;
-
-    if (motorDirection[MOTOR_LEFT] == MOTORDIR_BWD)
-        lspeed = -lspeed;
-    if (motorDirection[MOTOR_RIGHT] == MOTORDIR_BWD)
-        rspeed = -rspeed;
-
-     // UNDONE
-    if (!motorSpeed[MOTOR_LEFT])
-        lspeed = 0.0;
-    if (!motorSpeed[MOTOR_RIGHT])
-        rspeed = 0.0;
-#endif
     // The final move speed is simply the average of both motor speeds.
     const float movespeed = (lspeed + rspeed) / 2.0;
 
@@ -223,28 +231,28 @@ void CRobotGraphicsItem::tryMove()
       the case of failure try to unstuck the robot by moving it in
       random close positions.
     */
-    if (!tryDoMove(degspeed, mapDeltaPos(0.0, -movespeed)))
+    if (!tryDoMove(degspeed, mapDeltaPos(0.0, -movespeed), true))
     {
         skipFrames = 3;
 
         const float l = 0.25, h = 0.75, inc = 0.25;
         for (float dx = l; dx <= h; dx += inc)
         {
-            if (tryDoMove(0.0, mapDeltaPos(dx, 0.0)))
+            if (tryDoMove(0.0, mapDeltaPos(dx, 0.0), false))
                 return;
 
-            if (tryDoMove(0.0, mapDeltaPos(-dx, 0.0)))
+            if (tryDoMove(0.0, mapDeltaPos(-dx, 0.0), false))
                 return;
 
             for (float dy = l; dy <= h; dy += inc)
             {
-                if (tryDoMove(0.0, mapDeltaPos(0.0, dy)))
+                if (tryDoMove(0.0, mapDeltaPos(0.0, dy), false))
                     return;
-                if (tryDoMove(0.0, mapDeltaPos(0.0, -dy)))
+                if (tryDoMove(0.0, mapDeltaPos(0.0, -dy), false))
                     return;
-                if (tryDoMove(0.0, mapDeltaPos(dx, dy)))
+                if (tryDoMove(0.0, mapDeltaPos(dx, dy), false))
                     return;
-                if (tryDoMove(0.0, mapDeltaPos(-dx, dy)))
+                if (tryDoMove(0.0, mapDeltaPos(-dx, dy), false))
                     return;
             }
         }
@@ -253,13 +261,14 @@ void CRobotGraphicsItem::tryMove()
     skipFrames = 0;
 }
 
-bool CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos)
+bool CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos,
+                                   bool checkbumpers)
 {
     const QPointF oldpos(pos());
     const qreal oldrot = rotation();
 
     setRotation(rotation() + rotspeed);
-    if (checkCollidingItems(collidingItems()))
+    if (handleObstacles(checkbumpers))
     {
         setRotation(oldrot);
         return false;
@@ -267,7 +276,7 @@ bool CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos)
     else
     {
         setPos(pos() + dpos);
-        if (checkCollidingItems(collidingItems()))
+        if (handleObstacles(checkbumpers))
         {
             setPos(oldpos);
             return false;
@@ -275,6 +284,29 @@ bool CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos)
     }
 
     return true;
+}
+
+void CRobotGraphicsItem::updateBumpers()
+{
+    const bool lcollides =
+            checkCollidingItems(bumperItems[BUMPER_LEFT]->collidingItems(),
+                                this);
+    const bool rcollides =
+            checkCollidingItems(bumperItems[BUMPER_RIGHT]->collidingItems(),
+                                this);
+
+    if (lcollides != hitBumpers[BUMPER_LEFT])
+    {
+        hitBumpers[BUMPER_LEFT] = lcollides;
+        bumperItems[BUMPER_LEFT]->setVisible(lcollides);
+        emit bumperChanged(BUMPER_LEFT, lcollides);
+    }
+    if (rcollides != hitBumpers[BUMPER_RIGHT])
+    {
+        hitBumpers[BUMPER_RIGHT] = rcollides;
+        bumperItems[BUMPER_RIGHT]->setVisible(rcollides);
+        emit bumperChanged(BUMPER_RIGHT, rcollides);
+    }
 }
 
 void CRobotGraphicsItem::advance(int phase)
@@ -291,10 +323,10 @@ void CRobotGraphicsItem::advance(int phase)
     if (motorSpeed[MOTOR_LEFT] || motorSpeed[MOTOR_RIGHT])
     {
         const QPointF prepos(pos());
-        qDebug() << "rot:" << rotation();
+        const qreal oldrot = rotation();
         tryMove();
-        if (pos() != prepos)
-            emit posChanged(prepos);
+        if ((pos() != prepos) || (oldrot != rotation()))
+            emit robotMoved(prepos, oldrot);
     }
 }
 
@@ -386,8 +418,7 @@ void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
 {
     const QTransform tr(sceneTransform());
 
-    // Equal aspect ratio, so scaling equals for width and height
-    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
+    const qreal scale = getPixmapScale();
 
     if (enabledLEDs[LED1])
         drawLED(*painter, "led1", tr, scale);

@@ -51,3 +51,5 @@
     - ...
 - reset plugin action (stop+start)
 - BUG: lua timer destroyed after CSimulator is
+- robot widget: show motor speeds?
+- Remove lua driver handlers after plugin is stopped

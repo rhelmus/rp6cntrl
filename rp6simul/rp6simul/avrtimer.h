@@ -201,9 +201,12 @@ public:
 
 class CAVRClock: public QObject
 {
+public:
+    typedef QList<CAVRTimer *> TTimerList;
+
+private:
     Q_OBJECT
 
-    typedef QList<CAVRTimer *> TTimerList;
     TTimerList timerList;
     CTicks currentTicks, remainingTicks;
     QTimer *clockTimer;
@@ -222,6 +225,7 @@ public:
     CAVRTimer *createTimer(void);
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);
+    TTimerList &getTimers(void) { return timerList; }
     void start(void);
     bool isActive(void) const;
 
