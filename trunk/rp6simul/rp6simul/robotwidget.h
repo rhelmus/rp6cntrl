@@ -16,7 +16,7 @@ class CRobotWidget : public QWidget
     QPixmap robotPixmap;
     QMap<ELEDType, bool> enabledLEDs;
     QMap<EBumper, bool> hitBumpers;
-    QMap<EMotor, int> motorPower;
+    QMap<EMotor, int> motorPower, motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
 
 protected:
@@ -30,6 +30,7 @@ public:
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
     void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
     void setMotorPower(EMotor m, int p) { motorPower[m] = p; update(); }
+    void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; update(); }
     void setMotorDirection(EMotor m, EMotorDirection d)
     { motorDirection[m] = d; update(); }
 };

@@ -398,6 +398,13 @@ void CSimulator::loadRobotProperties()
                     (float)luaL_checknumber(NLua::luaInterface, -1);
             lua_pop(NLua::luaInterface, 1);
         }
+        else if (key == "robotLength")
+        {
+            lua_getfield(NLua::luaInterface, fieldind, "length");
+            robotProperties["robotLength"]["length"] =
+                    (float)luaL_checknumber(NLua::luaInterface, -1);
+            lua_pop(NLua::luaInterface, 1);
+        }
         else
         {
             lua_getfield(NLua::luaInterface, fieldind, "shape");

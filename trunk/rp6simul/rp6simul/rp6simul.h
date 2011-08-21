@@ -76,6 +76,8 @@ class CRP6Simulator : public QMainWindow
     QMutex robotLEDMutex;
     QMap<EMotor, int> changedMotorPower;
     QMutex motorPowerMutex;
+    QMap<EMotor, int> changedMotorSpeed;
+    QMutex motorSpeedMutex;
     QMap<EMotor, EMotorDirection> changedMotorDirection;
     QMutex motorDirectionMutex;
     QTimer *pluginUpdateUITimer;
@@ -113,6 +115,7 @@ class CRP6Simulator : public QMainWindow
     static int luaUpdateRobotStatus(lua_State *l);
     static int luaEnableLED(lua_State *l);
     static int luaSetMotorPower(lua_State *l);
+    static int luaSetMotorSpeed(lua_State *l);
     static int luaSetMotorDir(lua_State *l);
 
 private slots:
@@ -146,6 +149,7 @@ signals:
     // These are emitted by the class itself to easily thread-synchronize
     // function calls
     void motorPowerChanged(EMotor, int);
+    void motorSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
 };
 

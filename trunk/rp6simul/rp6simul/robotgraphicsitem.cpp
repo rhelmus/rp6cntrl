@@ -22,6 +22,33 @@ bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles)
     return false;
 }
 
+float getRobotFrameSpeed(int motorspeed, float frametime,
+                         EMotorDirection dir, float cmperpx)
+{
+    if (!motorspeed)
+        return 0.0;
+
+    // UNDONE: Make this configurable/load from plugin
+    const float encresolution = 0.24;
+    const float speedtimerbase = 200.0;
+
+    // Necessary correction for RP6 library bug: see motor driver
+    const float effspeedtimerbase = 1.1 * (speedtimerbase + 2.0);
+
+    const float speedfreq = 1000.0 / effspeedtimerbase;
+    const float counts_s = (float)motorspeed * speedfreq;
+    const float mm_s = counts_s * encresolution;
+    const float px_s = mm_s / (cmperpx * 10.0);
+
+    // Amount of pixels moved during this frame
+    float ret = px_s / 1000.0 * frametime;
+
+    if (dir == MOTORDIR_BWD)
+        ret = -ret;
+
+    return ret;
+}
+
 }
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
@@ -78,16 +105,61 @@ QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
 
 void CRobotGraphicsItem::tryMove()
 {
-    const float encresolution = 0.25; // UNDONE
-    const float speedtimerbase = 200.0; // UNDONE
-    // Correction: see motor driver
+    /*
+      This function tries to move the robot, depending on its current
+      motor speeds. For the movement two variables are used: movespeed
+      and degspeed. The first is used to move the robot forwards/backwards,
+      while the second controls how much the robot rotates.
+
+      The movespeed holds the amount of pixels that should be moved during
+      one frame (the delay between a frame is retrieved by
+      CRobotScene::getRobotAdvanceDelay()). For this the counts/s are
+      calculated from the motor speeds, converted to real distance (mm/s) and
+      finally to pixels/s (px/s). The conversion to real distance happens
+      in a similar way the DIST_MM macro from the RP6 library, using the encoder
+      resolution. For mm/s --> px/s conversion the cmPerPixel property (see
+      properties.lua) is used.
+
+      The degspeed holds the amount of degrees that should be rotated during
+      this frame. It is calculated in a similar way as the movespeed. To
+      convert from pixels to degrees, it is assumed that the radius is equal to
+      the length of the robot. This also explains the default value of
+      'ROTATION_FACTOR' defined in the RP6 library. This value is also based
+      on this length and holds the amount of counts per degree * 100.
+    */
+
+    const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+    Q_ASSERT(rscene);
+    // Delay between calls to this function (frame time)
+    const float advdelay = rscene->getRobotAdvanceDelay();
+
+    // Correct real distance calculations for different image scale
+    const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
+    const float cmperpx =
+            CSimulator::getInstance()->getRobotProperty("scale", "cmPerPixel").toFloat() / scale;
+
+    const float lspeed =
+            getRobotFrameSpeed(motorSpeed[MOTOR_LEFT], advdelay,
+                               motorDirection[MOTOR_LEFT], cmperpx);
+    const float rspeed =
+            getRobotFrameSpeed(motorSpeed[MOTOR_RIGHT], advdelay,
+                               motorDirection[MOTOR_RIGHT], cmperpx);
+
+#if 0
+    // UNDONE: Make this configurable/load from plugin
+    const float encresolution = 0.24;
+    const float speedtimerbase = 200.0;
+
+    // Necessary correction for RP6 library bug: see motor driver
     const float effspeedtimerbase = 1.1 * (speedtimerbase + 2.0);
+
     const float speedfreq = 1000.0 / effspeedtimerbase;
-    const float lcounts_s = (float)motorPower[MOTOR_LEFT] * speedfreq;
-    const float rcounts_s = (float)motorPower[MOTOR_RIGHT] * speedfreq;
+    const float lcounts_s = (float)motorSpeed[MOTOR_LEFT] * speedfreq;
+    const float rcounts_s = (float)motorSpeed[MOTOR_RIGHT] * speedfreq;
     const float lmm_s = lcounts_s * encresolution;
     const float rmm_s = rcounts_s * encresolution;
 
+    // Correct real distance calculations for different image scale
     const qreal scale = boundingRect().width() / (qreal)origRobotSize.width();
     const float cmperpx =
             CSimulator::getInstance()->getRobotProperty("scale", "cmPerPixel").toFloat() / scale;
@@ -97,8 +169,10 @@ void CRobotGraphicsItem::tryMove()
 
     const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
     Q_ASSERT(rscene);
+    // Delay between calls to this function (frame time)
     const float advdelay = rscene->getRobotAdvanceDelay();
 
+    // Amount of pixels moved during this frame
     float lspeed = lpx_s / 1000.0 * advdelay;
     float rspeed = rpx_s / 1000.0 * advdelay;
 
@@ -108,39 +182,48 @@ void CRobotGraphicsItem::tryMove()
         rspeed = -rspeed;
 
      // UNDONE
-    if (!motorPower[MOTOR_LEFT])
+    if (!motorSpeed[MOTOR_LEFT])
         lspeed = 0.0;
-    if (!motorPower[MOTOR_RIGHT])
+    if (!motorSpeed[MOTOR_RIGHT])
         rspeed = 0.0;
-
+#endif
+    // The final move speed is simply the average of both motor speeds.
     const float movespeed = (lspeed + rspeed) / 2.0;
 
-    // UNDONE: Property
-    const float chassismm = 165.0;
-    const float chassispx = chassismm / (cmperpx * 10.0);
-    const float perimeter = chassispx * M_PI;
-    const float pxperdeg = perimeter / 360.0;
+    /*
+      Both the move() and rotate() functions from the RP6 library try to
+      improve their accuracy by slowing down before the target encoder
+      counts (ie. target distance) is reached. However this only seems to have
+      a significant effect on move(), because this function sets it
+      'pre-deaccelerate' variable depending on the current driving speed (ie.
+      slow down earlier at high speeds). The rotate() function always slows down
+      100 encoder counts before reaching its target. This value is much too low
+      at high speeds whith the relative low speed update frequency (~5 Hz) used.
+      Therefore a positive bias (ie. turn too far) can clearly be seen when
+      rotation is simulated (without any artificial deviations).
+    */
+    // UNDONE: Correct for modified ROTATION_FACTOR values
+    // UNDONE: Somehow correct for positive bias caused by low speed update
+    //         frequency of RP6 library code?
     const float rotspeed = (lspeed - rspeed) / 2.0;
-    float angspeed = rotspeed / pxperdeg;
+    float degspeed = 0.0;
+    if (rotspeed != 0.0)
+    {
+        const float robotlengthmm = 10.0 *
+                CSimulator::getInstance()->getRobotProperty("robotLength", "length").toFloat();
+        const float robotlengthpx = robotlengthmm / (cmperpx * 10.0);
+        const float perimeter = robotlengthpx * M_PI;
+        const float pxperdeg = perimeter / 360.0;
+        degspeed = rotspeed / pxperdeg;
+    }
 
-    // UNDONE
-    if (rotspeed == 0.0)
-        angspeed = 0.0;
-
-#if 0
-    float lspeed = (float)motorPower[MOTOR_LEFT] / 10.0;
-    float rspeed = (float)motorPower[MOTOR_RIGHT] / 10.0;
-
-    if (motorDirection[MOTOR_LEFT] == MOTORDIR_BWD)
-        lspeed = -lspeed;
-    if (motorDirection[MOTOR_RIGHT] == MOTORDIR_BWD)
-        rspeed = -rspeed;
-
-    const float movespeed = (lspeed + rspeed) / 5.0;
-    const float rotspeed = (lspeed - rspeed) / 15.0;
-#endif
-
-    if (!tryDoMove(angspeed, mapDeltaPos(0.0, -movespeed)))
+    /*
+      Try to move with calculated move- and rotation speeds. This may fail if
+      the robot collides with any obstacles after having rotated/moved. In
+      the case of failure try to unstuck the robot by moving it in
+      random close positions.
+    */
+    if (!tryDoMove(degspeed, mapDeltaPos(0.0, -movespeed)))
     {
         skipFrames = 3;
 
@@ -205,11 +288,14 @@ void CRobotGraphicsItem::advance(int phase)
         return;
     }
 
-    const QPointF prepos(pos());
-    tryMove();
-
-    if (pos() != prepos)
-        emit posChanged(prepos);
+    if (motorSpeed[MOTOR_LEFT] || motorSpeed[MOTOR_RIGHT])
+    {
+        const QPointF prepos(pos());
+        qDebug() << "rot:" << rotation();
+        tryMove();
+        if (pos() != prepos)
+            emit posChanged(prepos);
+    }
 }
 
 bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
