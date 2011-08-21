@@ -135,6 +135,7 @@ private slots:
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
     void mapSelectorItemActivated(QTreeWidgetItem *item);
+    void setLuaBumper(EBumper b, bool e);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);
@@ -148,7 +149,6 @@ public:
 signals:
     // These are emitted by the class itself to easily thread-synchronize
     // function calls
-    void motorPowerChanged(EMotor, int);
     void motorSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
 };

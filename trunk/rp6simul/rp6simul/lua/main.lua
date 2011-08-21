@@ -1,6 +1,7 @@
 local driverList = { }
 local IOHandleMap = { }
 
+-- Local utilities
 local function getVarargString(s, ...)
     s = tostring(s)
 
@@ -103,6 +104,12 @@ function setSerialInputHandler(func)
     serialInputHandler = func
 end
 
+local bumperHandler
+function setBumperHandler(func)
+    bumperHandler = func
+end
+
+
 -- Functions called by C++ code
 function init()
     -- UNDONE: Need this?
@@ -122,8 +129,10 @@ function closePlugin()
     for _, d in ipairs(driverList) do
         callOptDriverFunc(d, "closePlugin")
     end
+
     driverList = { }
     IOHandleMap = { }
+
     collectgarbage("collect") -- Force removal of drivers
 end
 
@@ -167,6 +176,12 @@ end
 function sendSerial(text)
     if serialInputHandler then
         serialInputHandler(text)
+    end
+end
+
+function setBumper(b, e)
+    if bumperHandler then
+        bumperHandler(b, e)
     end
 end
 

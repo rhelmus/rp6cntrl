@@ -119,6 +119,7 @@ OTHER_FILES += \
     lua/drivers/led.lua \
     lua/drivers/adc.lua \
     lua/drivers/acs.lua \
-    lua/properties.lua
+    lua/properties.lua \
+    lua/drivers/bumper.lua
 
 INCLUDEPATH += ../lua

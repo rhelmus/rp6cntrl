@@ -9,12 +9,18 @@ It is important to update this file whenever rp6-top.png is changed!
 Data used for scale parameter:
 RP6 (board) width: 11.3 cm
 Using GIMP's ruler tool this should equal 565 px from the rp6-top.png image.
+
+The bumper fields contain the different points needed to construct a polygon
+for collision detection. These points are taken in such a way that they are
+'outside' the bumper: due scaling artifacts of the robot image, the resulting
+image gets a small 'border' around it. Thus to make sure that the bumpers are
+really hit, a larger collision polygon must be used.
 --]]
 
 local green = { 0, 255, 0 }
 local red = { 255, 0, 0 }
 local darkblue = { 0, 0, 192 }
-local blue = { 0, 0, 255 }
+local transblue = { 0, 0, 255, 80 }
 
 robotProperties =
 {
@@ -34,13 +40,13 @@ robotProperties =
     bumperLeft =
     {
         shape = "polygon",
-        points = { { 121, 4 }, { 128, 1 }, { 201, 2 }, { 318, 26 }, { 128, 25 } },
-        color = blue
+        points = { { 119, -1 }, { 210, -1 }, { 319, 23 }, { 125, 28 } },
+        color = transblue
     },
     bumperRight =
     {
         shape = "polygon",
-        points = { { 322, 26 }, { 446, 8 }, { 516, 18 }, { 518, 28 }, { 510, 40 } },
-        color = blue
+        points = { { 322, 23 }, { 439, 2 }, { 523, 12 }, { 525, 28 }, { 515, 44 } },
+        color = transblue
     },
 }

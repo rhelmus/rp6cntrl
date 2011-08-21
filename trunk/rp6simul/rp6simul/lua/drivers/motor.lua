@@ -26,7 +26,7 @@ local motorInfo = {
     rightEncCounter = 0,
 }
 
-local LeftEncTimer, rightEncTimer, encReadoutTimer
+local leftEncTimer, rightEncTimer, encReadoutTimer
 
 local function getSpeedTimerBase()
     -- This function should return the same value, defined as
@@ -115,8 +115,9 @@ local function setControlRegisterB(data)
         if ps and ps ~= motorInfo.prescaler then
             motorInfo.prescaler = ps
             log(string.format("Changed timer1 PWM prescaler to %d\n", ps))
-            leftEncTimer:setPrescaler(ps)
-            rightEncTimer:setPrescaler(ps)
+            -- UNDONE: Need this?
+--            leftEncTimer:setPrescaler(ps)
+--            rightEncTimer:setPrescaler(ps)
         end
 
         cond = (ps ~= nil)
@@ -170,6 +171,7 @@ local function setCompareRegisterB(data)
         end
     else
         -- Comments: see setCompareRegisterA
+        -- UNDONE: cpu speed configurable
         local freq = 1000 / getEffectiveSpeedTimerBase()
         leftEncTimer:setCompareValue(8000000 / (data * freq))
         if not leftEncTimer:isEnabled() then
@@ -290,5 +292,6 @@ function handleIOData(type, data)
         end
     end
 end
+
 
 return ret

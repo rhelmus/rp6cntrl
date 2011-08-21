@@ -81,8 +81,9 @@ private slots:
     void markLightingDirty(const QPointF &oldp);
     void markLightingDirty(const QSizeF &olds);
     void markLightingDirty(float);
-    void robotPosChanged(void);
-    void robotRotationChanged(void);
+    void updateRobotFollowing(void);
+    void updateRobotStartPosition(void);
+    void updateRobotStartRotation(void);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);

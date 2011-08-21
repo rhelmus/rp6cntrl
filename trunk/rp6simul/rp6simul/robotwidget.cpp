@@ -20,10 +20,8 @@ void drawBumper(QPainter &painter, const char *propname,
         *it = tr.map(*it);
     }
 
-    QColor c =
+    const QColor c =
             CSimulator::getInstance()->getRobotProperty(propname, "color").value<QColor>();
-
-    c.setAlpha(127);
 
     painter.setBrush(c);
     painter.setPen(Qt::NoPen);
@@ -33,8 +31,6 @@ void drawBumper(QPainter &painter, const char *propname,
 void drawMotorIndicator(QPainter &painter, const QRect &rect, int gradh,
                         EMotorDirection dir)
 {
-    // UNDONE: Direction
-
     const int tailwidth = 0.5 * (float)rect.width();
     const int tailx = rect.left() + ((rect.width()-tailwidth) / 2);
     const int headheight = 0.25 * rect.height();
@@ -98,6 +94,7 @@ void CRobotWidget::paintEvent(QPaintEvent *)
     tr.translate(imgx, imgy);
 
     // Equal aspect ratio, so scaling equals for width and height
+    // UNDONE: move to transform
     const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
 
     // NOTE: drawLED() alters brush

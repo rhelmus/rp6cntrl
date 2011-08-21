@@ -42,7 +42,7 @@ public:
     void setDeletable(bool d) { isDeletable = d; }
 
 signals:
-    void posChanged(const QPointF &oldp);
+    void posChanged(const QPointF &);
     void removed(CBaseGraphicsItem *);
 };
 
