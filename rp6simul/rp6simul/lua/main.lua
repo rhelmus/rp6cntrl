@@ -1,4 +1,6 @@
 local driverList = { }
+-- Used to check if drivers are properly destructed
+local weakDriverList = setmetatable({ }, { __mode = "kv" })
 local IOHandleMap = { }
 
 -- Local utilities
@@ -71,9 +73,10 @@ local function initDriver(d)
             IOHandleMap[v] = IOHandleMap[v] or { }
             table.insert(IOHandleMap[v], driver)
         end
-
-        table.insert(driverList, driver)
     end
+
+    table.insert(driverList, driver)
+    table.insert(weakDriverList, driver)
 
     callOptDriverFunc(driver, "initPlugin")
 end
@@ -112,7 +115,7 @@ end
 
 -- Functions called by C++ code
 function init()
-    -- UNDONE: Need this?
+    math.randomseed(os.time())
 end
 
 function initPlugin(drivers)
@@ -130,10 +133,20 @@ function closePlugin()
         callOptDriverFunc(d, "closePlugin")
     end
 
+    serialInputHandler = nil
+    bumperHandler = nil
+
     driverList = { }
     IOHandleMap = { }
 
     collectgarbage("collect") -- Force removal of drivers
+
+    if #weakDriverList > 0 then
+        warning("Not all drivers were properly destroyed! Remaining drivers:\n")
+        for k, v in pairs(weakDriverList) do
+            warning(string.format("\t[%d] = %s\n", k, v.description))
+        end
+    end
 end
 
 function handleIOData(type, data)
