@@ -6,7 +6,7 @@ handledIORegisters = {
     avr.IO_PORTB,
     avr.IO_PORTC,
     avr.IO_PORTD,
-    avr,IO_DDRB,
+    avr.IO_DDRB,
     avr.IO_DDRD,
 }
 
@@ -66,6 +66,18 @@ local function updateACSPower(type, data)
     end
 end
 
+local function maybeReceivePulse()
+    local chance = 0.05 -- UNDONE
+    -- Simulate that only a fraction of send pulses are bounced back
+    -- towards the detector. Receiving pulses happens immidiately after they
+    -- are sent. Note that in real life pulses travel at the speed of light,
+    -- which is close too instant as well :)
+    if math.random() <= chance then
+        -- Execute ISR used by RP6 lib to detect IR pulses
+        avr.execISR(avr.ISR_INT2_vect)
+    end
+end
+
 
 function handleIOData(type, data)
     if type == avr.IO_DDRD or type == avr.IO_PORTD or
@@ -79,6 +91,9 @@ function handleIOData(type, data)
             ACSInfo.leftEnabled = e
             log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
             enableLED("acsl", e)
+            if not e then
+                maybeReceivePulse()
+            end
         end
     elseif type == avr.IO_PORTC then
         local e = not bit.isSet(data, ACSFlags.ACS_R)
@@ -86,6 +101,9 @@ function handleIOData(type, data)
             ACSInfo.rightEnabled = e
             log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
             enableLED("acsr", e)
+            if not e then
+                maybeReceivePulse()
+            end
         end
     end
 end

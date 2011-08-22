@@ -34,6 +34,7 @@ enum EISRTypes
     // Encoders
     ISR_INT0_vect,
     ISR_INT1_vect,
+    ISR_INT2_vect,
 
     ISR_END
 };

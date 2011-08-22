@@ -102,6 +102,7 @@ QString constructISRFunc(EISRTypes type)
     case ISR_TIMER2_COMP_vect: f = "TIMER2_COMP_vect"; break;
     case ISR_INT0_vect: f = "INT0_vect"; break;
     case ISR_INT1_vect: f = "INT1_vect"; break;
+    case ISR_INT2_vect: f = "INT2_vect"; break;
     default: Q_ASSERT(false); break;
     }
 
@@ -113,7 +114,9 @@ QString constructISRFunc(EISRTypes type)
 
 CSimulator *CSimulator::instance = 0;
 
-CSimulator::CSimulator(QObject *parent) : QObject(parent), pluginMainThread(0), quitPlugin(false)
+CSimulator::CSimulator(QObject *parent) :
+    QObject(parent), pluginMainThread(0), quitPlugin(false),
+    ISRExecMutex(QMutex::Recursive)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -368,6 +371,7 @@ void CSimulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(ISR_TIMER2_COMP_vect);
     SET_LUA_CONSTANT(ISR_INT0_vect);
     SET_LUA_CONSTANT(ISR_INT1_vect);
+    SET_LUA_CONSTANT(ISR_INT2_vect);
 
 #undef SET_LUA_CONSTANT
 }
