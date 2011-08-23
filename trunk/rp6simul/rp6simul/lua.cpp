@@ -82,6 +82,17 @@ CLuaInterface::CLuaInterface()
         lua_call(luaState, 1, 0);
         lua_settop(luaState, 0);  // Clear stack
     }
+
+    // Initialize 'weak registry' table. This functions like the regular
+    // lua registry, but holds weak value-references instead.
+    lua_newtable(luaState); // registry table
+
+    lua_newtable(luaState); // metatable
+    lua_pushstring(luaState, "v");
+    lua_setfield(luaState, -2, "__mode");
+    lua_setmetatable(luaState, -2);
+
+    lua_setfield(luaState, LUA_REGISTRYINDEX, "weakregistry");
 }
 
 CLuaInterface::~CLuaInterface()
@@ -187,6 +198,26 @@ void registerClassFunction(lua_CFunction func, const char *name,
 
     lua_settable(luaInterface, mt);
     lua_remove(luaInterface, mt);
+}
+
+int createWeakRegistryRef(lua_State *l)
+{
+    lua_getfield(l, LUA_REGISTRYINDEX, "weakregistry");
+
+    // Value must be on top of stack, but we just pushed the weak registry
+    // there. Therefore swap the stack values.
+    lua_insert(l, -2);
+
+    const int ret = luaL_ref(NLua::luaInterface, -2);
+    lua_pop(l, 1); // Pop weak registry table
+    return ret;
+}
+
+void pushWeakRegistryRef(lua_State *l, int ref)
+{
+    lua_getfield(l, LUA_REGISTRYINDEX, "weakregistry");
+    lua_rawgeti(l, -1, ref);
+    lua_remove(l, -2); // Remove weakregistry table
 }
 
 void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr)
