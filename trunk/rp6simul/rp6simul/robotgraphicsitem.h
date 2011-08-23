@@ -7,11 +7,14 @@
 
 class QGraphicsPolygonItem;
 
+class CLED;
+
 class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 {
     Q_OBJECT
 
     QSize origRobotSize;
+    QList<CLED *> LEDs;
     QMap<ELEDType, bool> enabledLEDs;
     QMap<EMotor, int> motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
@@ -48,6 +51,8 @@ public:
 
     void initLua(void) { createBumperItems(); }
     void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; }
+    void addLED(CLED *l);
+    void removeLED(CLED *l);
     void drawLEDs(QPainter *painter) const;
 
 public slots:

@@ -49,6 +49,12 @@ local function updateLEDs(port)
     end
 end
 
+
+function initPlugin()
+    l = createLED({100, 100}, {255, 255, 255}, 40)
+    l:setEnabled(true)
+end
+
 function handleIOData(type, data)
     local uport
 
