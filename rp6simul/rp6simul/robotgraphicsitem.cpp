@@ -1,4 +1,5 @@
 #include "handlegraphicsitem.h"
+#include "led.h"
 #include "lightgraphicsitem.h"
 #include "robotgraphicsitem.h"
 #include "simulator.h"
@@ -414,6 +415,17 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 #endif
 }
 
+void CRobotGraphicsItem::addLED(CLED *l)
+{
+    LEDs << l;
+}
+
+void CRobotGraphicsItem::removeLED(CLED *l)
+{
+    qDebug() << "Removing LED from robot item";
+    LEDs.removeOne(l);
+}
+
 void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
 {
     const QTransform tr(sceneTransform());
@@ -432,4 +444,10 @@ void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
         drawLED(*painter, "led5", tr, scale);
     if (enabledLEDs[LED6])
         drawLED(*painter, "led6", tr, scale);
+
+    foreach (CLED *l, LEDs)
+    {
+        if (l->isEnabled())
+            drawLED(*painter, l, tr, scale);
+    }
 }

@@ -1,6 +1,6 @@
 --[[
 This table holds the positions (in px) and various
-other properties of some of the robot pheripicals.
+other properties of some of the robot peripherals.
 The scale field is used for centimeter to pixel conversion, for example
 to measure distances.
 

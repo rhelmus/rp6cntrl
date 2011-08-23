@@ -114,6 +114,9 @@ class CRP6Simulator : public QMainWindow
     static int luaAppendSerialOutput(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
     static int luaEnableLED(lua_State *l);
+    static int luaCreateLED(lua_State *l);
+    static int luaLEDSetEnabled(lua_State *l);
+    static int luaLEDDestr(lua_State *l);
     static int luaSetMotorPower(lua_State *l);
     static int luaSetMotorSpeed(lua_State *l);
     static int luaSetMotorDir(lua_State *l);

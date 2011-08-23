@@ -1,5 +1,6 @@
 #include "rp6simul.h"
 #include "avrtimer.h"
+#include "led.h"
 #include "lua.h"
 #include "mapsettingsdialog.h"
 #include "pathinput.h"
@@ -687,7 +688,10 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaSetMotorSpeed, "setMotorSpeed");
     NLua::registerFunction(luaSetMotorDir, "setMotorDir");
 
-    // UNDONE: Needed?
+    // LED class
+    NLua::registerFunction(luaCreateLED, "createLED");
+    NLua::registerClassFunction(luaLEDSetEnabled, "setEnabled", "led");
+
     lua_getglobal(NLua::luaInterface, "init");
     lua_call(NLua::luaInterface, 0, 0);
 }
@@ -817,12 +821,72 @@ int CRP6Simulator::luaEnableLED(lua_State *l)
     return 0;
 }
 
+int CRP6Simulator::luaCreateLED(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    // position
+    luaL_checktype(l, 1, LUA_TTABLE);
+
+    lua_rawgeti(l, 1, 1);
+    const float x = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 1, 2);
+    const float y = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    // color
+    luaL_checktype(l, 2, LUA_TTABLE);
+
+    lua_rawgeti(l, 2, 1);
+    const int r = luaL_checkint(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 2);
+    const int g = luaL_checkint(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 3);
+    const int b = luaL_checkint(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 4);
+    const int a = luaL_optint(l, -1, 255);
+    lua_pop(l, 1);
+
+    const float rad = (float)luaL_checknumber(l, 3);
+
+    CLED *led = new CLED(QPointF(x, y), QColor(r, g, b, a), rad);
+    instance->robotScene->getRobotItem()->addLED(led);
+    NLua::createClass(l, led, "led", luaLEDDestr);
+    return 1;
+}
+
+int CRP6Simulator::luaLEDSetEnabled(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
+    led->setEnabled(NLua::checkBoolean(l, 2));
+    return 0;
+}
+
+int CRP6Simulator::luaLEDDestr(lua_State *l)
+{
+    qDebug() << "Removing LED";
+    NLua::CLuaLocker lualocker;
+    CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
+    instance->robotScene->getRobotItem()->removeLED(led);
+    delete led;
+    return 0;
+}
+
 int CRP6Simulator::luaSetMotorPower(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
 
     const char *motor = luaL_checkstring(l, 1);
-    const int power = luaL_checkinteger(l, 2);
+    const int power = luaL_checkint(l, 2);
 
     EMotor mtype;
 
@@ -842,7 +906,7 @@ int CRP6Simulator::luaSetMotorSpeed(lua_State *l)
     NLua::CLuaLocker lualocker;
 
     const char *motor = luaL_checkstring(l, 1);
-    const int speed = luaL_checkinteger(l, 2);
+    const int speed = luaL_checkint(l, 2);
 
     EMotor mtype;
 

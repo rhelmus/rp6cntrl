@@ -105,7 +105,8 @@ HEADERS  += rp6simul.h \
     clock.h \
     graphicsitemtypes.h \
     progressdialog.h \
-    robotwidget.h
+    robotwidget.h \
+    led.h
 
 OTHER_FILES += \
     TODO.txt \
