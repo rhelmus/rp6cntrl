@@ -293,5 +293,8 @@ function handleIOData(type, data)
     end
 end
 
+function closePlugin()
+    leftEncTimer, rightEncTimer, encReadoutTimer = nil, nil, nil
+end
 
 return ret

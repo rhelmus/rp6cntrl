@@ -99,5 +99,9 @@ function handleIOData(type, data)
     end
 end
 
+function closePlugin()
+    timer = nil
+end
+
 
 return ret

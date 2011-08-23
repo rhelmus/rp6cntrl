@@ -766,8 +766,7 @@ int CSimulator::luaClockCreateTimer(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
     CAVRTimer *timer = instance->AVRClock->createTimer();
-    // UNDONE: Still need Lua destructor?
-    NLua::createClass(l, timer, "timer"/*, luaTimerDestr*/);
+    NLua::createClass(l, timer, "timer", luaTimerDestr);
     return 1;
 }
 
@@ -1048,19 +1047,6 @@ void CSimulator::stopPlugin()
     // UNDONE: Thread safe?
     while (AVRClock->isActive())
         ;
-
-    // Remove any remaining timers.
-    // NOTE: This is very important, since a timer may hold a reference
-    // to a lua function, which in turn may prevent garbage collection of
-    // drivers.
-    // NOTE: This means that closePlugin() cannot access any timers!
-    CAVRClock::TTimerList timers = AVRClock->getTimers();
-    while (!timers.isEmpty())
-    {
-        CAVRTimer *t = timers.takeLast();
-        AVRClock->removeTimer(t);
-        delete t;
-    }
 
     lua_getglobal(NLua::luaInterface, "closePlugin");
     lua_call(NLua::luaInterface, 0, 0);

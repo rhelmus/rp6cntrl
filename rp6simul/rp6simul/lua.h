@@ -30,6 +30,8 @@ void registerFunction(lua_CFunction func, const char *name, const char *tab,
                       void *d=0);
 void registerClassFunction(lua_CFunction func, const char *name, const char *type,
                            void *d=NULL);
+int createWeakRegistryRef(lua_State *l);
+void pushWeakRegistryRef(lua_State *l, int ref);
 void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr = NULL);
 void setVariable(int val, const char *var, const char *tab);
 bool checkBoolean(lua_State *l, int index);

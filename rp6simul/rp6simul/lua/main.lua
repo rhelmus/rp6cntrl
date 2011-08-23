@@ -30,6 +30,10 @@ local function dirname(p)
     return string.match(p, "/*.*/")
 end
 
+local function tableIsEmpty(t)
+    return next(t) == nil
+end
+
 local function loadDriver(d)
     local dir = dirname(d) or "lua/drivers/" -- UNDONE: Default path
     local file = basename(d)
@@ -119,7 +123,7 @@ function init()
 end
 
 function initPlugin(drivers)
-    assert(#driverList == 0 and #IOHandleMap == 0)
+    assert(tableIsEmpty(driverList) and tableIsEmpty(IOHandleMap))
 
     if drivers then
         for _, d in ipairs(drivers) do
@@ -139,9 +143,25 @@ function closePlugin()
     driverList = { }
     IOHandleMap = { }
 
-    collectgarbage("collect") -- Force removal of drivers
+    -- Force removal of all collectable data. Since some operations may
+    -- take more that one cycle, this function is repeatably called until
+    -- no memory is freed.
+    debug("pre-collect")
+    collectgarbage("collect")
+    local memleft = collectgarbage("count")
+    debug("memleft:", memleft)
+    while true do
+        collectgarbage("collect")
+        local m = collectgarbage("count")
+        if m == memleft then
+            break
+        end
+        memleft = m
+        debug("memleft:", memleft)
+    end
+    debug("post-collect")
 
-    if #weakDriverList > 0 then
+    if not tableIsEmpty(weakDriverList) then
         warning("Not all drivers were properly destroyed! Remaining drivers:\n")
         for k, v in pairs(weakDriverList) do
             warning(string.format("\t[%d] = %s\n", k, v.description))
