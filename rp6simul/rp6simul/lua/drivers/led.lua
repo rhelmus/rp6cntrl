@@ -24,6 +24,9 @@ local LEDInfo = {
     curPORTC = 0,
     curDDRB = 0,
     curDDRC = 0,
+    LEDs = { },
+    -- Although we could retrieve the status from a function, this is
+    -- more efficient for the possible many frequent calls
     LEDStatus = { false, false, false, false, false, false }
 }
 
@@ -32,9 +35,9 @@ local function updateLEDs(port)
         local e = (bit.isSet(p, fp) and bit.isSet(d, fd))
         if e ~= LEDInfo.LEDStatus[l] then
             log(string.format("LED %d %s\n", l, (e and "enabled") or "disabled"))
+            LEDInfo.LEDs[l]:setEnabled(e)
             LEDInfo.LEDStatus[l] = e
             updateRobotStatus("leds", tostring(l), (e and "ON") or "OFF")
-            enableLED("led" .. tostring(l), e)
         end
     end
 
@@ -51,8 +54,12 @@ end
 
 
 function initPlugin()
-    l = createLED({100, 100}, {255, 255, 255}, 40)
-    l:setEnabled(true)
+    for i=1,6 do
+        local propname = "led" .. tostring(i)
+        LEDInfo.LEDs[i] = createLED(robotProperties[propname].pos,
+                                    robotProperties[propname].color,
+                                    robotProperties[propname].radius)
+    end
 end
 
 function handleIOData(type, data)

@@ -6,6 +6,9 @@
 #include <QMap>
 #include <QWidget>
 
+class CBumper;
+class CLED;
+
 class CRobotWidget : public QWidget
 {
     Q_OBJECT   
@@ -14,8 +17,8 @@ class CRobotWidget : public QWidget
     const int motorArrowWidth, motorArrowXSpacing;
     QSize widgetMinSize;
     QPixmap robotPixmap;
-    QMap<ELEDType, bool> enabledLEDs;
-    QMap<EBumper, bool> hitBumpers;
+    QList<CLED *> LEDs;
+    QList<CBumper *> bumpers;
     QMap<EMotor, int> motorPower, motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
 
@@ -27,14 +30,14 @@ public:
 
     QSize minimumSizeHint(void) const { return widgetMinSize; }
 
-    void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; update(); }
+    void addBumper(CBumper *b);
+    void removeBumper(CBumper *b);
+    void addLED(CLED *l);
+    void removeLED(CLED *l);
     void setMotorPower(EMotor m, int p) { motorPower[m] = p; update(); }
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; update(); }
     void setMotorDirection(EMotor m, EMotorDirection d)
     { motorDirection[m] = d; update(); }
-
-public slots:
-    void setBumperHit(EBumper b, bool e) { hitBumpers[b] = e; update(); }
 };
 
 #endif // ROBOTWIDGET_H

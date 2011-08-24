@@ -24,36 +24,6 @@ bool verifySettingsFile(QSettings &file)
 }
 
 // Used by robot widget/item
-void drawLED(QPainter &painter, const char *propname,
-             const QTransform &tr, qreal scale)
-{
-    QPointF pos =
-            CSimulator::getInstance()->getRobotProperty(propname, "pos").toPoint();
-
-    // Account for scaling
-    pos.rx() *= scale;
-    pos.ry() *= scale;
-
-    pos = tr.map(pos);
-
-    const QColor c =
-            CSimulator::getInstance()->getRobotProperty(propname, "color").value<QColor>();
-
-    const int rad =
-            CSimulator::getInstance()->getRobotProperty(propname, "radius").toInt();
-    const int srad = static_cast<qreal>(rad) * scale;
-    const int totalrad = 2 * srad; // light effect is bigger than led
-
-    QRadialGradient rg(pos, totalrad);
-    rg.setColorAt(0.0, c);
-    rg.setColorAt(0.3, QColor(c.red(), c.green(), c.blue(), 255));
-    rg.setColorAt(1.0, QColor(c.red(), c.green(), c.blue(), 0));
-    painter.setBrush(rg);
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(pos, totalrad, totalrad);
-}
-
-// Used by robot widget/item
 void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
              qreal scale)
 {

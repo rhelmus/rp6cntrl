@@ -6,24 +6,28 @@ local ret = driver(...)
 description = "Driver for the bumpers."
 
 
+local bumperLeft, bumperRight
+
+
 function initPlugin()
-    setBumperHandler(function (b, e)
-        if b == "left" then
-            local data = avr.getIORegister(avr.IO_PINB)
+    local function makecallback(register, pin)
+        return function (e)
+            local data = avr.getIORegister(register)
             if e then
-                avr.setIORegister(avr.IO_PINB, bit.set(data, avr.PINB0))
+                avr.setIORegister(register, bit.set(data, pin))
             else
-                avr.setIORegister(avr.IO_PINB, bit.unSet(data, avr.PINB0))
-            end
-        elseif b == "right" then
-            local data = avr.getIORegister(avr.IO_PINC)
-            if e then
-                avr.setIORegister(avr.IO_PINC, bit.set(data, avr.PINC6))
-            else
-                avr.setIORegister(avr.IO_PINC, bit.unSet(data, avr.PINC6))
+                avr.setIORegister(register, bit.unSet(data, pin))
             end
         end
-    end)
+    end
+
+    bumperLeft = createBumper(robotProperties["bumperLeft"].points,
+                              robotProperties["bumperLeft"].color)
+    bumperLeft:setCallback(makecallback(avr.IO_PINB, avr.PINB0))
+
+    bumperRight = createBumper(robotProperties["bumperRight"].points,
+                               robotProperties["bumperRight"].color)
+    bumperRight:setCallback(makecallback(avr.IO_PINC, avr.PINC6))
 end
 
 return ret

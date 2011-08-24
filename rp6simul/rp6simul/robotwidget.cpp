@@ -1,3 +1,5 @@
+#include "bumper.h"
+#include "led.h"
 #include "robotwidget.h"
 #include "simulator.h"
 #include "utils.h"
@@ -6,11 +8,10 @@
 
 namespace {
 
-void drawBumper(QPainter &painter, const char *propname,
-             const QTransform &tr, qreal scale)
+void drawBumper(QPainter &painter, CBumper *bumper, const QTransform &tr,
+                qreal scale)
 {
-    QPolygonF points =
-            CSimulator::getInstance()->getRobotProperty(propname, "points").value<QPolygon>();
+    QPolygonF points = bumper->getPoints();
 
     // Account for scaling/transformation
     for (QPolygonF::iterator it=points.begin(); it!=points.end(); ++it)
@@ -20,10 +21,7 @@ void drawBumper(QPainter &painter, const char *propname,
         *it = tr.map(*it);
     }
 
-    const QColor c =
-            CSimulator::getInstance()->getRobotProperty(propname, "color").value<QColor>();
-
-    painter.setBrush(c);
+    painter.setBrush(bumper->getColor());
     painter.setPen(Qt::NoPen);
     painter.drawPolygon(points);
 }
@@ -97,28 +95,17 @@ void CRobotWidget::paintEvent(QPaintEvent *)
     // UNDONE: move to transform
     const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
 
-    // NOTE: drawLED() alters brush
-    if (enabledLEDs[LED1])
-        drawLED(painter, "led1", tr, scale);
-    if (enabledLEDs[LED2])
-        drawLED(painter, "led2", tr, scale);
-    if (enabledLEDs[LED3])
-        drawLED(painter, "led3", tr, scale);
-    if (enabledLEDs[LED4])
-        drawLED(painter, "led4", tr, scale);
-    if (enabledLEDs[LED5])
-        drawLED(painter, "led5", tr, scale);
-    if (enabledLEDs[LED6])
-        drawLED(painter, "led6", tr, scale);
-    if (enabledLEDs[ACSL])
-        drawLED(painter, "ACSLeft", tr, scale);
-    if (enabledLEDs[ACSR])
-        drawLED(painter, "ACSRight", tr, scale);
+    foreach (CLED *l, LEDs)
+    {
+        if (l->isEnabled())
+            drawLED(painter, l, tr, scale);
+    }
 
-    if (hitBumpers[BUMPER_LEFT])
-        drawBumper(painter, "bumperLeft", tr, scale);
-    if (hitBumpers[BUMPER_RIGHT])
-        drawBumper(painter, "bumperRight", tr, scale);
+    foreach (CBumper *b, bumpers)
+    {
+        if (b->isHit())
+            drawBumper(painter, b, tr, scale);
+    }
 
     const int arrowyoffset = robotPixmap.height() * 0.2;
     const int arrowmaxheight = robotPixmap.height() - (2 * arrowyoffset);
@@ -157,4 +144,26 @@ void CRobotWidget::paintEvent(QPaintEvent *)
         painter.drawText(trect, Qt::AlignCenter,
                          QString::number(motorPower[MOTOR_RIGHT]));
     }
+}
+
+void CRobotWidget::addBumper(CBumper *b)
+{
+    bumpers << b;
+}
+
+void CRobotWidget::removeBumper(CBumper *b)
+{
+    qDebug() << "Removing bumper from robot widget";
+    bumpers.removeOne(b);
+}
+
+void CRobotWidget::addLED(CLED *l)
+{
+    LEDs << l;
+}
+
+void CRobotWidget::removeLED(CLED *l)
+{
+    qDebug() << "Removing LED from robot widget";
+    LEDs.removeOne(l);
 }

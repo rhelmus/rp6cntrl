@@ -7,6 +7,7 @@
 
 class QGraphicsPolygonItem;
 
+class CBumper;
 class CLED;
 
 class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
@@ -15,11 +16,10 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 
     QSize origRobotSize;
     QList<CLED *> LEDs;
-    QMap<ELEDType, bool> enabledLEDs;
     QMap<EMotor, int> motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
-    QMap<EBumper, bool> hitBumpers;
-    QMap<EBumper, QGraphicsPolygonItem *> bumperItems;
+    QList<CBumper *> bumpers;
+    QMap<CBumper *, QGraphicsPolygonItem *> bumperItems;
     int skipFrames;
 
     typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
@@ -27,7 +27,6 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     CHandleGraphicsItem *pressedHandle;
 
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
-    void createBumperItems(void);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
     qreal getPixmapScale(void) const;
@@ -49,11 +48,11 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
-    void initLua(void) { createBumperItems(); }
-    void enableLED(ELEDType l, bool e) { enabledLEDs[l] = e; }
     void addLED(CLED *l);
     void removeLED(CLED *l);
     void drawLEDs(QPainter *painter) const;
+    void addBumper(CBumper *b);
+    void removeBumper(CBumper *b);
 
 public slots:
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; }
@@ -62,7 +61,7 @@ public slots:
 signals:
     void robotMoved(const QPointF &, qreal);
     void rotationChanged(qreal); // Manual rotate
-    void bumperChanged(EBumper, bool);
+    void bumperChanged(CBumper *, bool);
 };
 
 #endif // ROBOTGRAPHICSITEM_H
