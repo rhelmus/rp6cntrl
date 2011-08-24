@@ -90,7 +90,6 @@ function handleIOData(type, data)
         if e ~= ACSInfo.leftEnabled then
             ACSInfo.leftEnabled = e
             log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
-            enableLED("acsl", e)
             if not e then
                 maybeReceivePulse()
             end
@@ -100,7 +99,6 @@ function handleIOData(type, data)
         if e ~= ACSInfo.rightEnabled then
             ACSInfo.rightEnabled = e
             log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
-            enableLED("acsr", e)
             if not e then
                 maybeReceivePulse()
             end

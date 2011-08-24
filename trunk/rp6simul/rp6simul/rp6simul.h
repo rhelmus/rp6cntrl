@@ -10,8 +10,6 @@
 #include "lua.h"
 #include "robotscene.h"
 
-enum ELEDType { LED1, LED2, LED3, LED4, LED5, LED6, ACSL, ACSR };
-enum EBumper { BUMPER_LEFT, BUMPER_RIGHT };
 enum EMotor { MOTOR_LEFT, MOTOR_RIGHT };
 enum EMotorDirection { MOTORDIR_FWD, MOTORDIR_BWD };
 
@@ -30,6 +28,8 @@ class QTabWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 
+class CBumper;
+class CLED;
 class CProjectWizard;
 class CRobotWidget;
 class CSimulator;
@@ -72,7 +72,7 @@ class CRP6Simulator : public QMainWindow
     QMutex serialBufferMutex;
     QList<QStringList> robotStatusUpdateBuffer;
     QMutex robotStatusMutex;
-    QMap<ELEDType, bool> changedLEDs;
+    QMap<CLED *, bool> changedLEDs;
     QMutex robotLEDMutex;
     QMap<EMotor, int> changedMotorPower;
     QMutex motorPowerMutex;
@@ -80,6 +80,7 @@ class CRP6Simulator : public QMainWindow
     QMutex motorSpeedMutex;
     QMap<EMotor, EMotorDirection> changedMotorDirection;
     QMutex motorDirectionMutex;
+    QMap<CBumper *, int> bumperLuaCallbacks;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -113,7 +114,9 @@ class CRP6Simulator : public QMainWindow
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
-    static int luaEnableLED(lua_State *l);
+    static int luaCreateBumper(lua_State *l);
+    static int luaBumperSetCallback(lua_State *l);
+    static int luaBumperDestr(lua_State *l);
     static int luaCreateLED(lua_State *l);
     static int luaLEDSetEnabled(lua_State *l);
     static int luaLEDDestr(lua_State *l);
@@ -138,7 +141,7 @@ private slots:
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
     void mapSelectorItemActivated(QTreeWidgetItem *item);
-    void setLuaBumper(EBumper b, bool e);
+    void setLuaBumper(CBumper *b, bool e);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);

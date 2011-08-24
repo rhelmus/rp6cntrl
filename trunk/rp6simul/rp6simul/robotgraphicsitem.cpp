@@ -1,3 +1,4 @@
+#include "bumper.h"
 #include "handlegraphicsitem.h"
 #include "led.h"
 #include "lightgraphicsitem.h"
@@ -106,32 +107,6 @@ void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
 
     handles[pos] = handle;
 }
-void CRobotGraphicsItem::createBumperItems()
-{
-    const QPolygonF lp(CSimulator::getInstance()->getRobotProperty("bumperLeft", "points").value<QPolygon>());
-    const QPolygonF rp(CSimulator::getInstance()->getRobotProperty("bumperRight", "points").value<QPolygon>());
-    const QColor lc =
-            CSimulator::getInstance()->getRobotProperty("bumperLeft", "color").value<QColor>();
-    const QColor rc =
-            CSimulator::getInstance()->getRobotProperty("bumperRight", "color").value<QColor>();
-
-    const qreal scale = getPixmapScale();
-    QTransform tr;
-    tr.scale(scale, scale);
-
-    QGraphicsPolygonItem *pi = new QGraphicsPolygonItem(tr.map(lp), this);
-    pi->setPen(Qt::NoPen);
-    pi->setBrush(lc);
-    pi->setVisible(false);
-    bumperItems[BUMPER_LEFT] = pi;
-
-    pi = new QGraphicsPolygonItem(tr.map(rp), this);
-    pi->setPen(Qt::NoPen);
-    pi->setBrush(rc);
-    pi->setVisible(false);
-    bumperItems[BUMPER_RIGHT] = pi;
-}
-
 
 QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
 {
@@ -289,24 +264,16 @@ bool CRobotGraphicsItem::tryDoMove(float rotspeed, QPointF dpos,
 
 void CRobotGraphicsItem::updateBumpers()
 {
-    const bool lcollides =
-            checkCollidingItems(bumperItems[BUMPER_LEFT]->collidingItems(),
-                                this);
-    const bool rcollides =
-            checkCollidingItems(bumperItems[BUMPER_RIGHT]->collidingItems(),
-                                this);
-
-    if (lcollides != hitBumpers[BUMPER_LEFT])
+    foreach (CBumper *b, bumpers)
     {
-        hitBumpers[BUMPER_LEFT] = lcollides;
-        bumperItems[BUMPER_LEFT]->setVisible(lcollides);
-        emit bumperChanged(BUMPER_LEFT, lcollides);
-    }
-    if (rcollides != hitBumpers[BUMPER_RIGHT])
-    {
-        hitBumpers[BUMPER_RIGHT] = rcollides;
-        bumperItems[BUMPER_RIGHT]->setVisible(rcollides);
-        emit bumperChanged(BUMPER_RIGHT, rcollides);
+        const bool hit =
+                checkCollidingItems(bumperItems[b]->collidingItems(), this);
+        if (hit != b->isHit())
+        {
+            bumperItems[b]->setVisible(hit);
+            b->setHit(hit);
+            emit bumperChanged(b, hit);
+        }
     }
 }
 
@@ -429,25 +396,33 @@ void CRobotGraphicsItem::removeLED(CLED *l)
 void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
 {
     const QTransform tr(sceneTransform());
-
     const qreal scale = getPixmapScale();
-
-    if (enabledLEDs[LED1])
-        drawLED(*painter, "led1", tr, scale);
-    if (enabledLEDs[LED2])
-        drawLED(*painter, "led2", tr, scale);
-    if (enabledLEDs[LED3])
-        drawLED(*painter, "led3", tr, scale);
-    if (enabledLEDs[LED4])
-        drawLED(*painter, "led4", tr, scale);
-    if (enabledLEDs[LED5])
-        drawLED(*painter, "led5", tr, scale);
-    if (enabledLEDs[LED6])
-        drawLED(*painter, "led6", tr, scale);
-
     foreach (CLED *l, LEDs)
     {
         if (l->isEnabled())
             drawLED(*painter, l, tr, scale);
     }
+}
+
+void CRobotGraphicsItem::addBumper(CBumper *b)
+{
+    const qreal scale = getPixmapScale();
+    QTransform tr;
+    tr.scale(scale, scale);
+
+    QGraphicsPolygonItem *pi =
+            new QGraphicsPolygonItem(tr.map(b->getPoints()), this);
+    pi->setPen(Qt::NoPen);
+    pi->setBrush(b->getColor());
+    pi->setVisible(false);
+    bumperItems[b] = pi;
+
+    bumpers << b;
+}
+
+void CRobotGraphicsItem::removeBumper(CBumper *b)
+{
+    qDebug() << "Removing bumper from robot item";
+    delete bumperItems.take(b);
+    bumpers.removeOne(b);
 }
