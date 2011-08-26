@@ -23,6 +23,8 @@ local ACSInfo = {
     power = "off",
     leftEnabled = false,
     rightEnabled = false,
+    leftIRSensor = nil,
+    rightIRSensor = nil
 }
 
 
@@ -66,18 +68,40 @@ local function updateACSPower(type, data)
     end
 end
 
-local function maybeReceivePulse()
+local function maybeReceivePulse(sensor)
     local chance = 0.05 -- UNDONE
     -- Simulate that only a fraction of send pulses are bounced back
     -- towards the detector. Receiving pulses happens immidiately after they
     -- are sent. Note that in real life pulses travel at the speed of light,
     -- which is close too instant as well :)
-    if math.random() <= chance then
-        -- Execute ISR used by RP6 lib to detect IR pulses
-        avr.execISR(avr.ISR_INT2_vect)
+    if math.random() <= chance and ACSInfo.power ~= "off" then
+        local dist
+        if sensor == "left" then
+            dist = ACSInfo.leftIRSensor:getHitDistance()
+        else
+            dist = ACSInfo.rightIRSensor:getHitDistance()
+        end
+        log(string.format("dist: %d\n", dist))
+        if dist <= robotProperties.ACSLeft.distance[ACSInfo.power] then
+            -- Execute ISR used by RP6 lib to detect IR pulses
+            avr.execISR(avr.ISR_INT2_vect)
+        end
     end
 end
 
+
+function initPlugin()
+    ACSInfo.leftIRSensor = createIRSensor(robotProperties.ACSLeft.pos,
+                                          robotProperties.ACSLeft.color,
+                                          robotProperties.ACSLeft.radius,
+                                          robotProperties.ACSLeft.angle,
+                                          robotProperties.ACSLeft.distance.high)
+    ACSInfo.rightIRSensor = createIRSensor(robotProperties.ACSRight.pos,
+                                           robotProperties.ACSRight.color,
+                                           robotProperties.ACSRight.radius,
+                                           robotProperties.ACSRight.angle,
+                                           robotProperties.ACSRight.distance.high)
+end
 
 function handleIOData(type, data)
     if type == avr.IO_DDRD or type == avr.IO_PORTD or
@@ -91,7 +115,7 @@ function handleIOData(type, data)
             ACSInfo.leftEnabled = e
             log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
             if not e then
-                maybeReceivePulse()
+                maybeReceivePulse("left")
             end
         end
     elseif type == avr.IO_PORTC then
@@ -100,7 +124,7 @@ function handleIOData(type, data)
             ACSInfo.rightEnabled = e
             log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
             if not e then
-                maybeReceivePulse()
+                maybeReceivePulse("right")
             end
         end
     end

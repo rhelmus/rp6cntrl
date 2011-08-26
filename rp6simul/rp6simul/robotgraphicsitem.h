@@ -8,6 +8,7 @@
 class QGraphicsPolygonItem;
 
 class CBumper;
+class CIRSensor;
 class CLED;
 
 class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
@@ -20,6 +21,8 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     QMap<EMotor, EMotorDirection> motorDirection;
     QList<CBumper *> bumpers;
     QMap<CBumper *, QGraphicsPolygonItem *> bumperItems;
+    QList<CIRSensor *> IRSensors;
+    QTimer *IRSensorUpdateTimer;
     int skipFrames;
 
     typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
@@ -36,6 +39,7 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
 
 private slots:
     void updateBumpers(void);
+    void updateIRSensors(void);
 
 protected:
     void advance(int phase);
@@ -53,6 +57,8 @@ public:
     void drawLEDs(QPainter *painter) const;
     void addBumper(CBumper *b);
     void removeBumper(CBumper *b);
+    void addIRSensor(CIRSensor *ir);
+    void removeIRSensor(CIRSensor *ir);
 
 public slots:
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; }
@@ -62,6 +68,7 @@ signals:
     void robotMoved(const QPointF &, qreal);
     void rotationChanged(qreal); // Manual rotate
     void bumperChanged(CBumper *, bool);
+    void IRSensorChanged(CIRSensor *, float);
 };
 
 #endif // ROBOTGRAPHICSITEM_H
