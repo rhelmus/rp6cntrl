@@ -1,4 +1,5 @@
 #include "bumper.h"
+#include "irsensor.h"
 #include "led.h"
 #include "robotwidget.h"
 #include "simulator.h"
@@ -107,6 +108,21 @@ void CRobotWidget::paintEvent(QPaintEvent *)
             drawBumper(painter, b, tr, scale);
     }
 
+    foreach (CIRSensor *ir, IRSensors)
+    {
+        if (ir->getHitDistance() < ir->getTraceDistance())
+        {
+            QPointF pos = ir->getPosition();
+            pos.rx() *= scale;
+            pos.ry() *= scale;
+            pos = tr.map(pos);
+
+            const float rad = ir->getRadius() * scale;
+            painter.setBrush(ir->getColor());
+            painter.drawEllipse(pos, rad, rad);
+        }
+    }
+
     const int arrowyoffset = robotPixmap.height() * 0.2;
     const int arrowmaxheight = robotPixmap.height() - (2 * arrowyoffset);
     const int arrowtexth = painter.fontMetrics().height();
@@ -166,4 +182,15 @@ void CRobotWidget::removeLED(CLED *l)
 {
     qDebug() << "Removing LED from robot widget";
     LEDs.removeOne(l);
+}
+
+void CRobotWidget::addIRSensor(CIRSensor *ir)
+{
+    IRSensors << ir;
+}
+
+void CRobotWidget::removeIRSensor(CIRSensor *ir)
+{
+    qDebug() << "Removing IR sensor from robot widget";
+    IRSensors.removeOne(ir);
 }

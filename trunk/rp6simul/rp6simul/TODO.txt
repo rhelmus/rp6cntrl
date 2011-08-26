@@ -53,3 +53,5 @@
 - BUG: lua timer destroyed after CSimulator is
 - robot widget: show motor speeds?
 - Check high simulated CPU speeds
+- powerON/powerOFF currently don't affect encoders and such
+- acs: min hit distance?

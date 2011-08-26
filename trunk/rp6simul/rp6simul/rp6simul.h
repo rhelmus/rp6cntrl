@@ -123,6 +123,9 @@ class CRP6Simulator : public QMainWindow
     static int luaSetMotorPower(lua_State *l);
     static int luaSetMotorSpeed(lua_State *l);
     static int luaSetMotorDir(lua_State *l);
+    static int luaCreateIRSensor(lua_State *l);
+    static int luaIRSensorGetHitDistance(lua_State *l);
+    static int luaIRSensorDestr(lua_State *l);
 
 private slots:
     void updateClockDisplay(unsigned long hz);

@@ -1,5 +1,6 @@
 #include "bumper.h"
 #include "handlegraphicsitem.h"
+#include "irsensor.h"
 #include "led.h"
 #include "lightgraphicsitem.h"
 #include "robotgraphicsitem.h"
@@ -11,6 +12,19 @@
 #include <QtGui>
 
 namespace {
+
+qreal toClockwiseAngle(qreal a)
+{
+    // Convert from counter-clockwise + 90 to clockwise + 0
+    return 90.0 - a;
+}
+
+qreal toCounterClockwiseAngle(qreal a)
+{
+    // Convert from clockwise + 0 to counter-clockwise + 90
+    // (yes this is the same as the other way around)
+    return 90.0 - a;
+}
 
 // Check if one of the obstacles actually causes a collision
 bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles,
@@ -81,6 +95,10 @@ CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
               CHandleGraphicsItem::HANDLE_BOTTOM);
 
     connect(this, SIGNAL(posChanged(const QPointF &)), SLOT(updateBumpers()));
+
+    IRSensorUpdateTimer = new QTimer(this);
+    IRSensorUpdateTimer->setInterval(100);
+    connect(IRSensorUpdateTimer, SIGNAL(timeout()), SLOT(updateIRSensors()));
 }
 
 void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -277,6 +295,51 @@ void CRobotGraphicsItem::updateBumpers()
     }
 }
 
+void CRobotGraphicsItem::updateIRSensors()
+{
+    foreach (CIRSensor *ir, IRSensors)
+    {
+        // Start with line which has a zero degree angle
+        // (in Qt's counter clockwise system)
+        QPointF start(ir->getPosition());
+        const qreal scale = getPixmapScale();
+        start.rx() *= scale;
+        start.ry() *= scale;
+
+        QLineF line(start, start + QPointF(ir->getTraceDistance() * scale, 0.0));
+
+        line.setAngle(toCounterClockwiseAngle(ir->getTraceAngle()));
+
+        QPolygonF poly = mapToScene(line.x1(), line.y1(), line.x2(), line.y2());
+        QList<QGraphicsItem *> obstacles = scene()->items(poly);
+
+        foreach (QGraphicsItem *ob, obstacles)
+        {
+            if ((ob == this) || (ob->parentItem() == this))
+                continue;
+            QPolygonF obpoly(mapFromItem(ob, ob->boundingRect()));
+            for (QPolygonF::iterator it=obpoly.begin(); it!=(obpoly.end()-1); ++it)
+            {
+                QLineF obl(*it, *(it+1));
+                QPointF interp;
+                if (line.intersect(obl, &interp) == QLineF::BoundedIntersection)
+                {
+                    QLineF tmp(line.p1(), interp);
+                    if (tmp.length() < line.length())
+                        line.setP2(interp);
+                }
+            }
+        }
+
+        const float oldd = ir->getHitDistance();
+        const float newd = line.length() / scale;
+        ir->setHitDistance(newd);
+        if (oldd != newd)
+            emit IRSensorChanged(ir, newd);
+        qDebug() << "old/newd:" << oldd << newd;
+    }
+}
+
 void CRobotGraphicsItem::advance(int phase)
 {
     if (!phase)
@@ -314,8 +377,7 @@ bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
 
         const QPointF start(mapToScene(boundingRect().center()));
         const QPointF end(mapToScene(mapFromItem(pressedHandle, me->pos())));
-        // 90.0 - ... : Convert from counter-clockwise + 90 to clockwise + 0
-        const qreal mangle = 90.0 - QLineF(start, end).angle();
+        const qreal mangle = toClockwiseAngle(QLineF(start, end).angle());
 
         if (mangle != rotation())
         {
@@ -350,6 +412,20 @@ void CRobotGraphicsItem::paint(QPainter *painter,
                                QWidget *widget)
 {
     CResizablePixmapGraphicsItem::paint(painter, option, widget);
+
+    foreach (CIRSensor *ir, IRSensors)
+    {
+        // Start with line which has a zero degree angle
+        // (in Qt's counter clockwise system)
+        QPointF start(ir->getPosition());
+        const qreal scale = getPixmapScale();
+        start.rx() *= scale;
+        start.ry() *= scale;
+
+        QLineF line(start, start + QPointF(ir->getHitDistance() * scale, 0.0));
+        line.setAngle(toCounterClockwiseAngle(ir->getTraceAngle()));
+        painter->drawLine(line);
+    }
 
 #if 0
     // UNDONE
@@ -425,4 +501,19 @@ void CRobotGraphicsItem::removeBumper(CBumper *b)
     qDebug() << "Removing bumper from robot item";
     delete bumperItems.take(b);
     bumpers.removeOne(b);
+}
+
+void CRobotGraphicsItem::addIRSensor(CIRSensor *ir)
+{
+    IRSensors << ir;
+    if (!IRSensorUpdateTimer->isActive())
+        IRSensorUpdateTimer->start();
+}
+
+void CRobotGraphicsItem::removeIRSensor(CIRSensor *ir)
+{
+    qDebug() << "Removing IR sensor from robot item";
+    IRSensors.removeOne(ir);
+    if (IRSensors.isEmpty())
+        IRSensorUpdateTimer->stop();
 }

@@ -107,7 +107,8 @@ HEADERS  += rp6simul.h \
     progressdialog.h \
     robotwidget.h \
     led.h \
-    bumper.h
+    bumper.h \
+    irsensor.h
 
 OTHER_FILES += \
     TODO.txt \

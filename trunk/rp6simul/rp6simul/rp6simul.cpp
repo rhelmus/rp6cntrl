@@ -1,6 +1,7 @@
 #include "rp6simul.h"
 #include "avrtimer.h"
 #include "bumper.h"
+#include "irsensor.h"
 #include "led.h"
 #include "lua.h"
 #include "mapsettingsdialog.h"
@@ -363,6 +364,9 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
             robotWidget, SLOT(update()));
     connect(robotScene->getRobotItem(), SIGNAL(bumperChanged(CBumper *, bool)),
             SLOT(setLuaBumper(CBumper *, bool)));
+    connect(robotScene->getRobotItem(),
+            SIGNAL(IRSensorChanged(CIRSensor *, float)), robotWidget,
+            SLOT(update()));
 
     graphicsView = new QGraphicsView(robotScene);
     graphicsView->setRenderHints(QPainter::Antialiasing |
@@ -695,6 +699,11 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaCreateBumper, "createBumper");
     NLua::registerClassFunction(luaBumperSetCallback, "setCallback", "bumper");
 
+    // IR sensor class
+    NLua::registerFunction(luaCreateIRSensor, "createIRSensor");
+    NLua::registerClassFunction(luaIRSensorGetHitDistance, "getHitDistance",
+                                "irsensor");
+
     lua_getglobal(NLua::luaInterface, "init");
     lua_call(NLua::luaInterface, 0, 0);
 }
@@ -1002,6 +1011,71 @@ int CRP6Simulator::luaSetMotorDir(lua_State *l)
     instance->emit motorDirectionChanged(MOTOR_LEFT, ld);
     instance->emit motorDirectionChanged(MOTOR_RIGHT, rd);
 
+    return 0;
+}
+
+int CRP6Simulator::luaCreateIRSensor(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    // position
+    luaL_checktype(l, 1, LUA_TTABLE);
+
+    lua_rawgeti(l, 1, 1);
+    const float x = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 1, 2);
+    const float y = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    // color
+    luaL_checktype(l, 2, LUA_TTABLE);
+
+    lua_rawgeti(l, 2, 1);
+    const int r = luaL_checkint(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 2);
+    const int g = luaL_checkint(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 3);
+    const int b = luaL_checkint(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 4);
+    const int a = luaL_optint(l, -1, 255);
+    lua_pop(l, 1);
+
+    const float rad = (float)luaL_checknumber(l, 3);
+    const float angle = (float)luaL_checknumber(l, 4);
+    const float dist = (float)luaL_checknumber(l, 5);
+
+    CIRSensor *ir = new CIRSensor(QPointF(x, y), QColor(r, g, b, a),
+                                  rad, angle, dist);
+    instance->robotScene->getRobotItem()->addIRSensor(ir);
+    instance->robotWidget->addIRSensor(ir);
+    NLua::createClass(l, ir, "irsensor", luaIRSensorDestr);
+    return 1;
+}
+
+int CRP6Simulator::luaIRSensorGetHitDistance(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    CIRSensor *ir = NLua::checkClassData<CIRSensor>(l, 1, "irsensor");
+    lua_pushnumber(l, ir->getHitDistance());
+    return 1;
+}
+
+int CRP6Simulator::luaIRSensorDestr(lua_State *l)
+{
+    qDebug() << "Removing IR sensor";
+    NLua::CLuaLocker lualocker;
+    CIRSensor *ir = NLua::checkClassData<CIRSensor>(l, 1, "irsensor");
+    instance->robotScene->getRobotItem()->removeIRSensor(ir);
+    instance->robotWidget->removeIRSensor(ir);
+    delete ir;
     return 0;
 }
 

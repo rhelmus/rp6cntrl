@@ -17,14 +17,27 @@ image gets a small 'border' around it. Thus to make sure that the bumpers are
 really hit, a larger collision polygon must be used.
 --]]
 
+local robotWidthCm = 11.3
+local robotWidthPx = 565
+local cmPerPixel = robotWidthCm / robotWidthPx
+
 local green = { 0, 255, 0 }
 local red = { 255, 0, 0 }
 local darkblue = { 0, 0, 192 }
 local transblue = { 0, 0, 255, 80 }
 
+-- In px
+-- UNDONE
+local ACSDistances =
+{
+    low = 15 / cmPerPixel,
+    medium = 30 / cmPerPixel,
+    high = 50 / cmPerPixel
+}
+
 robotProperties =
 {
-    scale = { cmPerPixel = 11.3 / 565 }, -- See top comments
+    scale = { cmPerPixel = cmPerPixel },
     robotLength = { length = 18.9 }, -- in cm, used for rotation
 
     led1 = { pos = { 458, 209 }, shape = "ellips", radius = 10, color = green },
@@ -34,8 +47,24 @@ robotProperties =
     led5 = { pos = { 191, 181 }, shape = "ellips", radius = 10, color = red },
     led6 = { pos = { 191, 156 }, shape = "ellips", radius = 10, color = red },
 
-    ACSLeft = { pos = { 181, 62 }, shape = "ellips", radius = 11, color = darkblue },
-    ACSRight = { pos = { 465, 64 }, shape = "ellips", radius = 11, color = darkblue },
+    ACSLeft =
+    {
+        pos = { 181, 62 },
+        shape = "ellips",
+        radius = 11,
+        color = darkblue,
+        angle = 357, -- UNDONE
+        distance = ACSDistances
+    },
+    ACSRight =
+    {
+        pos = { 465, 64 },
+        shape = "ellips",
+        radius = 11,
+        color = darkblue,
+        angle = 3, -- UNDONE
+        distance = ACSDistances
+    },
 
     bumperLeft =
     {
