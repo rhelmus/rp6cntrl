@@ -22,10 +22,12 @@ local motorInfo = {
     compareValueA = 0,
     compareValueB = 0,
     inputRegister = 0,
-    leftEncCounter = 0,
-    rightEncCounter = 0,
-    leftSpeed = 0,
-    rightSpeed = 0,
+    leftPower = 0,
+    rightPower = 0,
+    leftEncDriveCounter = 0,
+    rightEncDriveCounter = 0,
+    leftEncMoveCounter = 0,
+    rightEncMoveCounter = 0,
     leftDistance = 0,
     rightDistance = 0,
 }
@@ -161,6 +163,7 @@ local function setCompareRegisterA(data)
             clock.enableTimer(encReadoutTimer, true)
         end
     end
+    motorInfo.rightPower = data
     updateRobotStatus("motor", "power", "right", data)
     setMotorPower("right", data)
     return true
@@ -185,6 +188,7 @@ local function setCompareRegisterB(data)
             clock.enableTimer(encReadoutTimer, true)
         end
     end
+    motorInfo.leftPower = data
     updateRobotStatus("motor", "power", "left", data)
     setMotorPower("left", data)
     return true
@@ -225,33 +229,43 @@ function initPlugin()
 
     leftEncTimer = clock.createTimer()
     leftEncTimer:setTimeOut(function()
-        avr.execISR(avr.ISR_INT0_vect)
-        motorInfo.leftEncCounter = motorInfo.leftEncCounter + 1
+        motorInfo.leftEncDriveCounter = motorInfo.leftEncDriveCounter + 1
+        if not robotIsBlocked() then
+            avr.execISR(avr.ISR_INT0_vect)
+            motorInfo.leftEncMoveCounter = motorInfo.leftEncMoveCounter + 1
+        end
     end)
 
     rightEncTimer = clock.createTimer()
     rightEncTimer:setTimeOut(function()
-        avr.execISR(avr.ISR_INT1_vect)
-        motorInfo.rightEncCounter = motorInfo.rightEncCounter + 1
+        motorInfo.rightEncDriveCounter = motorInfo.rightEncDriveCounter + 1
+        if not robotIsBlocked() then
+            avr.execISR(avr.ISR_INT1_vect)
+            motorInfo.rightEncMoveCounter = motorInfo.rightEncMoveCounter + 1
+        end
     end)
 
     encReadoutTimer = clock.createTimer()
     encReadoutTimer:setTimeOut(function()
-        motorInfo.leftSpeed = motorInfo.leftEncCounter
-        motorInfo.leftDistance = motorInfo.leftDistance +
-                                 motorInfo.leftEncCounter
-        motorInfo.leftEncCounter = 0
-        updateRobotStatus("motor", "speed", "left", motorInfo.leftSpeed)
-        setMotorSpeed("left", motorInfo.leftSpeed)
+        local drivespeed = motorInfo.leftEncDriveCounter
+        local movespeed = motorInfo.leftEncMoveCounter
+        motorInfo.leftDistance = motorInfo.leftDistance + movespeed
+        motorInfo.leftEncDriveCounter = 0
+        motorInfo.leftEncMoveCounter = 0
+        updateRobotStatus("motor", "speed", "left", movespeed)
+        setMotorDriveSpeed("left", drivespeed)
+        setMotorMoveSpeed("left", movespeed)
         updateRobotStatus("motor", "distance", "left", motorInfo.leftDistance)
 
-        motorInfo.rightSpeed = motorInfo.rightEncCounter
-        motorInfo.rightDistance = motorInfo.rightDistance +
-                                  motorInfo.rightEncCounter
-        motorInfo.rightEncCounter = 0
-        updateRobotStatus("motor", "speed", "right", motorInfo.rightSpeed)
+        drivespeed = motorInfo.rightEncDriveCounter
+        movespeed = motorInfo.rightEncMoveCounter
+        motorInfo.rightDistance = motorInfo.rightDistance + movespeed
+        motorInfo.rightEncDriveCounter = 0
+        motorInfo.rightEncMoveCounter = 0
+        updateRobotStatus("motor", "speed", "right", movespeed)
+        setMotorDriveSpeed("right", drivespeed)
+        setMotorMoveSpeed("right", movespeed)
         updateRobotStatus("motor", "distance", "right", motorInfo.rightDistance)
-        setMotorSpeed("right", motorInfo.rightSpeed)
     end)
 
     -- See top
@@ -301,6 +315,31 @@ function handleIOData(type, data)
             setMotorDirection(data)
         end
     end
+end
+
+function getADCValue(a)
+    -- RP6 library assumes that current ADC values between 150 and 770 are OK
+    -- For safety we take a range above/below this
+    local mincurrent, maxcurrent = 200, 700
+    local currentd = maxcurrent - mincurrent
+    local maxpower = 210
+    if a == "MCURRENT_L" then
+        if motorInfo.leftPower == 0 then
+            return 0
+        end
+        local ret = mincurrent + ((motorInfo.leftPower / maxpower) * currentd)
+        updateRobotStatus("motor", "current", "left", ret)
+        return ret
+    elseif a == "MCURRENT_R" then
+        if motorInfo.rightPower == 0 then
+            return 0
+        end
+        local ret = mincurrent + ((motorInfo.rightPower / maxpower) * currentd)
+        updateRobotStatus("motor", "current", "right", ret)
+        return ret
+    end
+
+    -- return nil
 end
 
 function closePlugin()

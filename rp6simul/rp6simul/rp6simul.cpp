@@ -44,7 +44,7 @@ void activateDockTab(QObject *p, const QString &tab)
 CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
-    QMainWindow(parent), currentMapIsTemplate(false)
+    QMainWindow(parent), currentMapIsTemplate(false), robotIsBlocked(false)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -361,11 +361,13 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     robotScene = new CRobotScene(this);
     connect(robotScene, SIGNAL(mouseModeChanged(CRobotScene::EMouseMode)), this,
             SLOT(sceneMouseModeChanged(CRobotScene::EMouseMode)));
-    connect(this, SIGNAL(motorSpeedChanged(EMotor, int)),
+    connect(this, SIGNAL(motorDriveSpeedChanged(EMotor, int)),
             robotScene->getRobotItem(), SLOT(setMotorSpeed(EMotor, int)));
     connect(this, SIGNAL(motorDirectionChanged(EMotor, EMotorDirection)),
             robotScene->getRobotItem(),
             SLOT(setMotorDirection(EMotor, EMotorDirection)));
+    connect(robotScene->getRobotItem(), SIGNAL(robotBlockedChanged(bool)),
+            SLOT(setRobotIsBlocked(bool)));
     connect(robotScene->getRobotItem(), SIGNAL(bumperChanged(CBumper *, bool)),
             robotWidget, SLOT(update()));
     connect(robotScene->getRobotItem(), SIGNAL(bumperChanged(CBumper *, bool)),
@@ -754,8 +756,10 @@ void CRP6Simulator::initLua()
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
     NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
+    NLua::registerFunction(luaRobotIsBlocked, "robotIsBlocked");
     NLua::registerFunction(luaSetMotorPower, "setMotorPower");
-    NLua::registerFunction(luaSetMotorSpeed, "setMotorSpeed");
+    NLua::registerFunction(luaSetMotorDriveSpeed, "setMotorDriveSpeed");
+    NLua::registerFunction(luaSetMotorMoveSpeed, "setMotorMoveSpeed");
     NLua::registerFunction(luaSetMotorDir, "setMotorDir");
 
     // LED class
@@ -870,6 +874,13 @@ int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
 
     instance->appendRobotStatusUpdate(strtree);
     return 0;
+}
+
+int CRP6Simulator::luaRobotIsBlocked(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    lua_pushboolean(l, instance->robotIsBlocked);
+    return 1;
 }
 
 int CRP6Simulator::luaCreateBumper(lua_State *l)
@@ -1034,7 +1045,7 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
     return 0;
 }
 
-int CRP6Simulator::luaSetMotorSpeed(lua_State *l)
+int CRP6Simulator::luaSetMotorDriveSpeed(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
 
@@ -1048,10 +1059,27 @@ int CRP6Simulator::luaSetMotorSpeed(lua_State *l)
     else if (!strcmp(motor, "right"))
         mtype = MOTOR_RIGHT;
 
-    QMutexLocker mlock(&instance->motorSpeedMutex);
-    instance->changedMotorSpeed[mtype] = speed;
+    instance->emit motorDriveSpeedChanged(mtype, speed);
 
-    instance->emit motorSpeedChanged(mtype, speed);
+    return 0;
+}
+
+int CRP6Simulator::luaSetMotorMoveSpeed(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    const char *motor = luaL_checkstring(l, 1);
+    const int speed = luaL_checkint(l, 2);
+
+    EMotor mtype;
+
+    if (!strcmp(motor, "left"))
+        mtype = MOTOR_LEFT;
+    else if (!strcmp(motor, "right"))
+        mtype = MOTOR_RIGHT;
+
+    QMutexLocker mlock(&instance->motorMoveSpeedMutex);
+    instance->changedMotorMoveSpeed[mtype] = speed;
 
     return 0;
 }
@@ -1450,13 +1478,13 @@ void CRP6Simulator::timedUIUpdate()
     }
     changedMotorPower.clear();
 
-    QMutexLocker mspeedlocker(&motorSpeedMutex);
-    for (QMap<EMotor, int>::iterator it=changedMotorSpeed.begin();
-         it!=changedMotorSpeed.end(); ++it)
+    QMutexLocker mspeedlocker(&motorMoveSpeedMutex);
+    for (QMap<EMotor, int>::iterator it=changedMotorMoveSpeed.begin();
+         it!=changedMotorMoveSpeed.end(); ++it)
     {
         robotWidget->setMotorSpeed(it.key(), it.value());
     }
-    changedMotorSpeed.clear();
+    changedMotorMoveSpeed.clear();
 
     QMutexLocker mdirlocker(&motorDirectionMutex);
     for (QMap<EMotor, EMotorDirection>::iterator it=changedMotorDirection.begin();
@@ -1520,6 +1548,8 @@ void CRP6Simulator::stopPlugin()
     stopPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
     serialSendButton->setEnabled(false);
+
+    robotIsBlocked = false;
 }
 
 void CRP6Simulator::tabViewChanged(int index)

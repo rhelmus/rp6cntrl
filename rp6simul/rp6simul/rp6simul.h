@@ -80,10 +80,11 @@ class CRP6Simulator : public QMainWindow
     QMutex robotLEDMutex;
     QMap<EMotor, int> changedMotorPower;
     QMutex motorPowerMutex;
-    QMap<EMotor, int> changedMotorSpeed;
-    QMutex motorSpeedMutex;
+    QMap<EMotor, int> changedMotorMoveSpeed;
+    QMutex motorMoveSpeedMutex;
     QMap<EMotor, EMotorDirection> changedMotorDirection;
     QMutex motorDirectionMutex;
+    volatile bool robotIsBlocked;
     QMap<CBumper *, int> bumperLuaCallbacks;
     QList<QCheckBox *> ADCOverrideCheckBoxes;
     QList<QSpinBox *> ADCOverrideSpinBoxes;
@@ -121,6 +122,7 @@ class CRP6Simulator : public QMainWindow
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
+    static int luaRobotIsBlocked(lua_State *l);
     static int luaCreateBumper(lua_State *l);
     static int luaBumperSetCallback(lua_State *l);
     static int luaBumperDestr(lua_State *l);
@@ -128,7 +130,8 @@ class CRP6Simulator : public QMainWindow
     static int luaLEDSetEnabled(lua_State *l);
     static int luaLEDDestr(lua_State *l);
     static int luaSetMotorPower(lua_State *l);
-    static int luaSetMotorSpeed(lua_State *l);
+    static int luaSetMotorDriveSpeed(lua_State *l);
+    static int luaSetMotorMoveSpeed(lua_State *l);
     static int luaSetMotorDir(lua_State *l);
     static int luaCreateIRSensor(lua_State *l);
     static int luaIRSensorGetHitDistance(lua_State *l);
@@ -156,6 +159,7 @@ private slots:
     void mapSelectorItemActivated(QTreeWidgetItem *item);
     void resetADCTable(void);
     void applyADCTable(void);
+    void setRobotIsBlocked(bool b) { robotIsBlocked = b; }
     void setLuaBumper(CBumper *b, bool e);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);
@@ -170,7 +174,7 @@ public:
 signals:
     // These are emitted by the class itself to easily thread-synchronize
     // function calls
-    void motorSpeedChanged(EMotor, int);
+    void motorDriveSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
 };
 

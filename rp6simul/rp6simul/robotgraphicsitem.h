@@ -25,6 +25,7 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     QList<CIRSensor *> IRSensors;
     QTimer *sensorUpdateTimer;
     QList<CLightSensor *> lightSensors;
+    bool isBlocked;
     int skipFrames;
 
     typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
@@ -70,6 +71,7 @@ public slots:
 
 signals:
     void robotMoved(const QPointF &, qreal);
+    void robotBlockedChanged(bool);
     void rotationChanged(qreal); // Manual rotate
     void bumperChanged(CBumper *, bool);
     void IRSensorChanged(CIRSensor *, float);
