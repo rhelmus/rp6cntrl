@@ -17,11 +17,13 @@ Q_DECLARE_METATYPE(EMotor)
 Q_DECLARE_METATYPE(EMotorDirection)
 
 class QActionGroup;
+class QCheckBox;
 class QGraphicsView;
 class QPushButton;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
+class QSpinBox;
 class QStackedWidget;
 class QTableWidget;
 class QTabWidget;
@@ -64,6 +66,8 @@ class CRP6Simulator : public QMainWindow
     QTreeWidget *mapSelectorTreeWidget;
     QTreeWidgetItem *mapTemplatesTreeItem;
     QTreeWidgetItem *mapHistoryTreeItem;
+    QDockWidget *ADCDockWidget;
+    QTableWidget *ADCTableWidget;
     QTableWidget *IORegisterTableWidget;
 
     QString logTextBuffer;
@@ -81,6 +85,8 @@ class CRP6Simulator : public QMainWindow
     QMap<EMotor, EMotorDirection> changedMotorDirection;
     QMutex motorDirectionMutex;
     QMap<CBumper *, int> bumperLuaCallbacks;
+    QList<QCheckBox *> ADCOverrideCheckBoxes;
+    QList<QSpinBox *> ADCOverrideSpinBoxes;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -95,6 +101,7 @@ class CRP6Simulator : public QMainWindow
     QWidget *createRobotSceneWidget(void);
     QWidget *createLogWidgets(void);
     QDockWidget *createStatusDock(void);
+    QDockWidget *createADCDock(void);
     QDockWidget *createRegisterDock(void);
 
     void updateMainStackedWidget(void);
@@ -144,6 +151,8 @@ private slots:
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
     void editMapSettings(void);
     void mapSelectorItemActivated(QTreeWidgetItem *item);
+    void resetADCTable(void);
+    void applyADCTable(void);
     void setLuaBumper(CBumper *b, bool e);
     void sendSerialPressed(void);
     void debugSetRobotLeftPower(int power);

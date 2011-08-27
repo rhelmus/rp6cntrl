@@ -336,7 +336,6 @@ void CRobotGraphicsItem::updateIRSensors()
         ir->setHitDistance(newd);
         if (oldd != newd)
             emit IRSensorChanged(ir, newd);
-        qDebug() << "old/newd:" << oldd << newd;
     }
 }
 

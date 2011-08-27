@@ -18,19 +18,18 @@ handledIORegisters = {
     avr.IO_ADCSRA
 }
 
+
 local ADCInfo = {
-    currentPort = 0,
+    currentPort = nil,
     ADCEnabled = false,
 }
-
-local ACDData = { }
 
 local function getADCPort(data)
     for p=0,7 do
         -- Skip 4: not used by RP6
         -- Mask by 7(0b111): Only look at first 3 bits
         if p ~= 4 and (bit.bitAnd(data, 7) == p) then
-            return p
+            return getADCPortNames()[p+1]
         end
     end
 end
@@ -55,9 +54,6 @@ end
 
 
 function initPlugin()
-    for i=0,7 do
-        ACDData[i] = 0
-    end
 end
 
 function handleIOData(type, data)
@@ -65,7 +61,7 @@ function handleIOData(type, data)
         local port = getADCPort(data)
         if not port then
             error("Unsupported ADC port specified (ignoring change)\n")
-        elseif port ~= ADCInfo.currentPort then
+        elseif not ADCInfo.currentPort or port ~= ADCInfo.currentPort then
             -- No logging...excessive with task_ADC() function...
 --            log(string.format("Changed ADC port to %d\n", port))
             ADCInfo.currentPort = port
@@ -78,7 +74,7 @@ function handleIOData(type, data)
 
         if bit.isSet(data, avr.ADSC) then
             -- Start conversion
-            avr.setIORegister(avr.IO_ADC, ACDData[ADCInfo.currentPort])
+            avr.setIORegister(avr.IO_ADC, getADCValue(ADCInfo.currentPort))
             -- Notify we're ready
             avr.setIORegister(avr.IO_ADCSRA, bit.unSet(data, avr.ADSC))
         end
