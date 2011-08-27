@@ -226,7 +226,17 @@ void CRobotGraphicsItem::tryMove()
       the case of failure try to unstuck the robot by moving it in
       random close positions.
     */
-    if (!tryDoMove(degspeed, mapDeltaPos(0.0, -movespeed), true))
+    const bool blocked =
+            !tryDoMove(degspeed, mapDeltaPos(0.0, -movespeed), true);
+
+    qDebug() << "blocked:" << blocked;
+    if (isBlocked != blocked)
+    {
+        isBlocked = blocked;
+        emit robotBlockedChanged(blocked);
+    }
+
+    if (blocked)
     {
         skipFrames = 3;
 
