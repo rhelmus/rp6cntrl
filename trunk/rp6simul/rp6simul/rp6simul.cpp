@@ -3,6 +3,7 @@
 #include "bumper.h"
 #include "irsensor.h"
 #include "led.h"
+#include "lightsensor.h"
 #include "lua.h"
 #include "mapsettingsdialog.h"
 #include "pathinput.h"
@@ -770,6 +771,10 @@ void CRP6Simulator::initLua()
     NLua::registerClassFunction(luaIRSensorGetHitDistance, "getHitDistance",
                                 "irsensor");
 
+    // light sensor class
+    NLua::registerFunction(luaCreateLightSensor, "createLightSensor");
+    NLua::registerClassFunction(luaLightSensorGetLight, "getLight", "lightsensor");
+
     lua_getglobal(NLua::luaInterface, "init");
     lua_call(NLua::luaInterface, 0, 0);
 }
@@ -1142,6 +1147,45 @@ int CRP6Simulator::luaIRSensorDestr(lua_State *l)
     instance->robotScene->getRobotItem()->removeIRSensor(ir);
     instance->robotWidget->removeIRSensor(ir);
     delete ir;
+    return 0;
+}
+
+int CRP6Simulator::luaCreateLightSensor(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+
+    // position
+    luaL_checktype(l, 1, LUA_TTABLE);
+
+    lua_rawgeti(l, 1, 1);
+    const float x = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 1, 2);
+    const float y = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    CLightSensor *light = new CLightSensor(QPointF(x, y));
+    instance->robotScene->getRobotItem()->addLightSensor(light);
+    NLua::createClass(l, light, "lightsensor", luaLightSensorDestr);
+    return 1;
+}
+
+int CRP6Simulator::luaLightSensorGetLight(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    CLightSensor *light = NLua::checkClassData<CLightSensor>(l, 1, "lightsensor");
+    lua_pushinteger(l, light->getLight());
+    return 1;
+}
+
+int CRP6Simulator::luaLightSensorDestr(lua_State *l)
+{
+    qDebug() << "Removing light sensor";
+    NLua::CLuaLocker lualocker;
+    CLightSensor *light = NLua::checkClassData<CLightSensor>(l, 1, "lightsensor");
+    instance->robotScene->getRobotItem()->removeLightSensor(light);
+    delete light;
     return 0;
 }
 

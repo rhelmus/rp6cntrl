@@ -78,4 +78,7 @@ robotProperties =
         points = { { 322, 23 }, { 439, 2 }, { 523, 12 }, { 525, 28 }, { 515, 44 } },
         color = transblue
     },
+
+    leftLDR = { pos = { 290, 70 }, shape = "point" },
+    rightLDR = { pos = { 353, 70 }, shape = "point" },
 }

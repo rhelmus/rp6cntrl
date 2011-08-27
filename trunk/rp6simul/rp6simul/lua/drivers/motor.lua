@@ -24,6 +24,10 @@ local motorInfo = {
     inputRegister = 0,
     leftEncCounter = 0,
     rightEncCounter = 0,
+    leftSpeed = 0,
+    rightSpeed = 0,
+    leftDistance = 0,
+    rightDistance = 0,
 }
 
 local leftEncTimer, rightEncTimer, encReadoutTimer
@@ -234,13 +238,19 @@ function initPlugin()
     encReadoutTimer = clock.createTimer()
     encReadoutTimer:setTimeOut(function()
         motorInfo.leftSpeed = motorInfo.leftEncCounter
+        motorInfo.leftDistance = motorInfo.leftDistance +
+                                 motorInfo.leftEncCounter
         motorInfo.leftEncCounter = 0
         updateRobotStatus("motor", "speed", "left", motorInfo.leftSpeed)
         setMotorSpeed("left", motorInfo.leftSpeed)
+        updateRobotStatus("motor", "distance", "left", motorInfo.leftDistance)
 
         motorInfo.rightSpeed = motorInfo.rightEncCounter
+        motorInfo.rightDistance = motorInfo.rightDistance +
+                                  motorInfo.rightEncCounter
         motorInfo.rightEncCounter = 0
         updateRobotStatus("motor", "speed", "right", motorInfo.rightSpeed)
+        updateRobotStatus("motor", "distance", "right", motorInfo.rightDistance)
         setMotorSpeed("right", motorInfo.rightSpeed)
     end)
 

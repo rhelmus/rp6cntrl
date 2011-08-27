@@ -18,7 +18,7 @@ local function callOptDriverFunc(driver, f, ...)
     -- Use rawget to avoid obtaining data from global environment
     local func = rawget(driver, f)
     if func then
-        func(...)
+        return func(...)
     end
 end
 
@@ -115,13 +115,21 @@ end
 -- or from drivers. The former overrides the latter.
 local UIADCValues = { }
 
-local driverADCValues = { }
-function setDriverADCValue(a, v)
-    driverADCValues[a] = v
-end
-
 function getADCValue(a)
-    return UIADCValues[a] or driverADCValues[a]
+    if UIADCValues[a] then
+        return UIADCValues[a]
+    end
+
+    -- No overridden ADC value, see if a driver has one
+    for _, d in ipairs(driverList) do
+        local val = callOptDriverFunc(d, "getADCValue", a)
+        if val then
+            return val
+        end
+    end
+
+    -- Nothing...
+    return 0
 end
 
 function getADCPortNames()
@@ -137,10 +145,6 @@ end
 
 function initPlugin(drivers)
     assert(tableIsEmpty(driverList) and tableIsEmpty(IOHandleMap))
-
-    for _, v in pairs(getADCPortNames()) do
-        setDriverADCValue(v, 0)
-    end
 
     if drivers then
         for _, d in ipairs(drivers) do
