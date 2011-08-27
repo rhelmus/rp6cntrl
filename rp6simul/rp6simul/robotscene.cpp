@@ -500,10 +500,10 @@ void CRobotScene::drawForeground(QPainter *painter, const QRectF &rect)
 
     painter->save();
 
-    if (!lightEditMode && !lightPixmap.isNull())
+    if (!lightEditMode && !lightImage.isNull())
     {
         painter->setCompositionMode(QPainter::CompositionMode_HardLight);
-        painter->drawPixmap(sceneRect().toRect(), lightPixmap);
+        painter->drawImage(sceneRect().toRect(), lightImage);
         painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
     }
 
@@ -912,6 +912,24 @@ void CRobotScene::loadMap(QSettings &settings)
     getGraphicsView()->centerOn(robotGraphicsItem);
 }
 
+float CRobotScene::getIntensity(QPointF point) const
+{
+    if (lightImage.isNull())
+        return 0;
+
+    const int maxc = 90; // Keep this in sync with intensityToColor()!
+
+    const qreal scalew = (qreal)lightImage.width() / sceneRect().width();
+    const qreal scaleh = (qreal)lightImage.height() / sceneRect().height();
+
+    point.rx() *= scalew;
+    point.ry() *= scaleh;
+
+    // Although we take the blue color, we could have taken any of them
+    const int intensity = qBlue(lightImage.pixel(point.toPoint()));
+    return qMin((float)intensity / (float)maxc, 2.0f);
+}
+
 void CRobotScene::zoomSceneIn()
 {
     scaleGraphicsView(1.2);
@@ -1108,12 +1126,12 @@ void CRobotScene::updateLighting()
     }
 
     const QSize lisize(sceneRect().size().toSize() / scale);
-    if (lightPixmap.isNull() || (lightPixmap.size() != lisize))
-        lightPixmap = QPixmap(lisize);
+    if (lightImage.isNull() || (lightImage.size() != lisize))
+        lightImage = QImage(lisize, QImage::Format_RGB32);
 
-    lightPixmap.fill(intensityToColor(ambientLight).rgb());
+    lightImage.fill(intensityToColor(ambientLight).rgb());
 
-    QPainter lipainter(&lightPixmap);
+    QPainter lipainter(&lightImage);
     lipainter.setRenderHint(QPainter::Antialiasing);
     lipainter.setPen(Qt::NoPen);
 
@@ -1184,7 +1202,7 @@ void CRobotScene::setLightEditMode(bool v)
 QColor intensityToColor(float intensity)
 {
     intensity = qBound(0.0f, intensity, 2.0f);
-    const float maxc = 90;
+    const float maxc = 90.0;
     const int c = qRound(intensity * maxc);
     return QColor(c, c, c);
 }

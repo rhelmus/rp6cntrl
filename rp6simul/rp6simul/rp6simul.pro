@@ -108,7 +108,8 @@ HEADERS  += rp6simul.h \
     robotwidget.h \
     led.h \
     bumper.h \
-    irsensor.h
+    irsensor.h \
+    lightsensor.h
 
 OTHER_FILES += \
     TODO.txt \
@@ -123,6 +124,7 @@ OTHER_FILES += \
     lua/drivers/adc.lua \
     lua/drivers/acs.lua \
     lua/properties.lua \
-    lua/drivers/bumper.lua
+    lua/drivers/bumper.lua \
+    lua/drivers/light.lua
 
 INCLUDEPATH += ../lua

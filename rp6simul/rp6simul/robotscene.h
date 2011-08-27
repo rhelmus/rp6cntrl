@@ -32,7 +32,7 @@ private:
 
     QList<SLight> lights;
     QPixmap backGroundPixmap;
-    QPixmap lightPixmap;
+    QImage lightImage;
     bool lightingDirty, autoRefreshLighting;
     float ambientLight;
     EShadowQuality shadowQuality;
@@ -114,6 +114,7 @@ public:
     void saveMap(QSettings &settings);
     void loadMap(QSettings &settings);
     bool getMapEdited(void) const { return mapEdited; }
+    float getIntensity(QPointF point) const;
 
     static QList<QGraphicsItem *> fixedSizeItems;
 

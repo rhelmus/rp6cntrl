@@ -55,3 +55,4 @@
 - Check high simulated CPU speeds
 - powerON/powerOFF currently don't affect encoders and such
 - acs: min hit distance?
+- Update default drivers

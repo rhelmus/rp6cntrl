@@ -169,7 +169,6 @@ void CRobotWidget::addBumper(CBumper *b)
 
 void CRobotWidget::removeBumper(CBumper *b)
 {
-    qDebug() << "Removing bumper from robot widget";
     bumpers.removeOne(b);
 }
 
@@ -180,7 +179,6 @@ void CRobotWidget::addLED(CLED *l)
 
 void CRobotWidget::removeLED(CLED *l)
 {
-    qDebug() << "Removing LED from robot widget";
     LEDs.removeOne(l);
 }
 
@@ -191,6 +189,5 @@ void CRobotWidget::addIRSensor(CIRSensor *ir)
 
 void CRobotWidget::removeIRSensor(CIRSensor *ir)
 {
-    qDebug() << "Removing IR sensor from robot widget";
     IRSensors.removeOne(ir);
 }

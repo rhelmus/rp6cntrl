@@ -3,6 +3,7 @@
 #include "irsensor.h"
 #include "led.h"
 #include "lightgraphicsitem.h"
+#include "lightsensor.h"
 #include "robotgraphicsitem.h"
 #include "simulator.h"
 #include "utils.h"
@@ -96,9 +97,9 @@ CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
 
     connect(this, SIGNAL(posChanged(const QPointF &)), SLOT(updateBumpers()));
 
-    IRSensorUpdateTimer = new QTimer(this);
-    IRSensorUpdateTimer->setInterval(100);
-    connect(IRSensorUpdateTimer, SIGNAL(timeout()), SLOT(updateIRSensors()));
+    sensorUpdateTimer = new QTimer(this);
+    sensorUpdateTimer->setInterval(100);
+    connect(sensorUpdateTimer, SIGNAL(timeout()), SLOT(updateSensors()));
 }
 
 void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
@@ -295,14 +296,15 @@ void CRobotGraphicsItem::updateBumpers()
     }
 }
 
-void CRobotGraphicsItem::updateIRSensors()
+void CRobotGraphicsItem::updateSensors()
 {
+    const qreal scale = getPixmapScale();
+
     foreach (CIRSensor *ir, IRSensors)
     {
         // Start with line which has a zero degree angle
         // (in Qt's counter clockwise system)
-        QPointF start(ir->getPosition());
-        const qreal scale = getPixmapScale();
+        QPointF start(ir->getPosition());       
         start.rx() *= scale;
         start.ry() *= scale;
 
@@ -336,6 +338,21 @@ void CRobotGraphicsItem::updateIRSensors()
         ir->setHitDistance(newd);
         if (oldd != newd)
             emit IRSensorChanged(ir, newd);
+    }
+
+    foreach (CLightSensor *light, lightSensors)
+    {
+        QPointF position = light->getPosition();
+        position.rx() *= scale;
+        position.ry() *= scale;
+        position = mapToScene(position);
+
+        const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+        Q_ASSERT(rscene);
+        const float intensity = rscene->getIntensity(position);
+
+        // intensity is in 0.0 .. 2.0 range, sensor in 0 .. 1023
+        light->setLight((intensity / 2.0) * 1023.0);
     }
 }
 
@@ -464,7 +481,6 @@ void CRobotGraphicsItem::addLED(CLED *l)
 
 void CRobotGraphicsItem::removeLED(CLED *l)
 {
-    qDebug() << "Removing LED from robot item";
     LEDs.removeOne(l);
 }
 
@@ -497,7 +513,6 @@ void CRobotGraphicsItem::addBumper(CBumper *b)
 
 void CRobotGraphicsItem::removeBumper(CBumper *b)
 {
-    qDebug() << "Removing bumper from robot item";
     delete bumperItems.take(b);
     bumpers.removeOne(b);
 }
@@ -505,14 +520,27 @@ void CRobotGraphicsItem::removeBumper(CBumper *b)
 void CRobotGraphicsItem::addIRSensor(CIRSensor *ir)
 {
     IRSensors << ir;
-    if (!IRSensorUpdateTimer->isActive())
-        IRSensorUpdateTimer->start();
+    if (!sensorUpdateTimer->isActive())
+        sensorUpdateTimer->start();
 }
 
 void CRobotGraphicsItem::removeIRSensor(CIRSensor *ir)
 {
-    qDebug() << "Removing IR sensor from robot item";
     IRSensors.removeOne(ir);
-    if (IRSensors.isEmpty())
-        IRSensorUpdateTimer->stop();
+    if (IRSensors.isEmpty() && lightSensors.isEmpty())
+        sensorUpdateTimer->stop();
+}
+
+void CRobotGraphicsItem::addLightSensor(CLightSensor *light)
+{
+    lightSensors << light;
+    if (!sensorUpdateTimer->isActive())
+        sensorUpdateTimer->start();
+}
+
+void CRobotGraphicsItem::removeLightSensor(CLightSensor *light)
+{
+    lightSensors.removeOne(light);
+    if (IRSensors.isEmpty() && lightSensors.isEmpty())
+        sensorUpdateTimer->stop();
 }
