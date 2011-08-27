@@ -74,10 +74,15 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QDockWidget *statdock, *regdock;
     addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
                   Qt::Vertical);
+    addDockWidget(Qt::LeftDockWidgetArea, ADCDockWidget = createADCDock(),
+                  Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, regdock = createRegisterDock(),
                   Qt::Vertical);
-    tabifyDockWidget(statdock, regdock);
+    tabifyDockWidget(statdock, ADCDockWidget);
+    tabifyDockWidget(ADCDockWidget, regdock);
     activateDockTab(this, "Status");
+
+    ADCDockWidget->setEnabled(false);
 
     // Do this after toolbars and dockedwidgets are created, as the
     // tabViewChanged slot needs some.
@@ -463,6 +468,67 @@ QDockWidget *CRP6Simulator::createStatusDock()
     mapHistoryTreeItem->setExpanded(true);
     loadMapTemplatesTree();
     loadMapHistoryTree();
+
+    return ret;
+}
+
+QDockWidget *CRP6Simulator::createADCDock()
+{
+    QDockWidget *ret = new QDockWidget("ADC", this);
+    ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    QWidget *w = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(w);
+    ret->setWidget(w);
+
+    QLabel *l =
+            new QLabel("In this table you can override ADC values "
+                       "that would otherwise be set by any of the "
+                       "loaded drivers.");
+    l->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    l->setWordWrap(true);
+    vbox->addWidget(l);
+    vbox->addSpacing(10);
+
+    vbox->addWidget(ADCTableWidget = new QTableWidget(7, 2));
+    ADCTableWidget->setHorizontalHeaderLabels(QStringList() << "override" <<
+                                              "value");
+    ADCTableWidget->setVerticalHeaderLabels(QStringList() << "ADC0" << "ADC1" <<
+                                    "LS_L" << "LS_R" << "MCURRENT_L" <<
+                                    "MCURRENT_R" << "BATTERY");
+
+    for (int i=0; i<ADCTableWidget->rowCount(); ++i)
+    {
+        QWidget *cw = new QWidget;
+        QHBoxLayout *chbox = new QHBoxLayout(cw);
+        chbox->setAlignment(Qt::AlignCenter);
+        chbox->setMargin(0);
+
+        QCheckBox *check = new QCheckBox;
+        chbox->addWidget(check);
+        ADCOverrideCheckBoxes << check;
+        ADCTableWidget->setCellWidget(i, 0, cw);
+
+        QSpinBox *spin = new QSpinBox;
+        spin->setRange(0, 1023); // UNDONE? ADC may have lower max
+        spin->setEnabled(false);
+        connect(check, SIGNAL(toggled(bool)), spin, SLOT(setEnabled(bool)));
+        ADCOverrideSpinBoxes << spin;
+        ADCTableWidget->setCellWidget(i, 1, spin);
+    }
+
+    ADCTableWidget->resizeRowsToContents();
+    ADCTableWidget->resizeColumnToContents(0);
+
+    QHBoxLayout *hbox = new QHBoxLayout;
+    vbox->addLayout(hbox);
+
+    QPushButton *button = new QPushButton("Reset");
+    connect(button, SIGNAL(clicked()), SLOT(resetADCTable()));
+    hbox->addWidget(button);
+
+    hbox->addWidget(button = new QPushButton("Apply"));
+    connect(button, SIGNAL(clicked()), SLOT(applyADCTable()));
 
     return ret;
 }
@@ -1381,6 +1447,7 @@ void CRP6Simulator::runPlugin()
 
     runPluginAction->setEnabled(false);
     stopPluginAction->setEnabled(true);
+    ADCDockWidget->setEnabled(true);
     serialSendButton->setEnabled(true);
 }
 
@@ -1407,6 +1474,7 @@ void CRP6Simulator::stopPlugin()
 
     runPluginAction->setEnabled(true);
     stopPluginAction->setEnabled(false);
+    ADCDockWidget->setEnabled(false);
     serialSendButton->setEnabled(false);
 }
 
@@ -1464,6 +1532,34 @@ void CRP6Simulator::mapSelectorItemActivated(QTreeWidgetItem *item)
     // Template map items without user data are subdirectories
     else if (mapItemIsTemplate(item) && !item->data(0, Qt::UserRole).isNull())
         loadMapFile(item->data(0, Qt::UserRole).toString(), true);
+}
+
+void CRP6Simulator::resetADCTable()
+{
+    // NOTE: setChecked() triggers ADCOverrideSpinBoxes[]->setEnabled()
+    foreach (QCheckBox *box, ADCOverrideCheckBoxes)
+        box->setChecked(false);
+    applyADCTable();
+}
+
+void CRP6Simulator::applyADCTable()
+{
+    NLua::CLuaLocker lualocker;
+    lua_getglobal(NLua::luaInterface, "setUIADCValue");
+    const int findex = lua_gettop(NLua::luaInterface);
+
+    for (int i=0; i<ADCTableWidget->rowCount(); ++i)
+    {
+        lua_pushvalue(NLua::luaInterface, findex);
+        lua_pushstring(NLua::luaInterface,
+                       qPrintable(ADCTableWidget->verticalHeaderItem(i)->text()));
+        if (ADCOverrideCheckBoxes[i]->isChecked())
+            lua_pushinteger(NLua::luaInterface, ADCOverrideSpinBoxes[i]->value());
+        else
+            lua_pushnil(NLua::luaInterface); // nil: don't override
+        lua_call(NLua::luaInterface, 2, 0);
+    }
+    lua_pop(NLua::luaInterface, 1); // Pop function
 }
 
 void CRP6Simulator::setLuaBumper(CBumper *b, bool e)

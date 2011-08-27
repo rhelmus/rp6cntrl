@@ -111,9 +111,22 @@ function setSerialInputHandler(func)
     serialInputHandler = func
 end
 
-local bumperHandler
-function setBumperHandler(func)
-    bumperHandler = func
+-- ADC values can either be set by the user interface program
+-- or from drivers. The former overrides the latter.
+local UIADCValues = { }
+
+local driverADCValues = { }
+function setDriverADCValue(a, v)
+    driverADCValues[a] = v
+end
+
+function getADCValue(a)
+    return UIADCValues[a] or driverADCValues[a]
+end
+
+function getADCPortNames()
+    return { "ADC0", "ADC1", "LS_R", "LS_L", "E_INT1", "MCURRENT_R",
+             "MCURRENT_L", "UBAT" }
 end
 
 
@@ -124,6 +137,10 @@ end
 
 function initPlugin(drivers)
     assert(tableIsEmpty(driverList) and tableIsEmpty(IOHandleMap))
+
+    for _, v in pairs(getADCPortNames()) do
+        setDriverADCValue(v, 0)
+    end
 
     if drivers then
         for _, d in ipairs(drivers) do
@@ -212,10 +229,9 @@ function sendSerial(text)
     end
 end
 
-function setBumper(b, e)
-    if bumperHandler then
-        bumperHandler(b, e)
-    end
+function setUIADCValue(a, v)
+    debug(string.format("setUIADCValue: %s = %s\n", a, tostring(v)))
+    UIADCValues[a] = v
 end
 
 
