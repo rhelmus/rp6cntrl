@@ -229,7 +229,6 @@ void CRobotGraphicsItem::tryMove()
     const bool blocked =
             !tryDoMove(degspeed, mapDeltaPos(0.0, -movespeed), true);
 
-    qDebug() << "blocked:" << blocked;
     if (isBlocked != blocked)
     {
         isBlocked = blocked;

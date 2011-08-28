@@ -113,7 +113,7 @@ function handleIOData(type, data)
         local e = not bit.isSet(data, ACSFlags.ACS_L)
         if e ~= ACSInfo.leftEnabled then
             ACSInfo.leftEnabled = e
-            log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
+--            log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
             if not e then
                 maybeReceivePulse("left")
             end
@@ -122,7 +122,7 @@ function handleIOData(type, data)
         local e = not bit.isSet(data, ACSFlags.ACS_R)
         if e ~= ACSInfo.rightEnabled then
             ACSInfo.rightEnabled = e
-            log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
+--            log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
             if not e then
                 maybeReceivePulse("right")
             end

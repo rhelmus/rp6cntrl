@@ -28,35 +28,6 @@ SOURCES += main.cpp\
     lightgraphicsitem.cpp \
     basegraphicsitem.cpp \
     mapsettingsdialog.cpp \
-    ../lua/lzio.c \
-    ../lua/lvm.c \
-    ../lua/lundump.c \
-    ../lua/ltm.c \
-    ../lua/ltablib.c \
-    ../lua/ltable.c \
-    ../lua/lstrlib.c \
-    ../lua/lstring.c \
-    ../lua/lstate.c \
-    ../lua/lparser.c \
-    ../lua/loslib.c \
-    ../lua/lopcodes.c \
-    ../lua/lobject.c \
-    ../lua/loadlib.c \
-    ../lua/lmem.c \
-    ../lua/lmathlib.c \
-    ../lua/llex.c \
-    ../lua/liolib.c \
-    ../lua/linit.c \
-    ../lua/lgc.c \
-    ../lua/lfunc.c \
-    ../lua/ldump.c \
-    ../lua/ldo.c \
-    ../lua/ldebug.c \
-    ../lua/ldblib.c \
-    ../lua/lcode.c \
-    ../lua/lbaselib.c \
-    ../lua/lauxlib.c \
-    ../lua/lapi.c \
     clock.cpp \
     progressdialog.cpp \
     robotwidget.cpp
@@ -78,30 +49,6 @@ HEADERS  += rp6simul.h \
     lightgraphicsitem.h \
     basegraphicsitem.h \
     mapsettingsdialog.h \
-    ../lua/lzio.h \
-    ../lua/lvm.h \
-    ../lua/lundump.h \
-    ../lua/lualib.h \
-    ../lua/luaconf.h \
-    ../lua/lua.h \
-    ../lua/ltm.h \
-    ../lua/ltable.h \
-    ../lua/lstring.h \
-    ../lua/lstate.h \
-    ../lua/lparser.h \
-    ../lua/lopcodes.h \
-    ../lua/lobject.h \
-    ../lua/lmem.h \
-    ../lua/llimits.h \
-    ../lua/llex.h \
-    ../lua/lgc.h \
-    ../lua/lfunc.h \
-    ../lua/ldo.h \
-    ../lua/ldebug.h \
-    ../lua/lcode.h \
-    ../lua/lauxlib.h \
-    ../lua/lapi.h \
-    ../lua/lua.hpp \
     clock.h \
     graphicsitemtypes.h \
     progressdialog.h \
@@ -125,6 +72,68 @@ OTHER_FILES += \
     lua/drivers/acs.lua \
     lua/properties.lua \
     lua/drivers/bumper.lua \
-    lua/drivers/light.lua
+    lua/drivers/light.lua \
+    lua/drivers/ircomm.lua
 
-INCLUDEPATH += ../lua
+win32 {
+    SOURCES += ../lua/lzio.c \
+        ../lua/lvm.c \
+        ../lua/lundump.c \
+        ../lua/ltm.c \
+        ../lua/ltablib.c \
+        ../lua/ltable.c \
+        ../lua/lstrlib.c \
+        ../lua/lstring.c \
+        ../lua/lstate.c \
+        ../lua/lparser.c \
+        ../lua/loslib.c \
+        ../lua/lopcodes.c \
+        ../lua/lobject.c \
+        ../lua/loadlib.c \
+        ../lua/lmem.c \
+        ../lua/lmathlib.c \
+        ../lua/llex.c \
+        ../lua/liolib.c \
+        ../lua/linit.c \
+        ../lua/lgc.c \
+        ../lua/lfunc.c \
+        ../lua/ldump.c \
+        ../lua/ldo.c \
+        ../lua/ldebug.c \
+        ../lua/ldblib.c \
+        ../lua/lcode.c \
+        ../lua/lbaselib.c \
+        ../lua/lauxlib.c \
+        ../lua/lapi.c
+
+    HEADERS += ../lua/lzio.h \
+        ../lua/lvm.h \
+        ../lua/lundump.h \
+        ../lua/lualib.h \
+        ../lua/luaconf.h \
+        ../lua/lua.h \
+        ../lua/ltm.h \
+        ../lua/ltable.h \
+        ../lua/lstring.h \
+        ../lua/lstate.h \
+        ../lua/lparser.h \
+        ../lua/lopcodes.h \
+        ../lua/lobject.h \
+        ../lua/lmem.h \
+        ../lua/llimits.h \
+        ../lua/llex.h \
+        ../lua/lgc.h \
+        ../lua/lfunc.h \
+        ../lua/ldo.h \
+        ../lua/ldebug.h \
+        ../lua/lcode.h \
+        ../lua/lauxlib.h \
+        ../lua/lapi.h \
+        ../lua/lua.hpp
+
+    INCLUDEPATH += ../lua
+}
+else {
+    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
+#    LIBS += -llua
+}

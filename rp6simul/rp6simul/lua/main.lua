@@ -1,3 +1,6 @@
+-- LuaJIT compat fix: http://lua-users.org/lists/lua-l/2010-09/msg00161.html
+os.setlocale("C", "numeric")
+
 local driverList = { }
 -- Used to check if drivers are properly destructed
 local weakDriverList = setmetatable({ }, { __mode = "kv" })
@@ -51,7 +54,7 @@ local function loadDriver(d)
     local name = file:gsub(".lua", "")
     local stat, driver = pcall(chunk, name)
     if not stat then
-        errorLog(string.format("Failed to execute driver %s%s\n", dir, file))
+        errorLog(string.format("Failed to execute driver %s%s: %s\n", dir, file, driver))
         return nil
     end
 

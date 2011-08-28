@@ -99,7 +99,7 @@ void CAVRClock::run()
     timeouts = 0;
 
     // UNDONE: Make this an option; ie higher value gives 'faster timer' (more correct MHz), but hammers CPU more.
-    while (timeouts < 15000)
+    while (timeouts < /*15000*/1500)
     {
         timer = getClosestTimer();
         if (!timer)
@@ -125,14 +125,20 @@ void CAVRClock::run()
     timeout_total += timeouts;
     timeout_count++;
 
+    static unsigned long tottimeouttime = 0;
+    clock_gettime(CLOCK_MONOTONIC, &curtime);
+    tottimeouttime += getUSDiff(lastClockTime, curtime);
+
     if (delta_total >= 1000000)
     {
         qDebug() << "delta_total:" << delta_total;
         qDebug() << "AVG delta:" << (delta_total / delta_count);
         qDebug() << "AVG timeout:" << (timeout_total / timeout_count);
         qDebug() << "Frequency (ticks/s):" << tickspersec;
+        qDebug() << "avg timeout time:" << tottimeouttime / timeout_count;
         delta_total = delta_count = 0;
         timeout_total = timeout_count = 0;
+        tottimeouttime = 0;
 
         // UNDONE: Move out of debug code
         emit clockSpeed(tickspersec.get());
@@ -146,7 +152,7 @@ void CAVRClock::run()
     usleep(1);
 #else
     timespec ts = { 0, 1000 };
-    nanosleep(&ts, 0);
+//    nanosleep(&ts, 0);
 #endif
 }
 
@@ -164,7 +170,11 @@ void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
     if (e != timer->isEnabled())
     {
         if (e) // Init timer?
-            timer->getRefNextTick() = currentTicks + timer->getTrueCompareValue();
+        {
+            const CTicks maxnexttick(currentTicks + timer->getTrueCompareValue());
+            if (maxnexttick < timer->getNextTick())
+                timer->getRefNextTick() = maxnexttick;
+        }
         timer->setEnabled(e);
     }
 }
