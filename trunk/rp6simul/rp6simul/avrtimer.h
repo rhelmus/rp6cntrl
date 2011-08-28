@@ -155,7 +155,7 @@ QDebug operator<<(QDebug dbg, const CTicks &ticks);
 // The timer either calls an ISR or lua function
 class CAVRTimer
 {
-    bool enabled;
+    volatile bool enabled;
     CTicks nextTick;
     EISRTypes ISRTimeOut; // ISR to call
     int luaTimeOutRef;

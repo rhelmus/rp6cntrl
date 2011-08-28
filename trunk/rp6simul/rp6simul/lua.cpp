@@ -8,19 +8,6 @@
 
 namespace {
 
-// Table of libs that should be loaded
-const luaL_Reg libTable[] = {
-    { "", luaopen_base },
-    { LUA_TABLIBNAME, luaopen_table },
-    { LUA_IOLIBNAME, luaopen_io },
-    { LUA_OSLIBNAME, luaopen_os },
-    { LUA_STRLIBNAME, luaopen_string },
-    { LUA_MATHLIBNAME, luaopen_math },
-    { LUA_LOADLIBNAME, luaopen_package },
-    { LUA_DBLIBNAME, luaopen_debug },
-    { NULL, NULL }
-};
-
 // Set global variable at stack
 void setGlobalVar(const char *var, const char *tab)
 {
@@ -74,14 +61,7 @@ CLuaInterface::CLuaInterface()
     if (!luaState)
         qFatal("Could not open lua VM\n");
 
-    const luaL_Reg *lib = libTable;
-    for (; lib->func; lib++)
-    {
-        lua_pushcfunction(luaState, lib->func);
-        lua_pushstring(luaState, lib->name);
-        lua_call(luaState, 1, 0);
-        lua_settop(luaState, 0);  // Clear stack
-    }
+    luaL_openlibs(luaState);
 
     // Initialize 'weak registry' table. This functions like the regular
     // lua registry, but holds weak value-references instead.

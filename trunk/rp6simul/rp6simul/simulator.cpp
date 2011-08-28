@@ -680,7 +680,7 @@ void CSimulator::checkPluginThreadDelay()
         else
         {
             timespec ts;
-            clock_gettime(CLOCK_MONOTONIC, &lastPluginDelay);
+            clock_gettime(CLOCK_MONOTONIC, &ts);
             const unsigned long delta = getUSDiff(lastPluginDelay, ts);
 
             if (delta > 50) // Delay every 50 us
@@ -711,16 +711,19 @@ void CSimulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
 
 void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
 {
-    instance->setIORegister(type, data);
+    if (instance->getIORegister(type) != data)
+    {
+        instance->setIORegister(type, data);
 
-    NLua::CLuaLocker lualocker;
-    lua_getglobal(NLua::luaInterface, "handleIOData");
-    lua_pushinteger(NLua::luaInterface, type);
-    lua_pushinteger(NLua::luaInterface, data);
+        NLua::CLuaLocker lualocker;
+        lua_getglobal(NLua::luaInterface, "handleIOData");
+        lua_pushinteger(NLua::luaInterface, type);
+        lua_pushinteger(NLua::luaInterface, data);
 
-    lua_call(NLua::luaInterface, 2, 0);
+        lua_call(NLua::luaInterface, 2, 0);
 
-    lualocker.unlock();
+        lualocker.unlock();
+    }
 
     instance->checkPluginThreadDelay();
 }
@@ -947,6 +950,33 @@ int CSimulator::luaBitAnd(lua_State *l)
     return 1;
 }
 
+int CSimulator::luaBitXor(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int data = luaL_checkint(l, 1);
+    const int bits = luaL_checkint(l, 2);
+    lua_pushinteger(l, (data ^ bits));
+    return 1;
+}
+
+int CSimulator::luaBitShiftLeft(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int data = luaL_checkint(l, 1);
+    const int bits = luaL_checkint(l, 2);
+    lua_pushinteger(l, (data << bits));
+    return 1;
+}
+
+int CSimulator::luaBitShiftRight(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int data = luaL_checkint(l, 1);
+    const int bits = luaL_checkint(l, 2);
+    lua_pushinteger(l, (data >> bits));
+    return 1;
+}
+
 void CSimulator::initLua()
 {
     setLuaIOTypes();
@@ -976,6 +1006,9 @@ void CSimulator::initLua()
     NLua::registerFunction(luaBitLower, "lower", "bit");
     NLua::registerFunction(luaBitUpper, "upper", "bit");
     NLua::registerFunction(luaBitAnd, "bitAnd", "bit");
+    NLua::registerFunction(luaBitXor, "bitXor", "bit");
+    NLua::registerFunction(luaBitShiftLeft, "shiftLeft", "bit");
+    NLua::registerFunction(luaBitShiftRight, "shiftRight", "bit");
 }
 
 bool CSimulator::loadProjectFile(const QSettings &settings)
