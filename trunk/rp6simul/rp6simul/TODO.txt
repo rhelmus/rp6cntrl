@@ -57,3 +57,4 @@
 - acs: min hit distance?
 - Update default drivers
 - Destruction: instance may be zero when it shouldn't yet
+- Test/verify atomic register array

@@ -10,8 +10,8 @@
 #include "lua.h"
 #include "robotscene.h"
 
-enum EMotor { MOTOR_LEFT, MOTOR_RIGHT };
-enum EMotorDirection { MOTORDIR_FWD, MOTORDIR_BWD };
+enum EMotor { MOTOR_LEFT=0, MOTOR_RIGHT, MOTOR_END };
+enum EMotorDirection { MOTORDIR_FWD=0, MOTORDIR_BWD, MOTORDIR_END };
 
 Q_DECLARE_METATYPE(EMotor)
 Q_DECLARE_METATYPE(EMotorDirection)
@@ -77,13 +77,19 @@ class CRP6Simulator : public QMainWindow
     QList<QStringList> robotStatusUpdateBuffer;
     QMutex robotStatusMutex;
     QMap<CLED *, bool> changedLEDs;
-    QMutex robotLEDMutex;
-    QMap<EMotor, int> changedMotorPower;
+    QMutex robotLEDMutex;    
+#ifdef USEATOMIC
+    QAtomicInt changedMotorPower[MOTOR_END];
+    QAtomicInt changedMotorMoveSpeed[MOTOR_END];
+    QAtomicInt changedMotorDirection[MOTORDIR_END];
+#else
+    int changedMotorPower[MOTOR_END];
     QMutex motorPowerMutex;
-    QMap<EMotor, int> changedMotorMoveSpeed;
+    int changedMotorMoveSpeed[MOTOR_END];
     QMutex motorMoveSpeedMutex;
-    QMap<EMotor, EMotorDirection> changedMotorDirection;
+    int changedMotorDirection[MOTORDIR_END];
     QMutex motorDirectionMutex;
+#endif
     volatile bool robotIsBlocked;
     QMap<CBumper *, int> bumperLuaCallbacks;
     QList<QCheckBox *> ADCOverrideCheckBoxes;

@@ -177,11 +177,11 @@ function closePlugin()
     while true do
         collectgarbage("collect")
         local m = collectgarbage("count")
+        debug("memleft:", m)
         if m == memleft then
             break
         end
         memleft = m
-        debug("memleft:", memleft)
     end
     debug("post-collect")
 
