@@ -699,13 +699,17 @@ void CSimulator::checkPluginThreadDelay()
 
 TIORegisterData CSimulator::getIORegister(EIORegisterTypes type) const
 {
+#ifndef USEATOMIC
     QReadLocker locker(&IORegisterReadWriteLock);
+#endif
     return IORegisterData[type];
 }
 
 void CSimulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
 {
+#ifndef USEATOMIC
     QWriteLocker locker(&IORegisterReadWriteLock);
+#endif
     IORegisterData[type] = data;
 }
 

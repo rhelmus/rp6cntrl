@@ -9,6 +9,8 @@ QT       += core gui
 TARGET = rp6simul
 TEMPLATE = app
 
+DEFINES += USEATOMIC
+
 INCLUDEPATH += ../shared/
 
 SOURCES += main.cpp\
@@ -134,6 +136,6 @@ win32 {
     INCLUDEPATH += ../lua
 }
 else {
-    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
-#    LIBS += -llua
+#    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
+    LIBS += -llua
 }

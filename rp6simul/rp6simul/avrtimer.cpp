@@ -99,7 +99,7 @@ void CAVRClock::run()
     timeouts = 0;
 
     // UNDONE: Make this an option; ie higher value gives 'faster timer' (more correct MHz), but hammers CPU more.
-    while (timeouts < /*15000*/1500)
+    while (timeouts < 15000)
     {
         timer = getClosestTimer();
         if (!timer)
@@ -152,7 +152,7 @@ void CAVRClock::run()
     usleep(1);
 #else
     timespec ts = { 0, 1000 };
-//    nanosleep(&ts, 0);
+    nanosleep(&ts, 0);
 #endif
 }
 

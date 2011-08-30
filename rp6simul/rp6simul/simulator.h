@@ -53,10 +53,14 @@ class CSimulator : public QObject
 
     CCallPluginMainThread *pluginMainThread;
     timespec lastPluginDelay;
-    volatile bool quitPlugin; // UNDONE: Volatile OK?
+    volatile bool quitPlugin;
 
+#if USEATOMIC
+    QAtomicInt IORegisterData[IO_END];
+#else
     TIORegisterData IORegisterData[IO_END];
     mutable QReadWriteLock IORegisterReadWriteLock;
+#endif
 
     bool ISRsEnabled;
     typedef void (*TISR)(void);
@@ -122,8 +126,12 @@ public:
     CAVRClock *getAVRClock(void) { return AVRClock; }
     bool runPlugin(void);
     void stopPlugin(void);
+#if USEATOMIC
+    const QAtomicInt *getIORegisterArray(void) const { return IORegisterData; }
+#else
     const TIORegisterData *getIORegisterArray(void) const { return IORegisterData; }
     QReadWriteLock &getIORegisterLock(void) { return IORegisterReadWriteLock; }
+#endif
     QVariant getRobotProperty(const QString &prop, const QString &field) const
     { return robotProperties[prop][field]; }
 

@@ -1039,7 +1039,9 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
     else if (!strcmp(motor, "right"))
         mtype = MOTOR_RIGHT;
 
+#ifndef USEATOMIC
     QMutexLocker mlock(&instance->motorPowerMutex);
+#endif
     instance->changedMotorPower[mtype] = power;
 
     return 0;
@@ -1078,7 +1080,9 @@ int CRP6Simulator::luaSetMotorMoveSpeed(lua_State *l)
     else if (!strcmp(motor, "right"))
         mtype = MOTOR_RIGHT;
 
+#ifndef USEATOMIC
     QMutexLocker mlock(&instance->motorMoveSpeedMutex);
+#endif
     instance->changedMotorMoveSpeed[mtype] = speed;
 
     return 0;
@@ -1103,7 +1107,9 @@ int CRP6Simulator::luaSetMotorDir(lua_State *l)
     else if (!strcmp(rdir, "BWD"))
         rd = MOTORDIR_BWD;
 
+#ifndef USEATOMIC
     QMutexLocker mlock(&instance->motorDirectionMutex);
+#endif
     instance->changedMotorDirection[MOTOR_LEFT] = ld;
     instance->changedMotorDirection[MOTOR_RIGHT] = rd;
 
@@ -1395,8 +1401,12 @@ void CRP6Simulator::loadMap()
 
 void CRP6Simulator::timedUIUpdate()
 {
+#ifdef USEATOMIC
+    const QAtomicInt *ioregisters = simulator->getIORegisterArray();
+#else
     QReadLocker iolocker(&simulator->getIORegisterLock());
     const TIORegisterData *ioregisters = simulator->getIORegisterArray();
+#endif
 
     for (int i=0; i<IO_END; ++i)
     {
@@ -1470,29 +1480,31 @@ void CRP6Simulator::timedUIUpdate()
     }
     robotStatusUpdateBuffer.clear();
 
+#ifndef USEATOMIC
     QMutexLocker mpowerlocker(&motorPowerMutex);
-    for (QMap<EMotor, int>::iterator it=changedMotorPower.begin();
-         it!=changedMotorPower.end(); ++it)
-    {
-        robotWidget->setMotorPower(it.key(), it.value());
-    }
-    changedMotorPower.clear();
-
     QMutexLocker mspeedlocker(&motorMoveSpeedMutex);
-    for (QMap<EMotor, int>::iterator it=changedMotorMoveSpeed.begin();
-         it!=changedMotorMoveSpeed.end(); ++it)
+#endif
+    for (int i=0; i<MOTOR_END; ++i)
     {
-        robotWidget->setMotorSpeed(it.key(), it.value());
+        if (changedMotorPower[i] != -1)
+            robotWidget->setMotorPower((EMotor)i, changedMotorPower[i]);
+        if (changedMotorMoveSpeed[i] != -1)
+            robotWidget->setMotorSpeed((EMotor)i, changedMotorMoveSpeed[i]);
+        changedMotorPower[i] = changedMotorMoveSpeed[i] = -1;
     }
-    changedMotorMoveSpeed.clear();
 
+#ifndef USEATOMIC
     QMutexLocker mdirlocker(&motorDirectionMutex);
-    for (QMap<EMotor, EMotorDirection>::iterator it=changedMotorDirection.begin();
-         it!=changedMotorDirection.end(); ++it)
+#endif
+    for (int i=0; i<MOTORDIR_END; ++i)
     {
-        robotWidget->setMotorDirection(it.key(), it.value());
+        if (changedMotorDirection[i] != -1)
+        {
+            robotWidget->setMotorDirection((EMotor)i,
+                                           (EMotorDirection)(int)changedMotorDirection[i]);
+            changedMotorDirection[i] = -1;
+        }
     }
-    changedMotorDirection.clear();
 }
 
 void CRP6Simulator::timedLEDUpdate()
