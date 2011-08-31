@@ -149,6 +149,8 @@ end
 -- Functions called by C++ code
 function init()
     math.randomseed(os.time())
+    setCmPerPixel(robotProperties.cmPerPixel)
+    setRobotLength(robotProperties.robotLength)
 end
 
 function initPlugin(drivers)

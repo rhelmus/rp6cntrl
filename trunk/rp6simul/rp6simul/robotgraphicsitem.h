@@ -17,6 +17,7 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     Q_OBJECT
 
     QSize origRobotSize;
+    float cmPerPixel, robotLength;
     QList<CLED *> LEDs;
     QMap<EMotor, int> motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
@@ -55,6 +56,8 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
+    void setCmPerPixel(float c) { cmPerPixel = c * getPixmapScale(); }
+    void setRobotLength(float l) { robotLength = l; }
     void addLED(CLED *l);
     void removeLED(CLED *l);
     void drawLEDs(QPainter *painter) const;

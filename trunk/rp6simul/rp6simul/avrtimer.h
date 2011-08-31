@@ -155,11 +155,13 @@ QDebug operator<<(QDebug dbg, const CTicks &ticks);
 // The timer either calls an ISR or lua function
 class CAVRTimer
 {
+public:
+    typedef void (*TTimeOut)(CAVRTimer *);
+
+private:
     volatile bool enabled;
+    TTimeOut timeOutCallback;
     CTicks nextTick;
-    EISRTypes ISRTimeOut; // ISR to call
-    int luaTimeOutRef;
-    enum { TIMEOUT_ISR, TIMEOUT_LUA, TIMEOUT_NONE } timeOutType;
     uint32_t compareValue, prescaler, trueCompareValue;
 
     void updateTrueCompareValue(void)
@@ -172,29 +174,18 @@ class CAVRTimer
         nextTick += v;
         trueCompareValue = v;
     }
-    void timeOutLua(void);
 
 public:
-    CAVRTimer(void) : enabled(false), timeOutType(TIMEOUT_NONE),
+    CAVRTimer(TTimeOut t) : enabled(false), timeOutCallback(t),
         compareValue(0), prescaler(1), trueCompareValue(0) { }
-    ~CAVRTimer(void);
 
     const CTicks &getNextTick(void) const { return nextTick; }
     CTicks &getRefNextTick(void) { return nextTick; }
-    void setTimeOutISR(EISRTypes isr)
-    { timeOutType = TIMEOUT_ISR; ISRTimeOut = isr; }
-    void setTimeOutLua(void);
     void setCompareValue(uint32_t c)
     { compareValue = c; updateTrueCompareValue(); }
     void setPrescaler(uint32_t p) { prescaler = p; updateTrueCompareValue(); }
     uint32_t getTrueCompareValue(void) const { return trueCompareValue; }
-    void timeOut(void)
-    {
-        if (timeOutType == TIMEOUT_ISR)
-            CSimulator::getInstance()->execISR(ISRTimeOut);
-        else if (timeOutType == TIMEOUT_LUA)
-            timeOutLua();
-    }
+    void timeOut(void) { if (timeOutCallback) (*timeOutCallback)(this); }
     bool isEnabled(void) const { return enabled; }
     void setEnabled(bool e) { enabled = e; }
 };
@@ -222,7 +213,7 @@ public:
     CAVRClock(void);
     ~CAVRClock(void);
 
-    CAVRTimer *createTimer(void);
+    CAVRTimer *createTimer(CAVRTimer::TTimeOut t);
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);
     TTimerList &getTimers(void) { return timerList; }

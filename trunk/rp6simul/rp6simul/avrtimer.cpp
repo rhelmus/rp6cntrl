@@ -15,27 +15,6 @@ QDebug operator<<(QDebug dbg, const CTicks &ticks)
 }
 
 
-CAVRTimer::~CAVRTimer()
-{
-    if (timeOutType == TIMEOUT_LUA)
-        luaL_unref(NLua::luaInterface, LUA_REGISTRYINDEX, luaTimeOutRef);
-}
-
-void CAVRTimer::timeOutLua()
-{
-    NLua::CLuaLocker lualocker;
-    lua_rawgeti(NLua::luaInterface, LUA_REGISTRYINDEX, luaTimeOutRef);
-    lua_call(NLua::luaInterface, 0, 0); // UNDONE: error handling
-}
-
-void CAVRTimer::setTimeOutLua()
-{
-    // Lua function should be at top of stack
-    timeOutType = TIMEOUT_LUA;
-    luaTimeOutRef = luaL_ref(NLua::luaInterface, LUA_REGISTRYINDEX);
-}
-
-
 CAVRClock::CAVRClock(void) : initClockTime(true)
 {
     clockTimer = new QTimer(this);
@@ -156,9 +135,9 @@ void CAVRClock::run()
 #endif
 }
 
-CAVRTimer *CAVRClock::createTimer()
+CAVRTimer *CAVRClock::createTimer(CAVRTimer::TTimeOut t)
 {
-    CAVRTimer *ret = new CAVRTimer;
+    CAVRTimer *ret = new CAVRTimer(t);
     timerList << ret;
     qDebug() << "Added new timer: " << (void *)ret <<
                 "(" << timerList.count() << "registered)";

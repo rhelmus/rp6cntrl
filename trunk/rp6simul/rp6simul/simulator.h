@@ -34,6 +34,8 @@ enum EISRTypes
     // Encoders
     ISR_INT0_vect,
     ISR_INT1_vect,
+
+    // IR receiver
     ISR_INT2_vect,
 
     ISR_END
@@ -42,14 +44,27 @@ enum EISRTypes
 class QSettings;
 
 class CAVRClock;
+class CAVRTimer;
 class CCallPluginMainThread;
 
 class CSimulator : public QObject
 {
     Q_OBJECT
 
+    struct STimeOutInfo
+    {
+        enum ETimeOutType { TIMEOUT_ISR, TIMEOUT_LUA };
+        ETimeOutType timeOutType;
+        EISRTypes ISRType;
+        int luaRef;
+        STimeOutInfo(void) { } // For QMap
+        STimeOutInfo(EISRTypes i) : timeOutType(TIMEOUT_ISR), ISRType(i) { }
+        STimeOutInfo(int l) : timeOutType(TIMEOUT_LUA), luaRef(l) { }
+    };
+
     CAVRClock *AVRClock;
     QThread *AVRClockThread;
+    QMap<CAVRTimer *, STimeOutInfo> timeOutMap;
 
     CCallPluginMainThread *pluginMainThread;
     timespec lastPluginDelay;
@@ -72,16 +87,11 @@ class CSimulator : public QObject
     QStringList currentDriverList;
     QLibrary RP6Plugin;
 
-    typedef QHash<QString, QVariant> TRobotPropertyFields;
-    typedef QHash<QString, TRobotPropertyFields> TRobotProperties;
-    TRobotProperties robotProperties;
-
     static CSimulator *instance;
 
     void initAVRClock(void);
     void setLuaIOTypes(void);
     void setLuaAVRConstants(void);
-    void loadRobotProperties(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     bool initPlugin(void);
@@ -93,6 +103,9 @@ class CSimulator : public QObject
     static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
     static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
     static void enableISRsCB(bool e);
+
+    // Timer callback
+    static void timeOutCallback(CAVRTimer *timer);
 
     // Lua bindings
     static int luaAvrGetIORegister(lua_State *l);
@@ -133,8 +146,6 @@ public:
     const TIORegisterData *getIORegisterArray(void) const { return IORegisterData; }
     QReadWriteLock &getIORegisterLock(void) { return IORegisterReadWriteLock; }
 #endif
-    QVariant getRobotProperty(const QString &prop, const QString &field) const
-    { return robotProperties[prop][field]; }
 
     static CSimulator *getInstance(void) { return instance; }
 

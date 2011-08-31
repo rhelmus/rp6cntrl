@@ -37,8 +37,8 @@ local ACSDistances =
 
 robotProperties =
 {
-    scale = { cmPerPixel = cmPerPixel },
-    robotLength = { length = 18.9 }, -- in cm, used for rotation
+    cmPerPixel = cmPerPixel,
+    robotLength = 18.9, -- in cm, used for rotation
 
     led1 = { pos = { 458, 209 }, shape = "ellips", radius = 10, color = green },
     led2 = { pos = { 458, 184 }, shape = "ellips", radius = 10, color = red },
