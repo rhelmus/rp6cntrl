@@ -62,6 +62,10 @@ class CRP6Simulator : public QMainWindow
     QPlainTextEdit *serialOutputWidget;
     QLineEdit *serialInputWidget;
     QPushButton *serialSendButton;
+    QPlainTextEdit *IRCOMMOutputWidget;
+    QSpinBox *IRCOMMAddressWidget, *IRCOMMKeyWidget;
+    QCheckBox *IRCOMMToggleWidget;
+    QPushButton *IRCOMMSendButton;
     QTreeWidget *robotStatusTreeWidget;
     QTreeWidget *mapSelectorTreeWidget;
     QTreeWidgetItem *mapTemplatesTreeItem;
@@ -127,6 +131,7 @@ class CRP6Simulator : public QMainWindow
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
+    static int luaLogIRCOMM(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
     static int luaRobotIsBlocked(lua_State *l);
     static int luaCreateBumper(lua_State *l);
@@ -167,7 +172,8 @@ private slots:
     void applyADCTable(void);
     void setRobotIsBlocked(bool b) { robotIsBlocked = b; }
     void setLuaBumper(CBumper *b, bool e);
-    void sendSerialPressed(void);
+    void sendSerialText(void);
+    void sendIRCOMM(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);
 
@@ -182,6 +188,7 @@ signals:
     // function calls
     void motorDriveSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
+    void newIRCOMMText(const QString &);
 };
 
 #endif // RP6SIMUL_H

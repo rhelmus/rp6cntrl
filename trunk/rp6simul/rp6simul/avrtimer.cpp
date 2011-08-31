@@ -171,9 +171,14 @@ void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
     {
         if (e) // Init timer?
         {
+            // UNDONE: Always do this when being enabled?
+            timer->getRefNextTick() =
+                    currentTicks + timer->getTrueCompareValue();
+#if 0
             const CTicks maxnexttick(currentTicks + timer->getTrueCompareValue());
             if (maxnexttick < timer->getNextTick())
                 timer->getRefNextTick() = maxnexttick;
+#endif
         }
         timer->setEnabled(e);
     }

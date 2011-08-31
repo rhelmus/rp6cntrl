@@ -409,9 +409,11 @@ QWidget *CRP6Simulator::createLogWidgets()
     QTabWidget *ret = new QTabWidget;
     ret->setTabPosition(QTabWidget::South);
 
+    // Log tab
     ret->addTab(logWidget = new QPlainTextEdit, "log");
     logWidget->setReadOnly(true);
 
+    // serial tab
     QWidget *w = new QWidget(ret);
     ret->addTab(w, "serial");
     QGridLayout *grid = new QGridLayout(w);
@@ -423,7 +425,7 @@ QWidget *CRP6Simulator::createLogWidgets()
 
     grid->addWidget(serialSendButton = new QPushButton("Send"), 1, 1);
     serialSendButton->setEnabled(false);
-    connect(serialSendButton, SIGNAL(clicked()), this, SLOT(sendSerialPressed()));
+    connect(serialSendButton, SIGNAL(clicked()), this, SLOT(sendSerialText()));
     connect(serialInputWidget, SIGNAL(returnPressed()), serialSendButton,
             SLOT(click()));
 
@@ -431,6 +433,36 @@ QWidget *CRP6Simulator::createLogWidgets()
     connect(button, SIGNAL(clicked()), serialOutputWidget, SLOT(clear()));
     grid->addWidget(button, 1, 2);
 
+    // IRCOMM tab
+    ret->addTab(w = new QWidget, "IRCOMM");
+    grid = new QGridLayout(w);
+
+    grid->addWidget(IRCOMMOutputWidget = new QPlainTextEdit, 0, 0, 1, -1);
+    IRCOMMOutputWidget->setReadOnly(true);
+    connect(this, SIGNAL(newIRCOMMText(const QString &)), IRCOMMOutputWidget,
+            SLOT(appendHtml(QString)));
+
+    QLabel *l = new QLabel("Address");
+    l->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    grid->addWidget(l, 1, 0);
+    grid->addWidget(IRCOMMAddressWidget = new QSpinBox, 1, 1);
+    IRCOMMAddressWidget->setRange(0, 31);
+
+    grid->addWidget(l = new QLabel("Key code"), 1, 2);
+    l->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    grid->addWidget(IRCOMMKeyWidget = new QSpinBox, 1, 3);
+    IRCOMMKeyWidget->setRange(0, 63);
+
+    grid->addWidget(l = new QLabel("Toggle bit"), 1, 4);
+    l->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    grid->addWidget(IRCOMMToggleWidget = new QCheckBox, 1, 5);
+
+    grid->addWidget(IRCOMMSendButton = new QPushButton("Send"), 1, 6);
+    IRCOMMSendButton->setEnabled(false);
+    connect(IRCOMMSendButton, SIGNAL(clicked()), SLOT(sendIRCOMM()));
+
+    grid->addWidget(button = new QPushButton("Clear"), 1, 7);
+    connect(button, SIGNAL(clicked()), IRCOMMOutputWidget, SLOT(clear()));
     return ret;
 }
 
@@ -755,6 +787,7 @@ void CRP6Simulator::initLua()
 
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
+    NLua::registerFunction(luaLogIRCOMM, "logIRCOMM");
     NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
     NLua::registerFunction(luaRobotIsBlocked, "robotIsBlocked");
     NLua::registerFunction(luaSetMotorPower, "setMotorPower");
@@ -860,6 +893,22 @@ int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
     NLua::CLuaLocker lualocker;
     QMutexLocker seriallocker(&instance->serialBufferMutex);
     instance->serialTextBuffer += luaL_checkstring(l, 1);
+    return 0;
+}
+
+int CRP6Simulator::luaLogIRCOMM(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int adr = luaL_checkint(l, 1);
+    const int key = luaL_checkint(l, 2);
+    const bool toggle = NLua::checkBoolean(l, 3);
+
+    const QString text = QString("Received IRCOMM: "
+                                 "Address: %1 | "
+                                 "Key code: %2 | "
+                                 "Toggle bit: %3\n").
+            arg(adr).arg(key).arg(toggle);
+    instance->emit newIRCOMMText(instance->getLogOutput(LOG_LOG, text));
     return 0;
 }
 
@@ -1533,6 +1582,7 @@ void CRP6Simulator::runPlugin()
     stopPluginAction->setEnabled(true);
     ADCDockWidget->setEnabled(true);
     serialSendButton->setEnabled(true);
+    IRCOMMSendButton->setEnabled(true);
 }
 
 void CRP6Simulator::stopPlugin()
@@ -1560,6 +1610,7 @@ void CRP6Simulator::stopPlugin()
     stopPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
     serialSendButton->setEnabled(false);
+    IRCOMMSendButton->setEnabled(false);
 
     robotIsBlocked = false;
 }
@@ -1656,7 +1707,7 @@ void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
     lua_call(NLua::luaInterface, 1, 0); // UNDONE: error handling
 }
 
-void CRP6Simulator::sendSerialPressed()
+void CRP6Simulator::sendSerialText()
 {
     NLua::CLuaLocker lualocker;
     lua_getglobal(NLua::luaInterface, "sendSerial");
@@ -1665,6 +1716,27 @@ void CRP6Simulator::sendSerialPressed()
     lua_call(NLua::luaInterface, 1, 0);
 
     serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));
+
+    serialInputWidget->clear();
+}
+
+void CRP6Simulator::sendIRCOMM()
+{
+    NLua::CLuaLocker lualocker;
+    lua_getglobal(NLua::luaInterface, "sendIRCOMM");
+    lua_pushinteger(NLua::luaInterface, IRCOMMAddressWidget->value());
+    lua_pushinteger(NLua::luaInterface, IRCOMMKeyWidget->value());
+    lua_pushboolean(NLua::luaInterface, IRCOMMToggleWidget->isChecked());
+    lua_call(NLua::luaInterface, 3, 0);
+
+    const QString text = QString("Send IRCOMM: "
+                                 "Address: %1 | "
+                                 "Key code: %2 | "
+                                 "Toggle bit: %3\n").
+            arg(IRCOMMAddressWidget->value()).
+            arg(IRCOMMKeyWidget->value()).
+            arg(IRCOMMToggleWidget->isChecked());
+    IRCOMMOutputWidget->appendHtml(getLogOutput(LOG_LOG, text));
 
     serialInputWidget->clear();
 }

@@ -954,6 +954,15 @@ int CSimulator::luaBitAnd(lua_State *l)
     return 1;
 }
 
+int CSimulator::luaBitOr(lua_State *l)
+{
+    NLua::CLuaLocker lualocker;
+    const int data = luaL_checkint(l, 1);
+    const int bits = luaL_checkint(l, 2);
+    lua_pushinteger(l, (data | bits));
+    return 1;
+}
+
 int CSimulator::luaBitXor(lua_State *l)
 {
     NLua::CLuaLocker lualocker;
@@ -1010,6 +1019,7 @@ void CSimulator::initLua()
     NLua::registerFunction(luaBitLower, "lower", "bit");
     NLua::registerFunction(luaBitUpper, "upper", "bit");
     NLua::registerFunction(luaBitAnd, "bitAnd", "bit");
+    NLua::registerFunction(luaBitOr, "bitOr", "bit");
     NLua::registerFunction(luaBitXor, "bitXor", "bit");
     NLua::registerFunction(luaBitShiftLeft, "shiftLeft", "bit");
     NLua::registerFunction(luaBitShiftRight, "shiftRight", "bit");
