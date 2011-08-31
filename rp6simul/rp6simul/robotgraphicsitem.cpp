@@ -178,17 +178,12 @@ void CRobotGraphicsItem::tryMove()
     // Delay between calls to this function (frame time)
     const float advdelay = rscene->getRobotAdvanceDelay();
 
-    // Correct real distance calculations for different image scale
-    const qreal scale = getPixmapScale();
-    const float cmperpx =
-            CSimulator::getInstance()->getRobotProperty("scale", "cmPerPixel").toFloat() / scale;
-
     const float lspeed =
             getRobotFrameSpeed(motorSpeed[MOTOR_LEFT], advdelay,
-                               motorDirection[MOTOR_LEFT], cmperpx);
+                               motorDirection[MOTOR_LEFT], cmPerPixel);
     const float rspeed =
             getRobotFrameSpeed(motorSpeed[MOTOR_RIGHT], advdelay,
-                               motorDirection[MOTOR_RIGHT], cmperpx);
+                               motorDirection[MOTOR_RIGHT], cmPerPixel);
 
     // The final move speed is simply the average of both motor speeds.
     const float movespeed = (lspeed + rspeed) / 2.0;
@@ -212,9 +207,7 @@ void CRobotGraphicsItem::tryMove()
     float degspeed = 0.0;
     if (rotspeed != 0.0)
     {
-        const float robotlengthmm = 10.0 *
-                CSimulator::getInstance()->getRobotProperty("robotLength", "length").toFloat();
-        const float robotlengthpx = robotlengthmm / (cmperpx * 10.0);
+        const float robotlengthpx = robotLength / cmPerPixel;
         const float perimeter = robotlengthpx * M_PI;
         const float pxperdeg = perimeter / 360.0;
         degspeed = rotspeed / pxperdeg;

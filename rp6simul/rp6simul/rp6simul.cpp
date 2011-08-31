@@ -787,6 +787,8 @@ void CRP6Simulator::initLua()
 
     NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
+    NLua::registerFunction(luaSetCmPerPixel, "setCmPerPixel");
+    NLua::registerFunction(luaSetRobotLength, "setRobotLength");
     NLua::registerFunction(luaLogIRCOMM, "logIRCOMM");
     NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
     NLua::registerFunction(luaRobotIsBlocked, "robotIsBlocked");
@@ -893,6 +895,22 @@ int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
     NLua::CLuaLocker lualocker;
     QMutexLocker seriallocker(&instance->serialBufferMutex);
     instance->serialTextBuffer += luaL_checkstring(l, 1);
+    return 0;
+}
+
+int CRP6Simulator::luaSetCmPerPixel(lua_State *l)
+{
+    // This function should only be called by init(), where we do
+    // not have to worry about threads
+    instance->robotScene->getRobotItem()->setCmPerPixel(luaL_checknumber(l, 1));
+    return 0;
+}
+
+int CRP6Simulator::luaSetRobotLength(lua_State *l)
+{
+    // This function should only be called by init(), where we do
+    // not have to worry about threads
+    instance->robotScene->getRobotItem()->setRobotLength(luaL_checknumber(l, 1));
     return 0;
 }
 

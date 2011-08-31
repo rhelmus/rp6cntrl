@@ -131,6 +131,8 @@ class CRP6Simulator : public QMainWindow
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
+    static int luaSetCmPerPixel(lua_State *l);
+    static int luaSetRobotLength(lua_State *l);
     static int luaLogIRCOMM(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
     static int luaRobotIsBlocked(lua_State *l);
