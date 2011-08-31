@@ -114,6 +114,11 @@ function setSerialInputHandler(func)
     serialInputHandler = func
 end
 
+local IRCOMMSendHandler
+function setIRCOMMSendHandler(func)
+    IRCOMMSendHandler = func
+end
+
 -- ADC values can either be set by the user interface program
 -- or from drivers. The former overrides the latter.
 local UIADCValues = { }
@@ -162,7 +167,7 @@ function closePlugin()
     end
 
     serialInputHandler = nil
-    bumperHandler = nil
+    IRCOMMSendHandler = nil
 
     driverList = { }
     IOHandleMap = { }
@@ -233,6 +238,12 @@ end
 function sendSerial(text)
     if serialInputHandler then
         serialInputHandler(text)
+    end
+end
+
+function sendIRCOMM(adr, key, toggle)
+    if IRCOMMSendHandler then
+        IRCOMMSendHandler(adr, key, toggle)
     end
 end
 

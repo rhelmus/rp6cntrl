@@ -112,6 +112,7 @@ class CSimulator : public QObject
     static int luaBitLower(lua_State *l);
     static int luaBitUpper(lua_State *l);
     static int luaBitAnd(lua_State *l);
+    static int luaBitOr(lua_State *l);
     static int luaBitXor(lua_State *l);
     static int luaBitShiftLeft(lua_State *l);
     static int luaBitShiftRight(lua_State *l);
