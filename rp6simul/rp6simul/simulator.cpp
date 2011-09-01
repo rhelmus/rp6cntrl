@@ -80,6 +80,11 @@ const char *IORegisterStringArray[IO_END] = {
 
 namespace {
 
+inline CSimulator *getInstanceFromData(void *d)
+{
+    return reinterpret_cast<CSimulator *>(d);
+}
+
 template <typename TF> TF getLibFunc(QLibrary &lib, const char *f)
 {
     TF ret = (TF)lib.resolve(f);
@@ -112,34 +117,29 @@ QString constructISRFunc(EISRTypes type)
 }
 
 
-CSimulator *CSimulator::instance = 0;
-
 CSimulator::CSimulator(QObject *parent) :
     QObject(parent), pluginMainThread(0), quitPlugin(false),
     ISRExecMutex(QMutex::Recursive)
 {
-    Q_ASSERT(!instance);
-    instance = this;
+    initLua();
     initAVRClock();
 }
 
 CSimulator::~CSimulator()
 {
+    if (luaState)
+    {
+        // Debug
+        qDebug("Lua stack:\n");
+        NLua::stackDump(luaState);
+
+        lua_close(luaState);
+        luaState = 0;
+    }
+
     terminateAVRClock();
     delete AVRClock;
     terminatePluginMainThread();
-    instance = 0;
-}
-
-void CSimulator::initAVRClock()
-{
-    // From http://labs.qt.nokia.com/2010/06/17/youre-doing-it-wrong/
-
-    AVRClock = new CAVRClock;
-    AVRClockThread = new QThread(this);
-    connect(AVRClockThread, SIGNAL(finished()), AVRClock, SLOT(stop()));
-    AVRClock->moveToThread(AVRClockThread);
-    AVRClockThread->start();
 }
 
 void CSimulator::setLuaIOTypes()
@@ -147,14 +147,14 @@ void CSimulator::setLuaIOTypes()
     for (int i=0; i<IO_END; ++i)
     {
         QString io = QString("IO_%1").arg(IORegisterStringArray[i]);
-        NLua::setVariable(i, qPrintable(io), "avr");
+        NLua::setVariable(luaState, i, qPrintable(io), "avr");
     }
 }
 
 void CSimulator::setLuaAVRConstants()
 {
     // Evil macros and stuff
-#define SET_LUA_CONSTANT(C) NLua::setVariable(C, #C, "avr")
+#define SET_LUA_CONSTANT(C) NLua::setVariable(luaState, C, #C, "avr")
 
     // Timer0
     SET_LUA_CONSTANT(WGM00);
@@ -376,6 +376,67 @@ void CSimulator::setLuaAVRConstants()
 #undef SET_LUA_CONSTANT
 }
 
+void CSimulator::initLua()
+{
+    luaState = lua_open();
+
+    if (!luaState)
+        qFatal("Could not open lua VM\n");
+
+    NLua::addLuaLockState(luaState);
+
+    luaL_openlibs(luaState);
+    setLuaIOTypes();
+    setLuaAVRConstants();
+
+    // avr
+    NLua::registerFunction(luaState, luaAvrGetIORegister, "getIORegister",
+                           "avr", this);
+    NLua::registerFunction(luaState, luaAvrSetIORegister, "setIORegister",
+                           "avr", this);
+    NLua::registerFunction(luaState, luaAvrExecISR, "execISR", "avr", this);
+
+    // clock
+    NLua::registerFunction(luaState, luaClockCreateTimer, "createTimer",
+                           "clock", this);
+    NLua::registerFunction(luaState, luaClockEnableTimer, "enableTimer",
+                           "clock", this);
+
+    // timer class
+    NLua::registerClassFunction(luaState, luaTimerSetCompareValue,
+                                "setCompareValue", "timer");
+    NLua::registerClassFunction(luaState, luaTimerSetPrescaler, "setPrescaler",
+                                "timer");
+    NLua::registerClassFunction(luaState, luaTimerSetTimeOut, "setTimeOut",
+                                "timer", this);
+    NLua::registerClassFunction(luaState, luaTimerIsEnabled, "isEnabled",
+                                "timer");
+
+    // bit
+    NLua::registerFunction(luaState, luaBitIsSet, "isSet", "bit");
+    NLua::registerFunction(luaState, luaBitSet, "set", "bit");
+    NLua::registerFunction(luaState, luaBitUnSet, "unSet", "bit");
+    NLua::registerFunction(luaState, luaBitUnPack, "unPack", "bit");
+    NLua::registerFunction(luaState, luaBitLower, "lower", "bit");
+    NLua::registerFunction(luaState, luaBitUpper, "upper", "bit");
+    NLua::registerFunction(luaState, luaBitAnd, "bitAnd", "bit");
+    NLua::registerFunction(luaState, luaBitOr, "bitOr", "bit");
+    NLua::registerFunction(luaState, luaBitXor, "bitXor", "bit");
+    NLua::registerFunction(luaState, luaBitShiftLeft, "shiftLeft", "bit");
+    NLua::registerFunction(luaState, luaBitShiftRight, "shiftRight", "bit");
+}
+
+void CSimulator::initAVRClock()
+{
+    // From http://labs.qt.nokia.com/2010/06/17/youre-doing-it-wrong/
+
+    AVRClock = new CAVRClock;
+    AVRClockThread = new QThread(this);
+    connect(AVRClockThread, SIGNAL(finished()), AVRClock, SLOT(stop()));
+    AVRClock->moveToThread(AVRClockThread);
+    AVRClockThread->start();
+}
+
 void CSimulator::terminateAVRClock()
 {
     qDebug() << "Terminating AVR clock thread";
@@ -492,20 +553,20 @@ bool CSimulator::initPlugin()
         return false;
     }
 
-    setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB);
+    setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB, this);
 
-    lua_getglobal(NLua::luaInterface, "initPlugin");
+    lua_getglobal(luaState, "initPlugin");
 
     // Push driver list
     if (!currentDriverList.isEmpty())
     {
-        NLua::pushStringList(NLua::luaInterface, currentDriverList);
-        lua_call(NLua::luaInterface, 1, 0);
+        NLua::pushStringList(luaState, currentDriverList);
+        lua_call(luaState, 1, 0);
     }
     else
     {
         qDebug() << "Running without any drivers!";
-        lua_call(NLua::luaInterface, 0, 0);
+        lua_call(luaState, 0, 0);
     }
 
     Q_ASSERT(!pluginMainThread);
@@ -576,18 +637,20 @@ void CSimulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
     IORegisterData[type] = data;
 }
 
-void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
+void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
+                                 void *data)
 {
-    if (instance->getIORegister(type) != data)
+    CSimulator *instance = getInstanceFromData(data);
+    if (instance->getIORegister(type) != value)
     {
-        instance->setIORegister(type, data);
+        instance->setIORegister(type, value);
 
-        NLua::CLuaLocker lualocker;
-        lua_getglobal(NLua::luaInterface, "handleIOData");
-        lua_pushinteger(NLua::luaInterface, type);
-        lua_pushinteger(NLua::luaInterface, data);
+        NLua::CLuaLocker lualocker(instance->luaState);
+        lua_getglobal(instance->luaState, "handleIOData");
+        lua_pushinteger(instance->luaState, type);
+        lua_pushinteger(instance->luaState, value);
 
-        lua_call(NLua::luaInterface, 2, 0);
+        lua_call(instance->luaState, 2, 0);
 
         lualocker.unlock();
     }
@@ -595,20 +658,23 @@ void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData data)
     instance->checkPluginThreadDelay();
 }
 
-TIORegisterData CSimulator::IORegisterGetCB(EIORegisterTypes type)
+TIORegisterData CSimulator::IORegisterGetCB(EIORegisterTypes type, void *data)
 {
+    CSimulator *instance = getInstanceFromData(data);
     instance->checkPluginThreadDelay();
     return instance->getIORegister(type);
 }
 
-void CSimulator::enableISRsCB(bool e)
+void CSimulator::enableISRsCB(bool e, void *data)
 {
+    CSimulator *instance = getInstanceFromData(data);
     QMutexLocker lock(&instance->ISRExecMutex);
     instance->ISRsEnabled = e;
 }
 
-void CSimulator::timeOutCallback(CAVRTimer *timer)
+void CSimulator::timeOutCallback(CAVRTimer *timer, void *data)
 {
+    CSimulator *instance = getInstanceFromData(data);
     QMap<CAVRTimer *, STimeOutInfo>::iterator it =
             instance->timeOutMap.find(timer);
     Q_ASSERT(it != instance->timeOutMap.end());
@@ -617,9 +683,9 @@ void CSimulator::timeOutCallback(CAVRTimer *timer)
     {
         if (it->timeOutType == STimeOutInfo::TIMEOUT_LUA)
         {
-            NLua::CLuaLocker lualocker;
-            lua_rawgeti(NLua::luaInterface, LUA_REGISTRYINDEX, it->luaRef);
-            lua_call(NLua::luaInterface, 0, 0); // UNDONE: error handling
+            NLua::CLuaLocker lualocker(instance->luaState);
+            lua_rawgeti(instance->luaState, LUA_REGISTRYINDEX, it->luaRef);
+            lua_call(instance->luaState, 0, 0); // UNDONE: error handling
         }
         else
             instance->execISR(it->ISRType);
@@ -628,7 +694,8 @@ void CSimulator::timeOutCallback(CAVRTimer *timer)
 
 int CSimulator::luaAvrGetIORegister(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
     lua_pushinteger(l, instance->getIORegister(type));
     return 1;
@@ -636,7 +703,8 @@ int CSimulator::luaAvrGetIORegister(lua_State *l)
 
 int CSimulator::luaAvrSetIORegister(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
     const int data = luaL_checkint(l, 2);
     instance->setIORegister(type, data);
@@ -645,7 +713,8 @@ int CSimulator::luaAvrSetIORegister(lua_State *l)
 
 int CSimulator::luaAvrExecISR(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     const EISRTypes isr = static_cast<EISRTypes>(luaL_checkint(l, 1));
     instance->execISR(isr);
     return 0;
@@ -653,15 +722,18 @@ int CSimulator::luaAvrExecISR(lua_State *l)
 
 int CSimulator::luaClockCreateTimer(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
-    CAVRTimer *timer = instance->AVRClock->createTimer(timeOutCallback);
-    NLua::createClass(l, timer, "timer", luaTimerDestr);
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
+    CAVRTimer *timer = instance->AVRClock->createTimer(timeOutCallback,
+                                                       instance);
+    NLua::createClass(l, timer, "timer", luaTimerDestr, instance);
     return 1;
 }
 
 int CSimulator::luaClockEnableTimer(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const bool e = NLua::checkBoolean(l, 2);
     instance->AVRClock->enableTimer(timer, e);
@@ -672,29 +744,27 @@ int CSimulator::luaTimerDestr(lua_State *l)
 {
     qDebug() << "Removing timer";
 
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
-    // HACK: instance may already be destroyed
-    if (instance)
-    {
-        instance->AVRClock->removeTimer(timer);
+    instance->AVRClock->removeTimer(timer);
 
-        QMap<CAVRTimer *, STimeOutInfo>::iterator it =
-                instance->timeOutMap.find(timer);
-        if (it != instance->timeOutMap.end())
-        {
-            if (it->timeOutType == STimeOutInfo::TIMEOUT_LUA)
-                luaL_unref(NLua::luaInterface, LUA_REGISTRYINDEX, it->luaRef);
-            instance->timeOutMap.erase(it);
-        }
+    QMap<CAVRTimer *, STimeOutInfo>::iterator it =
+            instance->timeOutMap.find(timer);
+    if (it != instance->timeOutMap.end())
+    {
+        if (it->timeOutType == STimeOutInfo::TIMEOUT_LUA)
+            luaL_unref(instance->luaState, LUA_REGISTRYINDEX, it->luaRef);
+        instance->timeOutMap.erase(it);
     }
+
     delete timer;
     return 0;
 }
 
 int CSimulator::luaTimerSetCompareValue(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const int compare = luaL_checkint(l, 2);
     timer->setCompareValue(compare);
@@ -703,7 +773,7 @@ int CSimulator::luaTimerSetCompareValue(lua_State *l)
 
 int CSimulator::luaTimerSetPrescaler(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     const int pre = luaL_checkint(l, 2);
     timer->setPrescaler(pre);
@@ -712,7 +782,8 @@ int CSimulator::luaTimerSetPrescaler(lua_State *l)
 
 int CSimulator::luaTimerSetTimeOut(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
 
     // UNDONE
@@ -724,7 +795,7 @@ int CSimulator::luaTimerSetTimeOut(lua_State *l)
     if (it != instance->timeOutMap.end())
     {
         if (it->timeOutType == STimeOutInfo::TIMEOUT_LUA)
-            luaL_unref(NLua::luaInterface, LUA_REGISTRYINDEX, it->luaRef);
+            luaL_unref(l, LUA_REGISTRYINDEX, it->luaRef);
     }
 
     if (lua_isnumber(l, 2))
@@ -734,7 +805,7 @@ int CSimulator::luaTimerSetTimeOut(lua_State *l)
     {
         lua_pushvalue(l, 2); // Push lua function
         instance->timeOutMap[timer] =
-                STimeOutInfo(luaL_ref(NLua::luaInterface, LUA_REGISTRYINDEX));
+                STimeOutInfo(luaL_ref(l, LUA_REGISTRYINDEX));
     }
     else
         luaL_argerror(l, 2, "Wrong timeout argument: needs ISR or function");
@@ -744,7 +815,7 @@ int CSimulator::luaTimerSetTimeOut(lua_State *l)
 
 int CSimulator::luaTimerIsEnabled(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
     lua_pushboolean(l, timer->isEnabled());
     return 1;
@@ -752,7 +823,7 @@ int CSimulator::luaTimerIsEnabled(lua_State *l)
 
 int CSimulator::luaBitIsSet(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int data = luaL_checkint(l, 1);
     const int nargs = lua_gettop(l);
 
@@ -775,7 +846,7 @@ int CSimulator::luaBitIsSet(lua_State *l)
 
 int CSimulator::luaBitSet(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     int data = luaL_checkint(l, 1);
     const int nargs = lua_gettop(l);
 
@@ -793,7 +864,7 @@ int CSimulator::luaBitSet(lua_State *l)
 
 int CSimulator::luaBitUnSet(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     int data = luaL_checkint(l, 1);
     const int nargs = lua_gettop(l);
 
@@ -811,7 +882,7 @@ int CSimulator::luaBitUnSet(lua_State *l)
 
 int CSimulator::luaBitUnPack(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const uint32_t low = luaL_checkint(l, 1);
     const uint32_t high = luaL_checkint(l, 2);
     const int size = luaL_checkint(l, 3);
@@ -826,7 +897,7 @@ int CSimulator::luaBitUnPack(lua_State *l)
 
 int CSimulator::luaBitLower(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const uint32_t value = luaL_checkint(l, 1);
     const int size = luaL_checkint(l, 2);
 
@@ -840,7 +911,7 @@ int CSimulator::luaBitLower(lua_State *l)
 
 int CSimulator::luaBitUpper(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const uint32_t value = luaL_checkint(l, 1);
     const int size = luaL_checkint(l, 2);
 
@@ -854,7 +925,7 @@ int CSimulator::luaBitUpper(lua_State *l)
 
 int CSimulator::luaBitAnd(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int data = luaL_checkint(l, 1);
     const int bits = luaL_checkint(l, 2);
     lua_pushinteger(l, (data & bits));
@@ -863,7 +934,7 @@ int CSimulator::luaBitAnd(lua_State *l)
 
 int CSimulator::luaBitOr(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int data = luaL_checkint(l, 1);
     const int bits = luaL_checkint(l, 2);
     lua_pushinteger(l, (data | bits));
@@ -872,7 +943,7 @@ int CSimulator::luaBitOr(lua_State *l)
 
 int CSimulator::luaBitXor(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int data = luaL_checkint(l, 1);
     const int bits = luaL_checkint(l, 2);
     lua_pushinteger(l, (data ^ bits));
@@ -881,7 +952,7 @@ int CSimulator::luaBitXor(lua_State *l)
 
 int CSimulator::luaBitShiftLeft(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int data = luaL_checkint(l, 1);
     const int bits = luaL_checkint(l, 2);
     lua_pushinteger(l, (data << bits));
@@ -890,45 +961,21 @@ int CSimulator::luaBitShiftLeft(lua_State *l)
 
 int CSimulator::luaBitShiftRight(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int data = luaL_checkint(l, 1);
     const int bits = luaL_checkint(l, 2);
     lua_pushinteger(l, (data >> bits));
     return 1;
 }
 
-void CSimulator::initLua()
+void CSimulator::startLua()
 {
-    setLuaIOTypes();
-    setLuaAVRConstants();
+    const QString p = QDir::toNativeSeparators("lua/main.lua");
+    if (luaL_dofile(luaState, qPrintable(p)))
+        NLua::luaError(luaState, true);
 
-    // avr
-    NLua::registerFunction(luaAvrGetIORegister, "getIORegister", "avr");
-    NLua::registerFunction(luaAvrSetIORegister, "setIORegister", "avr");
-    NLua::registerFunction(luaAvrExecISR, "execISR", "avr");
-
-    // clock
-    NLua::registerFunction(luaClockCreateTimer, "createTimer", "clock");
-    NLua::registerFunction(luaClockEnableTimer, "enableTimer", "clock");
-
-    // timer class
-    NLua::registerClassFunction(luaTimerSetCompareValue, "setCompareValue", "timer");
-    NLua::registerClassFunction(luaTimerSetPrescaler, "setPrescaler", "timer");
-    NLua::registerClassFunction(luaTimerSetTimeOut, "setTimeOut", "timer");
-    NLua::registerClassFunction(luaTimerIsEnabled, "isEnabled", "timer");
-
-    // bit
-    NLua::registerFunction(luaBitIsSet, "isSet", "bit");
-    NLua::registerFunction(luaBitSet, "set", "bit");
-    NLua::registerFunction(luaBitUnSet, "unSet", "bit");
-    NLua::registerFunction(luaBitUnPack, "unPack", "bit");
-    NLua::registerFunction(luaBitLower, "lower", "bit");
-    NLua::registerFunction(luaBitUpper, "upper", "bit");
-    NLua::registerFunction(luaBitAnd, "bitAnd", "bit");
-    NLua::registerFunction(luaBitOr, "bitOr", "bit");
-    NLua::registerFunction(luaBitXor, "bitXor", "bit");
-    NLua::registerFunction(luaBitShiftLeft, "shiftLeft", "bit");
-    NLua::registerFunction(luaBitShiftRight, "shiftRight", "bit");
+    lua_getglobal(luaState, "init");
+    lua_call(luaState, 0, 0);
 }
 
 bool CSimulator::loadProjectFile(const QSettings &settings)
@@ -1001,8 +1048,8 @@ void CSimulator::stopPlugin()
     while (AVRClock->isActive())
         ;
 
-    lua_getglobal(NLua::luaInterface, "closePlugin");
-    lua_call(NLua::luaInterface, 0, 0);
+    lua_getglobal(luaState, "closePlugin");
+    lua_call(luaState, 0, 0);
 
     for (int i=0; i<IO_END; ++i)
         IORegisterData[i] = 0;

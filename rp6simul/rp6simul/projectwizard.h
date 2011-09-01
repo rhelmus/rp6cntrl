@@ -1,7 +1,7 @@
 #ifndef PROJECTWIZARD_H
 #define PROJECTWIZARD_H
 
-#include <QMap>
+#include <QHash>
 #include <QWizard>
 
 class QTreeWidget;
@@ -17,6 +17,8 @@ public:
 
     void accept(void);
 
+    void setDriverLists(const QHash<QString, QString> &desc,
+                        const QStringList &def);
     QString getProjectFile(void) const;
 };
 
@@ -34,13 +36,12 @@ class CNewProjectSettingsPage: public QWizardPage
     Q_OBJECT
 
     QTreeWidget *driverTreeWidget;
-    QMap<QString, QString> driverList;
-    QStringList defaultDrivers;
+    QHash<QString, QString> driverDescList;
+    QStringList defaultDriverList;
     bool initDriverList;
     QPushButton *addDriverButton, *delDriverButton;
     QAction *addCustomDriverAction;
 
-    void getDriverList(void);
     QAction *getAddAction(const QString &driver);
 
 private slots:
@@ -55,6 +56,9 @@ public:
     bool isComplete(void) const;
     bool validatePage();
 
+    void setDriverLists(const QHash<QString, QString> &desc,
+                        const QStringList &def)
+    { driverDescList = desc; defaultDriverList = def; }
     QStringList getSelectedDrivers(void) const;
 };
 

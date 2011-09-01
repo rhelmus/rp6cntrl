@@ -52,10 +52,6 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     qRegisterMetaType<EMotor>("EMotor");
     qRegisterMetaType<EMotorDirection>("EMotorDirection");
 
-    simulator = new CSimulator(this);
-    connect(simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
-            SLOT(updateClockDisplay(unsigned long)));
-
     resize(850, 600);
 
     projectWizard = new CProjectWizard(this);
@@ -101,7 +97,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
             SLOT(timedLEDUpdate()));
     pluginUpdateLEDsTimer->setInterval(50);
 
-    initLua();
+    initSimulators();
 
 
     // UNDONE
@@ -115,6 +111,49 @@ CRP6Simulator::~CRP6Simulator()
     stopPlugin();
     simulator = 0; // Destruction happens automaticallty by Qt's parent system
     instance = 0;
+    NLua::clearLuaLockStates();
+}
+
+void CRP6Simulator::initSimulators()
+{
+    simulator = new CSimulator(this);
+    connect(simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
+            SLOT(updateClockDisplay(unsigned long)));
+    initLua(simulator->getLuaState());
+    simulator->startLua();
+}
+
+void CRP6Simulator::initLua(lua_State *l)
+{
+    NLua::registerFunction(l, luaAppendLogOutput, "appendLogOutput");
+    NLua::registerFunction(l, luaAppendSerialOutput, "appendSerialOutput");
+    NLua::registerFunction(l, luaSetCmPerPixel, "setCmPerPixel");
+    NLua::registerFunction(l, luaSetRobotLength, "setRobotLength");
+    NLua::registerFunction(l, luaLogIRCOMM, "logIRCOMM");
+    NLua::registerFunction(l, luaUpdateRobotStatus, "updateRobotStatus");
+    NLua::registerFunction(l, luaRobotIsBlocked, "robotIsBlocked");
+    NLua::registerFunction(l, luaSetMotorPower, "setMotorPower");
+    NLua::registerFunction(l, luaSetMotorDriveSpeed, "setMotorDriveSpeed");
+    NLua::registerFunction(l, luaSetMotorMoveSpeed, "setMotorMoveSpeed");
+    NLua::registerFunction(l, luaSetMotorDir, "setMotorDir");
+
+    // LED class
+    NLua::registerFunction(l, luaCreateLED, "createLED");
+    NLua::registerClassFunction(l, luaLEDSetEnabled, "setEnabled", "led");
+
+    // Bumper class
+    NLua::registerFunction(l, luaCreateBumper, "createBumper");
+    NLua::registerClassFunction(l, luaBumperSetCallback, "setCallback",
+                                "bumper");
+
+    // IR sensor class
+    NLua::registerFunction(l, luaCreateIRSensor, "createIRSensor");
+    NLua::registerClassFunction(l, luaIRSensorGetHitDistance, "getHitDistance",
+                                "irsensor");
+
+    // light sensor class
+    NLua::registerFunction(l, luaCreateLightSensor, "createLightSensor");
+    NLua::registerClassFunction(l, luaLightSensorGetLight, "getLight", "lightsensor");
 }
 
 void CRP6Simulator::createMenus()
@@ -775,49 +814,6 @@ void CRP6Simulator::addMapHistoryFile(const QString &file)
     }
 }
 
-void CRP6Simulator::initLua()
-{
-    // Execute main lua file. Do this before initializing simulator, as it
-    // needs the lua definitions (ie properties).
-    const QString p = QDir::toNativeSeparators("lua/main.lua");
-    if (luaL_dofile(NLua::luaInterface, qPrintable(p)))
-        luaError(NLua::luaInterface, true);
-
-    simulator->initLua();
-
-    NLua::registerFunction(luaAppendLogOutput, "appendLogOutput");
-    NLua::registerFunction(luaAppendSerialOutput, "appendSerialOutput");
-    NLua::registerFunction(luaSetCmPerPixel, "setCmPerPixel");
-    NLua::registerFunction(luaSetRobotLength, "setRobotLength");
-    NLua::registerFunction(luaLogIRCOMM, "logIRCOMM");
-    NLua::registerFunction(luaUpdateRobotStatus, "updateRobotStatus");
-    NLua::registerFunction(luaRobotIsBlocked, "robotIsBlocked");
-    NLua::registerFunction(luaSetMotorPower, "setMotorPower");
-    NLua::registerFunction(luaSetMotorDriveSpeed, "setMotorDriveSpeed");
-    NLua::registerFunction(luaSetMotorMoveSpeed, "setMotorMoveSpeed");
-    NLua::registerFunction(luaSetMotorDir, "setMotorDir");
-
-    // LED class
-    NLua::registerFunction(luaCreateLED, "createLED");
-    NLua::registerClassFunction(luaLEDSetEnabled, "setEnabled", "led");
-
-    // Bumper class
-    NLua::registerFunction(luaCreateBumper, "createBumper");
-    NLua::registerClassFunction(luaBumperSetCallback, "setCallback", "bumper");
-
-    // IR sensor class
-    NLua::registerFunction(luaCreateIRSensor, "createIRSensor");
-    NLua::registerClassFunction(luaIRSensorGetHitDistance, "getHitDistance",
-                                "irsensor");
-
-    // light sensor class
-    NLua::registerFunction(luaCreateLightSensor, "createLightSensor");
-    NLua::registerClassFunction(luaLightSensorGetLight, "getLight", "lightsensor");
-
-    lua_getglobal(NLua::luaInterface, "init");
-    lua_call(NLua::luaInterface, 0, 0);
-}
-
 QString CRP6Simulator::getLogOutput(ELogType type, QString text) const
 {
     text = Qt::escape(text);
@@ -869,7 +865,7 @@ void CRP6Simulator::appendRobotStatusUpdate(const QStringList &strtree)
 
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     QMutexLocker loglocker(&instance->logBufferMutex);
 
     const char *type = luaL_checkstring(l, 1);
@@ -892,9 +888,27 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 
 int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     QMutexLocker seriallocker(&instance->serialBufferMutex);
     instance->serialTextBuffer += luaL_checkstring(l, 1);
+    return 0;
+}
+
+int CRP6Simulator::luaSetDriverLists(lua_State *l)
+{
+    // This function should only be called by init(), where we do
+    // not have to worry about threads
+
+    luaL_checktype(l, 1, LUA_TTABLE); // Driver descriptions
+    luaL_checktype(l, 2, LUA_TTABLE); // Default driver list
+
+    QHash<QString, QVariant> list = NLua::convertLuaTable(l, 1);
+    QHash<QString, QString> descmap;
+    for(QHash<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
+        descmap[it.key()] = it.value().toString();
+
+    instance->projectWizard->setDriverLists(descmap,
+                                            NLua::getStringList(l, 2));
     return 0;
 }
 
@@ -916,7 +930,7 @@ int CRP6Simulator::luaSetRobotLength(lua_State *l)
 
 int CRP6Simulator::luaLogIRCOMM(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int adr = luaL_checkint(l, 1);
     const int key = luaL_checkint(l, 2);
     const bool toggle = NLua::checkBoolean(l, 3);
@@ -932,7 +946,7 @@ int CRP6Simulator::luaLogIRCOMM(lua_State *l)
 
 int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     const int nargs = lua_gettop(l);
     QStringList strtree;
 
@@ -945,14 +959,14 @@ int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
 
 int CRP6Simulator::luaRobotIsBlocked(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     lua_pushboolean(l, instance->robotIsBlocked);
     return 1;
 }
 
 int CRP6Simulator::luaCreateBumper(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     // points
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1003,7 +1017,7 @@ int CRP6Simulator::luaCreateBumper(lua_State *l)
 
 int CRP6Simulator::luaBumperSetCallback(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CBumper *b = NLua::checkClassData<CBumper>(l, 1, "bumper");
     luaL_checktype(l, 2, LUA_TFUNCTION);
     if (instance->bumperLuaCallbacks[b])
@@ -1016,7 +1030,7 @@ int CRP6Simulator::luaBumperSetCallback(lua_State *l)
 int CRP6Simulator::luaBumperDestr(lua_State *l)
 {
     qDebug() << "Removing bumper";
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CBumper *b = NLua::checkClassData<CBumper>(l, 1, "bumper");
     if (instance->bumperLuaCallbacks[b])
     {
@@ -1031,7 +1045,7 @@ int CRP6Simulator::luaBumperDestr(lua_State *l)
 
 int CRP6Simulator::luaCreateLED(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1074,7 +1088,7 @@ int CRP6Simulator::luaCreateLED(lua_State *l)
 
 int CRP6Simulator::luaLEDSetEnabled(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
     QMutexLocker LEDlocker(&instance->robotLEDMutex);
     instance->changedLEDs[led] = NLua::checkBoolean(l, 2);
@@ -1084,7 +1098,7 @@ int CRP6Simulator::luaLEDSetEnabled(lua_State *l)
 int CRP6Simulator::luaLEDDestr(lua_State *l)
 {
     qDebug() << "Removing LED";
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
     instance->robotScene->getRobotItem()->removeLED(led);
     instance->robotWidget->removeLED(led);
@@ -1094,7 +1108,7 @@ int CRP6Simulator::luaLEDDestr(lua_State *l)
 
 int CRP6Simulator::luaSetMotorPower(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     const char *motor = luaL_checkstring(l, 1);
     const int power = luaL_checkint(l, 2);
@@ -1116,7 +1130,7 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
 
 int CRP6Simulator::luaSetMotorDriveSpeed(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     const char *motor = luaL_checkstring(l, 1);
     const int speed = luaL_checkint(l, 2);
@@ -1135,7 +1149,7 @@ int CRP6Simulator::luaSetMotorDriveSpeed(lua_State *l)
 
 int CRP6Simulator::luaSetMotorMoveSpeed(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     const char *motor = luaL_checkstring(l, 1);
     const int speed = luaL_checkint(l, 2);
@@ -1157,7 +1171,7 @@ int CRP6Simulator::luaSetMotorMoveSpeed(lua_State *l)
 
 int CRP6Simulator::luaSetMotorDir(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     const char *ldir = luaL_checkstring(l, 1);
     const char *rdir = luaL_checkstring(l, 2);
@@ -1188,7 +1202,7 @@ int CRP6Simulator::luaSetMotorDir(lua_State *l)
 
 int CRP6Simulator::luaCreateIRSensor(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1234,7 +1248,7 @@ int CRP6Simulator::luaCreateIRSensor(lua_State *l)
 
 int CRP6Simulator::luaIRSensorGetHitDistance(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CIRSensor *ir = NLua::checkClassData<CIRSensor>(l, 1, "irsensor");
     lua_pushnumber(l, ir->getHitDistance());
     return 1;
@@ -1243,7 +1257,7 @@ int CRP6Simulator::luaIRSensorGetHitDistance(lua_State *l)
 int CRP6Simulator::luaIRSensorDestr(lua_State *l)
 {
     qDebug() << "Removing IR sensor";
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CIRSensor *ir = NLua::checkClassData<CIRSensor>(l, 1, "irsensor");
     instance->robotScene->getRobotItem()->removeIRSensor(ir);
     instance->robotWidget->removeIRSensor(ir);
@@ -1253,7 +1267,7 @@ int CRP6Simulator::luaIRSensorDestr(lua_State *l)
 
 int CRP6Simulator::luaCreateLightSensor(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
 
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1274,7 +1288,7 @@ int CRP6Simulator::luaCreateLightSensor(lua_State *l)
 
 int CRP6Simulator::luaLightSensorGetLight(lua_State *l)
 {
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CLightSensor *light = NLua::checkClassData<CLightSensor>(l, 1, "lightsensor");
     lua_pushinteger(l, light->getLight());
     return 1;
@@ -1283,7 +1297,7 @@ int CRP6Simulator::luaLightSensorGetLight(lua_State *l)
 int CRP6Simulator::luaLightSensorDestr(lua_State *l)
 {
     qDebug() << "Removing light sensor";
-    NLua::CLuaLocker lualocker;
+    NLua::CLuaLocker lualocker(l);
     CLightSensor *light = NLua::checkClassData<CLightSensor>(l, 1, "lightsensor");
     instance->robotScene->getRobotItem()->removeLightSensor(light);
     delete light;
@@ -1609,9 +1623,9 @@ void CRP6Simulator::stopPlugin()
     {
         // Need to do this before calling CSimulator::stopPlugin() to make sure
         // drivers can properly be unloaded
-        NLua::CLuaLocker lualocker;
+        NLua::CLuaLocker lualocker(simulator->getLuaState());
         foreach (int ref, bumperLuaCallbacks)
-            luaL_unref(NLua::luaInterface, LUA_REGISTRYINDEX, ref);
+            luaL_unref(simulator->getLuaState(), LUA_REGISTRYINDEX, ref);
         bumperLuaCallbacks.clear();
     }
 
@@ -1699,39 +1713,39 @@ void CRP6Simulator::resetADCTable()
 
 void CRP6Simulator::applyADCTable()
 {
-    NLua::CLuaLocker lualocker;
-    lua_getglobal(NLua::luaInterface, "setUIADCValue");
-    const int findex = lua_gettop(NLua::luaInterface);
+    NLua::CLuaLocker lualocker(simulator->getLuaState());
+    lua_getglobal(simulator->getLuaState(), "setUIADCValue");
+    const int findex = lua_gettop(simulator->getLuaState());
 
     for (int i=0; i<ADCTableWidget->rowCount(); ++i)
     {
-        lua_pushvalue(NLua::luaInterface, findex);
-        lua_pushstring(NLua::luaInterface,
+        lua_pushvalue(simulator->getLuaState(), findex);
+        lua_pushstring(simulator->getLuaState(),
                        qPrintable(ADCTableWidget->verticalHeaderItem(i)->text()));
         if (ADCOverrideCheckBoxes[i]->isChecked())
-            lua_pushinteger(NLua::luaInterface, ADCOverrideSpinBoxes[i]->value());
+            lua_pushinteger(simulator->getLuaState(), ADCOverrideSpinBoxes[i]->value());
         else
-            lua_pushnil(NLua::luaInterface); // nil: don't override
-        lua_call(NLua::luaInterface, 2, 0);
+            lua_pushnil(simulator->getLuaState()); // nil: don't override
+        lua_call(simulator->getLuaState(), 2, 0);
     }
-    lua_pop(NLua::luaInterface, 1); // Pop function
+    lua_pop(simulator->getLuaState(), 1); // Pop function
 }
 
 void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
 {
-    NLua::CLuaLocker lualocker;
-    lua_rawgeti(NLua::luaInterface, LUA_REGISTRYINDEX, bumperLuaCallbacks[b]);
-    lua_pushboolean(NLua::luaInterface, e);
-    lua_call(NLua::luaInterface, 1, 0); // UNDONE: error handling
+    NLua::CLuaLocker lualocker(simulator->getLuaState());
+    lua_rawgeti(simulator->getLuaState(), LUA_REGISTRYINDEX, bumperLuaCallbacks[b]);
+    lua_pushboolean(simulator->getLuaState(), e);
+    lua_call(simulator->getLuaState(), 1, 0); // UNDONE: error handling
 }
 
 void CRP6Simulator::sendSerialText()
 {
-    NLua::CLuaLocker lualocker;
-    lua_getglobal(NLua::luaInterface, "sendSerial");
-    lua_pushstring(NLua::luaInterface,
+    NLua::CLuaLocker lualocker(simulator->getLuaState());
+    lua_getglobal(simulator->getLuaState(), "sendSerial");
+    lua_pushstring(simulator->getLuaState(),
                    qPrintable(serialInputWidget->text() + "\n"));
-    lua_call(NLua::luaInterface, 1, 0);
+    lua_call(simulator->getLuaState(), 1, 0);
 
     serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));
 
@@ -1740,12 +1754,12 @@ void CRP6Simulator::sendSerialText()
 
 void CRP6Simulator::sendIRCOMM()
 {
-    NLua::CLuaLocker lualocker;
-    lua_getglobal(NLua::luaInterface, "sendIRCOMM");
-    lua_pushinteger(NLua::luaInterface, IRCOMMAddressWidget->value());
-    lua_pushinteger(NLua::luaInterface, IRCOMMKeyWidget->value());
-    lua_pushboolean(NLua::luaInterface, IRCOMMToggleWidget->isChecked());
-    lua_call(NLua::luaInterface, 3, 0);
+    NLua::CLuaLocker lualocker(simulator->getLuaState());
+    lua_getglobal(simulator->getLuaState(), "sendIRCOMM");
+    lua_pushinteger(simulator->getLuaState(), IRCOMMAddressWidget->value());
+    lua_pushinteger(simulator->getLuaState(), IRCOMMKeyWidget->value());
+    lua_pushboolean(simulator->getLuaState(), IRCOMMToggleWidget->isChecked());
+    lua_call(simulator->getLuaState(), 3, 0);
 
     const QString text = QString("Send IRCOMM: "
                                  "Address: %1 | "
@@ -1775,4 +1789,24 @@ void CRP6Simulator::debugSetRobotRightPower(int power)
         robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_FWD);
     else
         robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_BWD);
+}
+
+bool CRP6Simulator::loadCustomDriverInfo(const QString &file, QString &name,
+                                         QString &desc)
+{
+    lua_getglobal(simulator->getLuaState(), "getDriver");
+    lua_pushstring(simulator->getLuaState(), qPrintable(file));
+
+    lua_call(simulator->getLuaState(), 1, 2);
+
+    const bool ok = !(lua_isnil(simulator->getLuaState(), -1));
+    if (ok)
+    {
+        name = luaL_checkstring(simulator->getLuaState(), -2);
+        desc = luaL_checkstring(simulator->getLuaState(), -1);
+    }
+
+    lua_pop(simulator->getLuaState(), 2);
+
+    return ok;
 }

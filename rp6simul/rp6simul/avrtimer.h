@@ -156,11 +156,12 @@ QDebug operator<<(QDebug dbg, const CTicks &ticks);
 class CAVRTimer
 {
 public:
-    typedef void (*TTimeOut)(CAVRTimer *);
+    typedef void (*TTimeOut)(CAVRTimer *, void *);
 
 private:
     volatile bool enabled;
     TTimeOut timeOutCallback;
+    void *timeOutData;
     CTicks nextTick;
     uint32_t compareValue, prescaler, trueCompareValue;
 
@@ -176,8 +177,8 @@ private:
     }
 
 public:
-    CAVRTimer(TTimeOut t) : enabled(false), timeOutCallback(t),
-        compareValue(0), prescaler(1), trueCompareValue(0) { }
+    CAVRTimer(TTimeOut t, void *d) : enabled(false), timeOutCallback(t),
+        timeOutData(d), compareValue(0), prescaler(1), trueCompareValue(0) { }
 
     const CTicks &getNextTick(void) const { return nextTick; }
     CTicks &getRefNextTick(void) { return nextTick; }
@@ -185,7 +186,8 @@ public:
     { compareValue = c; updateTrueCompareValue(); }
     void setPrescaler(uint32_t p) { prescaler = p; updateTrueCompareValue(); }
     uint32_t getTrueCompareValue(void) const { return trueCompareValue; }
-    void timeOut(void) { if (timeOutCallback) (*timeOutCallback)(this); }
+    void timeOut(void)
+    { if (timeOutCallback) (*timeOutCallback)(this, timeOutData); }
     bool isEnabled(void) const { return enabled; }
     void setEnabled(bool e) { enabled = e; }
 };
@@ -213,7 +215,7 @@ public:
     CAVRClock(void);
     ~CAVRClock(void);
 
-    CAVRTimer *createTimer(CAVRTimer::TTimeOut t);
+    CAVRTimer *createTimer(CAVRTimer::TTimeOut t, void *d);
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);
     TTimerList &getTimers(void) { return timerList; }

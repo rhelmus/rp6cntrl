@@ -73,6 +73,11 @@ enum EIORegisterTypes
 // Just use single type that is able to contain both 8 and 16 bit io types
 typedef uint16_t TIORegisterData;
 
+typedef void (*TIORegisterSetCB)(EIORegisterTypes, TIORegisterData, void *);
+typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes, void *);
+typedef void (*TEnableISRsCB)(bool, void *);
+typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
+                                    TEnableISRsCB, void *);
 #ifdef GLUE
 } // end namespace
 #endif

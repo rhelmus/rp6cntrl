@@ -135,9 +135,9 @@ void CAVRClock::run()
 #endif
 }
 
-CAVRTimer *CAVRClock::createTimer(CAVRTimer::TTimeOut t)
+CAVRTimer *CAVRClock::createTimer(CAVRTimer::TTimeOut t, void *d)
 {
-    CAVRTimer *ret = new CAVRTimer(t);
+    CAVRTimer *ret = new CAVRTimer(t, d);
     timerList << ret;
     qDebug() << "Added new timer: " << (void *)ret <<
                 "(" << timerList.count() << "registered)";

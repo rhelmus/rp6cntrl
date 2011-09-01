@@ -9,31 +9,17 @@
 
 namespace NLua
 {
-
-class CLuaInterface
-{
-    lua_State *luaState;
-
-public:
-    CLuaInterface(void);
-    ~CLuaInterface(void);
-
-    operator lua_State*(void) { return luaState; }
-};
-
-extern CLuaInterface luaInterface;
-
 void stackDump(lua_State *l);
 void luaError(lua_State *l, bool fatal);
-void registerFunction(lua_CFunction func, const char *name, void *d=0);
-void registerFunction(lua_CFunction func, const char *name, const char *tab,
+void registerFunction(lua_State *l, lua_CFunction func, const char *name,
                       void *d=0);
-void registerClassFunction(lua_CFunction func, const char *name, const char *type,
-                           void *d=NULL);
-int createWeakRegistryRef(lua_State *l);
-void pushWeakRegistryRef(lua_State *l, int ref);
-void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr = NULL);
-void setVariable(int val, const char *var, const char *tab);
+void registerFunction(lua_State *l, lua_CFunction func, const char *name,
+                      const char *tab, void *d=0);
+void registerClassFunction(lua_State *l, lua_CFunction func, const char *name,
+                           const char *type, void *d=NULL);
+void createClass(lua_State *l, void *data, const char *type,
+                 lua_CFunction destr=0, void *destrd=0);
+void setVariable(lua_State *l, int val, const char *var, const char *tab);
 bool checkBoolean(lua_State *l, int index);
 QHash<QString, QVariant> convertLuaTable(lua_State *l, int index);
 inline int luaAbsIndex(lua_State *l, int i)
@@ -47,17 +33,46 @@ template <typename C> C *checkClassData(lua_State *l, int index, const char *typ
     return static_cast <C*>(*p);
 }
 
+template <typename C> C getFromClosure(lua_State *l, int n=1)
+{
+    return reinterpret_cast<C>(lua_touserdata(l, lua_upvalueindex(n)));
+}
+
+
+// Interface for lua mutex locking
+void addLuaLockState(lua_State *l);
+void clearLuaLockStates(void);
+
+// Simple linked list: thread safety
+struct SLuaLockList
+{
+    lua_State *luaState;
+    QMutex mutex;
+    SLuaLockList *next;
+    SLuaLockList(void) : luaState(0), mutex(QMutex::Recursive), next(0) { }
+};
+
+extern SLuaLockList *luaLockList;
+
 class CLuaLocker
 {
-    static QMutex mutex;
+    SLuaLockList *mutexListEntry;
     bool locked;
 
 public:
-    CLuaLocker(void) : locked(false) { lock(); }
+    CLuaLocker(lua_State *l) : locked(false)
+    {
+        mutexListEntry = luaLockList;
+        while (mutexListEntry && (mutexListEntry->luaState != l))
+            mutexListEntry = mutexListEntry->next;
+        lock();
+    }
     ~CLuaLocker(void) { unlock(); }
 
-    void lock(void) { if (!locked) { mutex.lock(); locked = true; } }
-    void unlock(void) { if (locked) { mutex.unlock(); locked = false; } }
+    void lock(void)
+    { if (!locked) { mutexListEntry->mutex.lock(); locked = true; } }
+    void unlock(void)
+    { if (locked) { mutexListEntry->mutex.unlock(); locked = false; } }
 };
 
 }

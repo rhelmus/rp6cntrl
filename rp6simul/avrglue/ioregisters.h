@@ -12,30 +12,29 @@ namespace NRP6SimulGlue {
 class CIORegister
 {
 public:
-    typedef TIORegisterData (*TGetCallback)(EIORegisterTypes);
-    typedef void (*TSetCallback)(EIORegisterTypes, TIORegisterData);
-
-    static TGetCallback getCallback;
-    static TSetCallback setCallback;
+    static TIORegisterGetCB getCallback;
+    static TIORegisterSetCB setCallback;
 
 private:
     EIORegisterTypes IOType;
 
-    void set(TIORegisterData d) { setCallback(IOType, d); }
+    void set(TIORegisterData d) { setCallback(IOType, d, callBackData); }
+    TIORegisterData get(void) const { return getCallback(IOType, callBackData); }
 
 public:
     CIORegister(EIORegisterTypes t) : IOType(t) { }
-    CIORegister(const CIORegister &other) { set(other.getCallback(IOType)); }
+    CIORegister(const CIORegister &other)
+    { set(other.getCallback(IOType, callBackData)); }
 
     CIORegister &operator=(TIORegisterData d) { set(d); return *this; }
     CIORegister &operator=(CIORegister &other) { set(other); return *this; }
-    operator TIORegisterData(void) { return getCallback(IOType); }
+    operator TIORegisterData(void) { return get(); }
     CIORegister &operator|=(TIORegisterData d)
-    { set(getCallback(IOType) | d); return *this; }
+    { set(get() | d); return *this; }
     CIORegister &operator&=(TIORegisterData d)
-    { set(getCallback(IOType) & d); return *this; }
+    { set(get() & d); return *this; }
     CIORegister &operator^=(TIORegisterData d)
-    { set(getCallback(IOType) ^ d); return *this; }
+    { set(get() ^ d); return *this; }
 };
 
 }

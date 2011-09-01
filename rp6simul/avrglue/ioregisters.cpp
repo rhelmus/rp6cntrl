@@ -2,8 +2,8 @@
 
 namespace NRP6SimulGlue {
 
-CIORegister::TSetCallback CIORegister::setCallback = 0;
-CIORegister::TGetCallback CIORegister::getCallback = 0;
+TIORegisterSetCB CIORegister::setCallback = 0;
+TIORegisterGetCB CIORegister::getCallback = 0;
 
 }
 
