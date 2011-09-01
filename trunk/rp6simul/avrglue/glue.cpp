@@ -8,12 +8,12 @@
 #include <time.h>
 
 namespace {
-
-typedef void (*TEnableISRsCallback)(bool);
-TEnableISRsCallback enableISRsCallback = 0;
+NRP6SimulGlue::TEnableISRsCB enableISRsCallback = 0;
 }
 
 namespace NRP6SimulGlue {
+
+void *callBackData;
 
 void debugOut(const char *s...)
 {
@@ -35,13 +35,13 @@ void debugOut(const char *s...)
 void cli(void)
 {
     if (enableISRsCallback)
-        enableISRsCallback(false);
+        enableISRsCallback(false, NRP6SimulGlue::callBackData);
 }
 
 void sei(void)
 {
     if (enableISRsCallback)
-        enableISRsCallback(true);
+        enableISRsCallback(true, NRP6SimulGlue::callBackData);
 }
 
 // Exported functions
@@ -52,11 +52,12 @@ EXPORT void callAvrMain(void)
     main();
 }
 
-EXPORT void setPluginCallbacks(NRP6SimulGlue::CIORegister::TSetCallback s,
-                               NRP6SimulGlue::CIORegister::TGetCallback g,
-                               TEnableISRsCallback i)
+EXPORT void setPluginCallbacks(NRP6SimulGlue::TIORegisterSetCB s,
+                               NRP6SimulGlue::TIORegisterGetCB g,
+                               NRP6SimulGlue::TEnableISRsCB i, void *d)
 {
     NRP6SimulGlue::CIORegister::setCallback = s;
     NRP6SimulGlue::CIORegister::getCallback = g;
     enableISRsCallback = i;
+    NRP6SimulGlue::callBackData = d;
 }

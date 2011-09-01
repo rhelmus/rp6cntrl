@@ -9,24 +9,24 @@
 namespace {
 
 // Set global variable at stack
-void setGlobalVar(const char *var, const char *tab)
+void setGlobalVar(lua_State *l, const char *var, const char *tab)
 {
     if (!tab)
-        lua_setglobal(NLua::luaInterface, var);
+        lua_setglobal(l, var);
     else
     {
-        lua_getglobal(NLua::luaInterface, tab);
+        lua_getglobal(l, tab);
 
-        if (lua_isnil(NLua::luaInterface, -1))
+        if (lua_isnil(l, -1))
         {
-            lua_pop(NLua::luaInterface, 1);
-            lua_newtable(NLua::luaInterface);
+            lua_pop(l, 1);
+            lua_newtable(l);
         }
 
-        lua_insert(NLua::luaInterface, -2); // Swap table <--> value
-        lua_setfield(NLua::luaInterface, -2, var);
+        lua_insert(l, -2); // Swap table <--> value
+        lua_setfield(l, -2, var);
 
-        lua_setglobal(NLua::luaInterface, tab);
+        lua_setglobal(l, tab);
     }
 }
 
@@ -50,43 +50,6 @@ void getClassMT(lua_State *l, const char *type)
 
 
 namespace NLua {
-
-CLuaInterface luaInterface;
-
-CLuaInterface::CLuaInterface()
-{
-    // Initialize lua
-    luaState = lua_open();
-
-    if (!luaState)
-        qFatal("Could not open lua VM\n");
-
-    luaL_openlibs(luaState);
-
-    // Initialize 'weak registry' table. This functions like the regular
-    // lua registry, but holds weak value-references instead.
-    lua_newtable(luaState); // registry table
-
-    lua_newtable(luaState); // metatable
-    lua_pushstring(luaState, "v");
-    lua_setfield(luaState, -2, "__mode");
-    lua_setmetatable(luaState, -2);
-
-    lua_setfield(luaState, LUA_REGISTRYINDEX, "weakregistry");
-}
-
-CLuaInterface::~CLuaInterface()
-{
-    if (luaState)
-    {
-        // Debug
-        qDebug("Lua stack:\n");
-        stackDump(luaState);
-
-        lua_close(luaState);
-        luaState = 0;
-    }
-}
 
 // Based from a example in the book "Programming in Lua"
 void stackDump(lua_State *l)
@@ -125,82 +88,64 @@ void luaError(lua_State *l, bool fatal)
         qFatal("Lua error: %s\n", errmsg);
 }
 
-void registerFunction(lua_CFunction func, const char *name, void *d)
-{
-    if (d)
-    {
-        lua_pushlightuserdata(luaInterface, d);
-        lua_pushcclosure(luaInterface, func, 1);
-    }
-    else
-        lua_pushcfunction(luaInterface, func);
-    lua_setglobal(luaInterface, name);
-}
-
-void registerFunction(lua_CFunction func, const char *name, const char *tab,
+void registerFunction(lua_State *l, lua_CFunction func, const char *name,
                       void *d)
 {
-    lua_getglobal(luaInterface, tab);
-
-    if (lua_isnil(luaInterface, -1))
+    if (d)
     {
-        lua_pop(luaInterface, 1);
-        lua_newtable(luaInterface);
+        lua_pushlightuserdata(l, d);
+        lua_pushcclosure(l, func, 1);
+    }
+    else
+        lua_pushcfunction(l, func);
+    lua_setglobal(l, name);
+}
+
+void registerFunction(lua_State *l, lua_CFunction func, const char *name,
+                      const char *tab, void *d)
+{
+    lua_getglobal(l, tab);
+
+    if (lua_isnil(l, -1))
+    {
+        lua_pop(l, 1);
+        lua_newtable(l);
     }
 
     if (d)
     {
-        lua_pushlightuserdata(luaInterface, d);
-        lua_pushcclosure(luaInterface, func, 1);
+        lua_pushlightuserdata(l, d);
+        lua_pushcclosure(l, func, 1);
     }
     else
-        lua_pushcfunction(luaInterface, func);
+        lua_pushcfunction(l, func);
 
-    lua_setfield(luaInterface, -2, name);
-    lua_setglobal(luaInterface, tab);
+    lua_setfield(l, -2, name);
+    lua_setglobal(l, tab);
 }
 
-void registerClassFunction(lua_CFunction func, const char *name,
+void registerClassFunction(lua_State *l, lua_CFunction func, const char *name,
                            const char *type, void *d)
 {
-    getClassMT(luaInterface, type);
-    const int mt = lua_gettop(luaInterface);
+    getClassMT(l, type);
+    const int mt = lua_gettop(l);
 
-    lua_pushstring(luaInterface, name);
+    lua_pushstring(l, name);
 
     if (d)
     {
-        lua_pushlightuserdata(luaInterface, d);
-        lua_pushcclosure(luaInterface, func, 1);
+        lua_pushlightuserdata(l, d);
+        lua_pushcclosure(l, func, 1);
     }
     else
-        lua_pushcfunction(luaInterface, func);
+        lua_pushcfunction(l, func);
 
-    lua_settable(luaInterface, mt);
-    lua_remove(luaInterface, mt);
+    lua_settable(l, mt);
+    lua_remove(l, mt);
 }
 
-int createWeakRegistryRef(lua_State *l)
-{
-    lua_getfield(l, LUA_REGISTRYINDEX, "weakregistry");
-
-    // Value must be on top of stack, but we just pushed the weak registry
-    // there. Therefore swap the stack values.
-    lua_insert(l, -2);
-
-    const int ret = luaL_ref(NLua::luaInterface, -2);
-    lua_pop(l, 1); // Pop weak registry table
-    return ret;
-}
-
-void pushWeakRegistryRef(lua_State *l, int ref)
-{
-    lua_getfield(l, LUA_REGISTRYINDEX, "weakregistry");
-    lua_rawgeti(l, -1, ref);
-    lua_remove(l, -2); // Remove weakregistry table
-}
-
-void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr)
+void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr,
+                 void *destrd)
 {
     void **p = static_cast<void **>(lua_newuserdata(l, sizeof(void **)));
     *p = data;
@@ -215,7 +160,15 @@ void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr
     if (destr) // Add destructor?
     {
         lua_pushstring(l, "__gc");
-        lua_pushcfunction(l, destr);
+
+        if (destrd) // Destructor private data?
+        {
+            lua_pushlightuserdata(l, destrd);
+            lua_pushcclosure(l, destr, 1);
+        }
+        else
+            lua_pushcfunction(l, destr);
+
         lua_settable(l, mt);
     }
 
@@ -224,16 +177,16 @@ void createClass(lua_State *l, void *data, const char *type, lua_CFunction destr
     // New userdata is left on stack
 }
 
-void setVariable(int val, const char *var, const char *tab)
+void setVariable(lua_State *l, int val, const char *var, const char *tab)
 {
-    lua_pushinteger(luaInterface, val);
-    setGlobalVar(var, tab);
+    lua_pushinteger(l, val);
+    setGlobalVar(l, var, tab);
 }
 
 bool checkBoolean(lua_State *l, int index)
 {
     luaL_checktype(l, index, LUA_TBOOLEAN);
-    return lua_toboolean(luaInterface, index);
+    return lua_toboolean(l, index);
 }
 
 QHash<QString, QVariant> convertLuaTable(lua_State *l, int index)
@@ -296,6 +249,47 @@ QStringList getStringList(lua_State *l, int index)
     return ret;
 }
 
-QMutex CLuaLocker::mutex(QMutex::Recursive);
+
+// Lua mutex lock interface
+
+SLuaLockList *luaLockList = 0;
+
+void addLuaLockState(lua_State *l)
+{
+    // NOT thread safe
+    SLuaLockList *entry = new SLuaLockList;
+    entry->luaState = l;
+    entry->next = 0;
+
+    if (!luaLockList)
+    {
+        luaLockList = entry;
+        return;
+    }
+
+    SLuaLockList *it = luaLockList;
+    while (it)
+    {
+        if (!it->next)
+        {
+            it->next = entry;
+            break;
+        }
+        it = it->next;
+    }
+}
+
+void clearLuaLockStates()
+{
+    SLuaLockList *it = luaLockList;
+    while (it)
+    {
+        SLuaLockList *it2 = it;
+        it = it->next;
+        delete it2;
+    }
+    luaLockList = 0;
+}
+
 
 }

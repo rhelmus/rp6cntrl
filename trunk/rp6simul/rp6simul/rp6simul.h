@@ -103,6 +103,9 @@ class CRP6Simulator : public QMainWindow
 
     static CRP6Simulator *instance;
 
+    void initSimulators(void);
+    void initLua(lua_State *l);
+
     void createMenus(void);
     void setToolBarToolTips(void);
     void createToolbars(void);
@@ -124,13 +127,13 @@ class CRP6Simulator : public QMainWindow
     void syncMapHistoryTree(const QStringList &l);
     void loadMapHistoryTree(void);
     void addMapHistoryFile(const QString &file);
-    void initLua(void);
     QString getLogOutput(ELogType type, QString text) const;
     void appendRobotStatusUpdate(const QStringList &strtree);
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendSerialOutput(lua_State *l);
+    static int luaSetDriverLists(lua_State *l);
     static int luaSetCmPerPixel(lua_State *l);
     static int luaSetRobotLength(lua_State *l);
     static int luaLogIRCOMM(lua_State *l);
@@ -184,6 +187,8 @@ public:
     ~CRP6Simulator(void);
 
     static CRP6Simulator *getInstance(void) { return instance; }
+    bool loadCustomDriverInfo(const QString &file, QString &name,
+                              QString &desc);
 
 signals:
     // These are emitted by the class itself to easily thread-synchronize

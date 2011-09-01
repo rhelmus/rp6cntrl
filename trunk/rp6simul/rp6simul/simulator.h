@@ -13,13 +13,7 @@
 #include <QReadWriteLock>
 #include <QStringList>
 
-// UNDONE: Move to shared.h?
 typedef void (*TCallPluginMainFunc)(void);
-typedef void (*TIORegisterSetCB)(EIORegisterTypes, TIORegisterData);
-typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes);
-typedef void (*TEnableISRsCB)(bool);
-typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
-                                    TEnableISRsCB);
 
 enum EISRTypes
 {
@@ -62,6 +56,7 @@ class CSimulator : public QObject
         STimeOutInfo(int l) : timeOutType(TIMEOUT_LUA), luaRef(l) { }
     };
 
+    lua_State *luaState;
     CAVRClock *AVRClock;
     QThread *AVRClockThread;
     QMap<CAVRTimer *, STimeOutInfo> timeOutMap;
@@ -87,11 +82,10 @@ class CSimulator : public QObject
     QStringList currentDriverList;
     QLibrary RP6Plugin;
 
-    static CSimulator *instance;
-
-    void initAVRClock(void);
     void setLuaIOTypes(void);
     void setLuaAVRConstants(void);
+    void initLua(void);
+    void initAVRClock(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
     bool initPlugin(void);
@@ -100,12 +94,14 @@ class CSimulator : public QObject
     void setIORegister(EIORegisterTypes type, TIORegisterData data);
 
     // Callbacks for RP6 plugin
-    static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData data);
-    static TIORegisterData IORegisterGetCB(EIORegisterTypes type);
-    static void enableISRsCB(bool e);
+    static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
+                                void *data);
+    static TIORegisterData IORegisterGetCB(EIORegisterTypes type,
+                                           void *data);
+    static void enableISRsCB(bool e, void *data);
 
     // Timer callback
-    static void timeOutCallback(CAVRTimer *timer);
+    static void timeOutCallback(CAVRTimer *timer, void *data);
 
     // Lua bindings
     static int luaAvrGetIORegister(lua_State *l);
@@ -134,7 +130,8 @@ public:
     explicit CSimulator(QObject *parent = 0);
     ~CSimulator(void);
 
-    void initLua(void);
+    void startLua(void);
+    lua_State *getLuaState(void) const { return luaState; }
     bool loadProjectFile(const QSettings &settings);
     void execISR(EISRTypes type);
     CAVRClock *getAVRClock(void) { return AVRClock; }
@@ -146,9 +143,6 @@ public:
     const TIORegisterData *getIORegisterArray(void) const { return IORegisterData; }
     QReadWriteLock &getIORegisterLock(void) { return IORegisterReadWriteLock; }
 #endif
-
-    static CSimulator *getInstance(void) { return instance; }
-
 };
 
 #endif // SIMULATOR_H

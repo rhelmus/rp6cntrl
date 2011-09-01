@@ -7,6 +7,8 @@ namespace NRP6SimulGlue {
 
 #define EXPORT extern "C"
 
+extern void *callBackData;
+
 void debugOut(const char *s, ...);
 
 }

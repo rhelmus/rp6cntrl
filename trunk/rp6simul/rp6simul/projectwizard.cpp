@@ -2,6 +2,7 @@
 #include "lua.h"
 #include "pathinput.h"
 #include "projectsettings.h"
+#include "rp6simul.h"
 #include "utils.h"
 
 #include <QDebug>
@@ -45,6 +46,12 @@ void CProjectWizard::accept()
     }
     else
         reject();
+}
+
+void CProjectWizard::setDriverLists(const QHash<QString, QString> &desc,
+                                    const QStringList &def)
+{
+    projectSettingsPage->setDriverLists(desc, def);
 }
 
 QString CProjectWizard::getProjectFile() const
@@ -160,28 +167,6 @@ CNewProjectSettingsPage::CNewProjectSettingsPage(QWidget *parent)
     vbox->addWidget(button);
 }
 
-void CNewProjectSettingsPage::getDriverList()
-{
-    lua_getglobal(NLua::luaInterface, "getDriverList");
-    lua_call(NLua::luaInterface, 0, 2);
-
-    luaL_checktype(NLua::luaInterface, -2, LUA_TTABLE);
-    luaL_checktype(NLua::luaInterface, -1, LUA_TTABLE);
-
-    QHash<QString, QVariant> list = NLua::convertLuaTable(NLua::luaInterface, -2);
-    for(QHash<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
-    {
-        driverList[it.key()] = it.value().toString();
-        QAction *a = new QAction(it.key(), addDriverButton->menu());
-        addDriverButton->menu()->insertAction(addCustomDriverAction, a);
-        a->setToolTip(it.value().toString());
-    }
-
-    defaultDrivers = NLua::getStringList(NLua::luaInterface, -1);
-
-    lua_pop(NLua::luaInterface, 2);
-}
-
 QAction *CNewProjectSettingsPage::getAddAction(const QString &driver)
 {
     QList<QAction *> actions = addDriverButton->menu()->actions();
@@ -204,31 +189,28 @@ void CNewProjectSettingsPage::addDriver(QAction *action)
                                                     "driver files (*.lua)");
         if (!file.isEmpty())
         {
-            lua_getglobal(NLua::luaInterface, "getDriver");
-            lua_pushstring(NLua::luaInterface, qPrintable(file));
-
-            lua_call(NLua::luaInterface, 1, 2);
-
-            if (lua_isnil(NLua::luaInterface, -1))
+            QString name, desc;
+            const bool ok =
+                    CRP6Simulator::getInstance()->loadCustomDriverInfo(file,
+                                                                       name,
+                                                                       desc);
+            if (!ok)
                 QMessageBox::critical(this, "Custom driver error",
                                       "Could not load custom driver (see error log");
             else
             {
-                const char *name = luaL_checkstring(NLua::luaInterface, -2);
-                const char *desc = luaL_checkstring(NLua::luaInterface, -1);
-                QTreeWidgetItem *item = new QTreeWidgetItem(driverTreeWidget,
-                                                            QStringList() << name << desc);
+                QTreeWidgetItem *item =
+                        new QTreeWidgetItem(driverTreeWidget,
+                                            QStringList() << name << desc);
                 item->setData(0, Qt::UserRole, file);
             }
-
-            lua_pop(NLua::luaInterface, 2);
         }
     }
     else
     {
         action->setVisible(false);
         QStringList l = QStringList() << action->text() <<
-                                         driverList[action->text()];
+                                         driverDescList[action->text()];
         new QTreeWidgetItem(driverTreeWidget, l);
     }
 
@@ -255,10 +237,10 @@ void CNewProjectSettingsPage::resetDriverTree()
 {
     driverTreeWidget->clear();
 
-    for (QMap<QString, QString>::iterator it=driverList.begin();
-         it != driverList.end(); ++it)
+    for (QHash<QString, QString>::iterator it=driverDescList.begin();
+         it != driverDescList.end(); ++it)
     {
-        bool def = defaultDrivers.contains(it.key());
+        bool def = defaultDriverList.contains(it.key());
         if (def)
         {
             QStringList l = QStringList() << it.key() << it.value();
@@ -280,7 +262,13 @@ void CNewProjectSettingsPage::initializePage()
 
     if (initDriverList)
     {
-        getDriverList();
+        for(QHash<QString, QString>::iterator it=driverDescList.begin();
+            it!=driverDescList.end(); ++it)
+        {
+            QAction *a = new QAction(it.key(), addDriverButton->menu());
+            addDriverButton->menu()->insertAction(addCustomDriverAction, a);
+            a->setToolTip(it.value());
+        }
         initDriverList = false;
     }
 
