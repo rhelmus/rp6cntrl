@@ -37,6 +37,7 @@ local ACSDistances =
 
 robotProperties =
 {
+    clockSpeed = 8000000,
     cmPerPixel = cmPerPixel,
     robotLength = 18.9, -- in cm, used for rotation
 

@@ -100,14 +100,13 @@ local function setBaudRate(data)
 
     -- UNDONE: There seems to be a little rounding (int cutoff) error
     -- when calculating back to the desired bps.
-    local freq = 8000000 -- UNDONE
-    local baud = (freq / (data + 1)) / 16
+    local baud = (robotProperties.clockSpeed / (data + 1)) / 16
     log(string.format("Setting UART baud rate to %d (%d bps)\n", data, baud))
     updateRobotStatus("UART", "Baudrate (bps)", string.format("%d", baud))
     UARTInfo.baudRate = data
 end
 
-local function handleInput(text)
+local function sendSerial(text)
     if UARTInfo.receiverEnabled and UARTInfo.receiverISREnabled then
         local lastch
         for ch in text:gmatch(".") do
@@ -126,7 +125,7 @@ function initPlugin()
     avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
     avr.setIORegister(avr.IO_UCSRC, bit.set(0, avr.URSEL, avr.UCSZ0, avr.UCSZ1))
 
-    setSerialInputHandler(handleInput)
+    setSerialSendCallback(sendSerial)
 end
 
 function handleIOData(type, data)
@@ -148,5 +147,6 @@ function handleIOData(type, data)
         end
     end
 end
+
 
 return ret

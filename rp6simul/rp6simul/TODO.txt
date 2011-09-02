@@ -59,3 +59,4 @@
 - Destruction: instance may be zero when it shouldn't yet
 - Test/verify atomic register array
 - Auto toggle for IRCOMM sending?
+- Reset ADC after project/plugin load?

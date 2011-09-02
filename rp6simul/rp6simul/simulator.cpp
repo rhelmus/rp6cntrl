@@ -397,6 +397,8 @@ void CSimulator::initLua()
     NLua::registerFunction(luaState, luaAvrExecISR, "execISR", "avr", this);
 
     // clock
+    NLua::registerFunction(luaState, luaClockSetTargetSpeed, "setTargetSpeed",
+                           "clock", this);
     NLua::registerFunction(luaState, luaClockCreateTimer, "createTimer",
                            "clock", this);
     NLua::registerFunction(luaState, luaClockEnableTimer, "enableTimer",
@@ -720,6 +722,14 @@ int CSimulator::luaAvrExecISR(lua_State *l)
     return 0;
 }
 
+int CSimulator::luaClockSetTargetSpeed(lua_State *l)
+{
+    NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
+    instance->AVRClock->setTargetClockSpeed(luaL_checkint(l, 1));
+    return 0;
+}
+
 int CSimulator::luaClockCreateTimer(lua_State *l)
 {
     NLua::CLuaLocker lualocker(l);
@@ -968,19 +978,20 @@ int CSimulator::luaBitShiftRight(lua_State *l)
     return 1;
 }
 
-void CSimulator::startLua()
+void CSimulator::startLua(const char *name)
 {
     const QString p = QDir::toNativeSeparators("lua/main.lua");
     if (luaL_dofile(luaState, qPrintable(p)))
         NLua::luaError(luaState, true);
 
     lua_getglobal(luaState, "init");
-    lua_call(luaState, 0, 0);
+    lua_pushstring(luaState, name);
+    lua_call(luaState, 1, 0);
 }
 
 bool CSimulator::loadProjectFile(const QSettings &settings)
 {
-    const QString plugfile = settings.value("RP6Plugin").toString();
+    const QString plugfile = settings.value("plugin").toString();
     if (!verifyPluginFile(plugfile))
         return false;
 
@@ -989,7 +1000,7 @@ bool CSimulator::loadProjectFile(const QSettings &settings)
 
     if (currentDriverList.isEmpty())
         QMessageBox::warning(CRP6Simulator::getInstance(), "Empty driverlist",
-                             "Project has not any drivers specified!");
+                             "Project does not have any drivers specified!");
 
     stopPlugin();
     return true;

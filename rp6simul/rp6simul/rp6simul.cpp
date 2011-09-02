@@ -44,7 +44,8 @@ void activateDockTab(QObject *p, const QString &tab)
 CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
-    QMainWindow(parent), currentMapIsTemplate(false), robotIsBlocked(false)
+    QMainWindow(parent), currentMapIsTemplate(false), robotIsBlocked(false),
+    serialSendLuaCallback(0), IRCOMMSendLuaCallback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -109,33 +110,52 @@ CRP6Simulator::~CRP6Simulator()
     // Stop plugin manually: ensures safe thread destruction before anything
     // else is destroyed
     stopPlugin();
-    simulator = 0; // Destruction happens automaticallty by Qt's parent system
+
+    // Destruction happens automaticallty by Qt's parent system
+    robotSimulator = 0;
+    m32Simulator = 0;
+
     instance = 0;
     NLua::clearLuaLockStates();
 }
 
 void CRP6Simulator::initSimulators()
 {
-    simulator = new CSimulator(this);
-    connect(simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
+    robotSimulator = new CSimulator(this);
+    connect(robotSimulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
             SLOT(updateClockDisplay(unsigned long)));
-    initLua(simulator->getLuaState());
-    simulator->startLua();
+    registerLuaGeneric(robotSimulator->getLuaState());
+    registerLuaRobot(robotSimulator->getLuaState());
+    robotSimulator->startLua("robot");
+
+    m32Simulator = new CSimulator(this);
+    // UNDONE
+//    connect(m32Simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
+//            SLOT(updateClockDisplay(unsigned long)));
+    registerLuaGeneric(m32Simulator->getLuaState());
+    registerLuaM32(m32Simulator->getLuaState());
+    m32Simulator->startLua("m32");
 }
 
-void CRP6Simulator::initLua(lua_State *l)
+void CRP6Simulator::registerLuaGeneric(lua_State *l)
 {
     NLua::registerFunction(l, luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(l, luaAppendSerialOutput, "appendSerialOutput");
+    NLua::registerFunction(l, luaUpdateRobotStatus, "updateRobotStatus");
+    NLua::registerFunction(l, luaSetSerialSendCallback, "setSerialSendCallback");
+}
+
+void CRP6Simulator::registerLuaRobot(lua_State *l)
+{
     NLua::registerFunction(l, luaSetCmPerPixel, "setCmPerPixel");
     NLua::registerFunction(l, luaSetRobotLength, "setRobotLength");
     NLua::registerFunction(l, luaLogIRCOMM, "logIRCOMM");
-    NLua::registerFunction(l, luaUpdateRobotStatus, "updateRobotStatus");
     NLua::registerFunction(l, luaRobotIsBlocked, "robotIsBlocked");
     NLua::registerFunction(l, luaSetMotorPower, "setMotorPower");
     NLua::registerFunction(l, luaSetMotorDriveSpeed, "setMotorDriveSpeed");
     NLua::registerFunction(l, luaSetMotorMoveSpeed, "setMotorMoveSpeed");
     NLua::registerFunction(l, luaSetMotorDir, "setMotorDir");
+    NLua::registerFunction(l, luaSetIRCOMMSendCallback, "setIRCOMMSendCallback");
 
     // LED class
     NLua::registerFunction(l, luaCreateLED, "createLED");
@@ -154,6 +174,10 @@ void CRP6Simulator::initLua(lua_State *l)
     // light sensor class
     NLua::registerFunction(l, luaCreateLightSensor, "createLightSensor");
     NLua::registerClassFunction(l, luaLightSensorGetLight, "getLight", "lightsensor");
+}
+
+void CRP6Simulator::registerLuaM32(lua_State *l)
+{
 }
 
 void CRP6Simulator::createMenus()
@@ -467,6 +491,8 @@ QWidget *CRP6Simulator::createLogWidgets()
     connect(serialSendButton, SIGNAL(clicked()), this, SLOT(sendSerialText()));
     connect(serialInputWidget, SIGNAL(returnPressed()), serialSendButton,
             SLOT(click()));
+    connect(this, SIGNAL(receivedSerialSendCallback(bool)), serialSendButton,
+            SLOT(setEnabled(bool)));
 
     QPushButton *button = new QPushButton("Clear");
     connect(button, SIGNAL(clicked()), serialOutputWidget, SLOT(clear()));
@@ -499,6 +525,15 @@ QWidget *CRP6Simulator::createLogWidgets()
     grid->addWidget(IRCOMMSendButton = new QPushButton("Send"), 1, 6);
     IRCOMMSendButton->setEnabled(false);
     connect(IRCOMMSendButton, SIGNAL(clicked()), SLOT(sendIRCOMM()));
+    // UNDONE
+//    connect(IRCOMMAddressWidget, SIGNAL(returnPressed()), IRCOMMSendButton,
+//            SLOT(click()));
+//    connect(IRCOMMKeyWidget, SIGNAL(returnPressed()), IRCOMMSendButton,
+//            SLOT(click()));
+//    connect(IRCOMMToggleWidget, SIGNAL(returnPressed()), IRCOMMSendButton,
+//            SLOT(click()));
+    connect(this, SIGNAL(receivedIRCOMMSendCallback(bool)), IRCOMMSendButton,
+            SLOT(setEnabled(bool)));
 
     grid->addWidget(button = new QPushButton("Clear"), 1, 7);
     connect(button, SIGNAL(clicked()), IRCOMMOutputWidget, SLOT(clear()));
@@ -664,8 +699,15 @@ void CRP6Simulator::openProjectFile(const QString &file)
     if (!verifySettingsFile(prsettings))
         return;
 
-    if (!simulator->loadProjectFile(prsettings))
+    prsettings.beginGroup("robot");
+    if (!robotSimulator->loadProjectFile(prsettings))
         return;
+    prsettings.endGroup();
+
+    prsettings.beginGroup("m32");
+    if (!m32Simulator->loadProjectFile(prsettings))
+        return; // UNDONE: Close robot robot simulator?
+    prsettings.endGroup();
 
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
@@ -1304,6 +1346,30 @@ int CRP6Simulator::luaLightSensorDestr(lua_State *l)
     return 0;
 }
 
+int CRP6Simulator::luaSetSerialSendCallback(lua_State *l)
+{
+    NLua::CLuaLocker lualocker(l);
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    if (instance->serialSendLuaCallback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->serialSendLuaCallback);
+    lua_pushvalue(l, 1);
+    instance->serialSendLuaCallback = luaL_ref(l, LUA_REGISTRYINDEX);
+    instance->emit receivedSerialSendCallback(true);
+    return 0;
+}
+
+int CRP6Simulator::luaSetIRCOMMSendCallback(lua_State *l)
+{
+    NLua::CLuaLocker lualocker(l);
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    if (instance->IRCOMMSendLuaCallback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->IRCOMMSendLuaCallback);
+    lua_pushvalue(l, 1);
+    instance->IRCOMMSendLuaCallback = luaL_ref(l, LUA_REGISTRYINDEX);
+    instance->emit receivedIRCOMMSendCallback(true);
+    return 0;
+}
+
 void CRP6Simulator::updateClockDisplay(unsigned long hz)
 {
     double mhz = static_cast<double>(hz) / 1000000.0;
@@ -1483,7 +1549,7 @@ void CRP6Simulator::loadMap()
 void CRP6Simulator::timedUIUpdate()
 {
 #ifdef USEATOMIC
-    const QAtomicInt *ioregisters = simulator->getIORegisterArray();
+    const QAtomicInt *ioregisters = robotSimulator->getIORegisterArray();
 #else
     QReadLocker iolocker(&simulator->getIORegisterLock());
     const TIORegisterData *ioregisters = simulator->getIORegisterArray();
@@ -1602,7 +1668,7 @@ void CRP6Simulator::timedLEDUpdate()
 
 void CRP6Simulator::runPlugin()
 {
-    if (!simulator->runPlugin())
+    if (!robotSimulator->runPlugin() || !m32Simulator->runPlugin())
         return;
 
     serialOutputWidget->clear();
@@ -1613,23 +1679,39 @@ void CRP6Simulator::runPlugin()
     runPluginAction->setEnabled(false);
     stopPluginAction->setEnabled(true);
     ADCDockWidget->setEnabled(true);
-    serialSendButton->setEnabled(true);
-    IRCOMMSendButton->setEnabled(true);
 }
 
 void CRP6Simulator::stopPlugin()
 {
-    if (!bumperLuaCallbacks.isEmpty()) // Left overs?
+    if (serialSendLuaCallback || IRCOMMSendLuaCallback ||
+        !bumperLuaCallbacks.isEmpty())
     {
         // Need to do this before calling CSimulator::stopPlugin() to make sure
         // drivers can properly be unloaded
-        NLua::CLuaLocker lualocker(simulator->getLuaState());
+
+        NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
         foreach (int ref, bumperLuaCallbacks)
-            luaL_unref(simulator->getLuaState(), LUA_REGISTRYINDEX, ref);
+            luaL_unref(robotSimulator->getLuaState(), LUA_REGISTRYINDEX, ref);
         bumperLuaCallbacks.clear();
+
+        if (serialSendLuaCallback)
+        {
+            luaL_unref(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
+                       serialSendLuaCallback);
+            serialSendLuaCallback = 0;
+        }
+
+        if (IRCOMMSendLuaCallback)
+        {
+            luaL_unref(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
+                       IRCOMMSendLuaCallback);
+            IRCOMMSendLuaCallback = 0;
+        }
     }
 
-    simulator->stopPlugin();
+
+    robotSimulator->stopPlugin();
+    m32Simulator->stopPlugin();
 
     pluginUpdateUITimer->stop();
     pluginUpdateLEDsTimer->stop();
@@ -1641,6 +1723,7 @@ void CRP6Simulator::stopPlugin()
     runPluginAction->setEnabled(true);
     stopPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
+
     serialSendButton->setEnabled(false);
     IRCOMMSendButton->setEnabled(false);
 
@@ -1713,39 +1796,42 @@ void CRP6Simulator::resetADCTable()
 
 void CRP6Simulator::applyADCTable()
 {
-    NLua::CLuaLocker lualocker(simulator->getLuaState());
-    lua_getglobal(simulator->getLuaState(), "setUIADCValue");
-    const int findex = lua_gettop(simulator->getLuaState());
+    // UNDONE: m32
+    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
+    lua_getglobal(robotSimulator->getLuaState(), "setUIADCValue");
+    const int findex = lua_gettop(robotSimulator->getLuaState());
 
     for (int i=0; i<ADCTableWidget->rowCount(); ++i)
     {
-        lua_pushvalue(simulator->getLuaState(), findex);
-        lua_pushstring(simulator->getLuaState(),
+        lua_pushvalue(robotSimulator->getLuaState(), findex);
+        lua_pushstring(robotSimulator->getLuaState(),
                        qPrintable(ADCTableWidget->verticalHeaderItem(i)->text()));
         if (ADCOverrideCheckBoxes[i]->isChecked())
-            lua_pushinteger(simulator->getLuaState(), ADCOverrideSpinBoxes[i]->value());
+            lua_pushinteger(robotSimulator->getLuaState(), ADCOverrideSpinBoxes[i]->value());
         else
-            lua_pushnil(simulator->getLuaState()); // nil: don't override
-        lua_call(simulator->getLuaState(), 2, 0);
+            lua_pushnil(robotSimulator->getLuaState()); // nil: don't override
+        lua_call(robotSimulator->getLuaState(), 2, 0);
     }
-    lua_pop(simulator->getLuaState(), 1); // Pop function
+    lua_pop(robotSimulator->getLuaState(), 1); // Pop function
 }
 
 void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
 {
-    NLua::CLuaLocker lualocker(simulator->getLuaState());
-    lua_rawgeti(simulator->getLuaState(), LUA_REGISTRYINDEX, bumperLuaCallbacks[b]);
-    lua_pushboolean(simulator->getLuaState(), e);
-    lua_call(simulator->getLuaState(), 1, 0); // UNDONE: error handling
+    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
+    lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
+                bumperLuaCallbacks[b]);
+    lua_pushboolean(robotSimulator->getLuaState(), e);
+    lua_call(robotSimulator->getLuaState(), 1, 0); // UNDONE: error handling
 }
 
 void CRP6Simulator::sendSerialText()
 {
-    NLua::CLuaLocker lualocker(simulator->getLuaState());
-    lua_getglobal(simulator->getLuaState(), "sendSerial");
-    lua_pushstring(simulator->getLuaState(),
+    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
+    lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
+                serialSendLuaCallback);
+    lua_pushstring(robotSimulator->getLuaState(),
                    qPrintable(serialInputWidget->text() + "\n"));
-    lua_call(simulator->getLuaState(), 1, 0);
+    lua_call(robotSimulator->getLuaState(), 1, 0);
 
     serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));
 
@@ -1754,12 +1840,13 @@ void CRP6Simulator::sendSerialText()
 
 void CRP6Simulator::sendIRCOMM()
 {
-    NLua::CLuaLocker lualocker(simulator->getLuaState());
-    lua_getglobal(simulator->getLuaState(), "sendIRCOMM");
-    lua_pushinteger(simulator->getLuaState(), IRCOMMAddressWidget->value());
-    lua_pushinteger(simulator->getLuaState(), IRCOMMKeyWidget->value());
-    lua_pushboolean(simulator->getLuaState(), IRCOMMToggleWidget->isChecked());
-    lua_call(simulator->getLuaState(), 3, 0);
+    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
+    lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
+                IRCOMMSendLuaCallback);
+    lua_pushinteger(robotSimulator->getLuaState(), IRCOMMAddressWidget->value());
+    lua_pushinteger(robotSimulator->getLuaState(), IRCOMMKeyWidget->value());
+    lua_pushboolean(robotSimulator->getLuaState(), IRCOMMToggleWidget->isChecked());
+    lua_call(robotSimulator->getLuaState(), 3, 0);
 
     const QString text = QString("Send IRCOMM: "
                                  "Address: %1 | "
@@ -1769,8 +1856,6 @@ void CRP6Simulator::sendIRCOMM()
             arg(IRCOMMKeyWidget->value()).
             arg(IRCOMMToggleWidget->isChecked());
     IRCOMMOutputWidget->appendHtml(getLogOutput(LOG_LOG, text));
-
-    serialInputWidget->clear();
 }
 
 void CRP6Simulator::debugSetRobotLeftPower(int power)
@@ -1794,19 +1879,19 @@ void CRP6Simulator::debugSetRobotRightPower(int power)
 bool CRP6Simulator::loadCustomDriverInfo(const QString &file, QString &name,
                                          QString &desc)
 {
-    lua_getglobal(simulator->getLuaState(), "getDriver");
-    lua_pushstring(simulator->getLuaState(), qPrintable(file));
+    lua_getglobal(robotSimulator->getLuaState(), "getDriver");
+    lua_pushstring(robotSimulator->getLuaState(), qPrintable(file));
 
-    lua_call(simulator->getLuaState(), 1, 2);
+    lua_call(robotSimulator->getLuaState(), 1, 2);
 
-    const bool ok = !(lua_isnil(simulator->getLuaState(), -1));
+    const bool ok = !(lua_isnil(robotSimulator->getLuaState(), -1));
     if (ok)
     {
-        name = luaL_checkstring(simulator->getLuaState(), -2);
-        desc = luaL_checkstring(simulator->getLuaState(), -1);
+        name = luaL_checkstring(robotSimulator->getLuaState(), -2);
+        desc = luaL_checkstring(robotSimulator->getLuaState(), -1);
     }
 
-    lua_pop(simulator->getLuaState(), 2);
+    lua_pop(robotSimulator->getLuaState(), 2);
 
     return ok;
 }

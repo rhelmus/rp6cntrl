@@ -1,45 +1,50 @@
 -- LuaJIT compat fix: http://lua-users.org/lists/lua-l/2010-09/msg00161.html
 os.setlocale("C", "numeric")
 
+
+dofile("lua/utils.lua")
+
+
+local simulatorEnv = nil
+local simulatorPath = nil
 local driverList = { }
 -- Used to check if drivers are properly destructed
 local weakDriverList = setmetatable({ }, { __mode = "kv" })
 local IOHandleMap = { }
+local exportedDriverSyms = { }
+
 
 -- Local utilities
-local function getVarargString(s, ...)
-    s = tostring(s)
 
-    for i=1, select("#", ...) do
-        s = s .. "\t" .. tostring(select(i, ...))
+local function loadSimulator(s)
+    -- UNDONE: Path separators, static path
+    local file = string.format("lua/%s/%s.lua", s, s)
+
+    local chunk, stat = loadfile(file)
+    if not chunk then
+        errorLog(string.format("Failed to load %s simulator: %s\n", s, stat))
+        return nil
     end
 
-    return s
-end
-
-local function callOptDriverFunc(driver, f, ...)
-    -- Use rawget to avoid obtaining data from global environment
-    local func = rawget(driver, f)
-    if func then
-        return func(...)
+    local stat, sim = pcall(chunk, s)
+    if not stat then
+        errorLog(string.format("Failed to execute %s simulator: %s\n", s, sim))
+        return nil
     end
-end
 
-local function basename(p)
-    return string.gsub(p, "/*.+/", "")
-end
+    if not sim then
+        errorLog(string.format("No simulator returned from %s!\n", file))
+        return nil
+    end
 
-local function dirname(p)
-    return string.match(p, "/*.*/")
-end
+    log(string.format("Succesfully loaded simulator %s (%s)\n", s, file))
 
-local function tableIsEmpty(t)
-    return next(t) == nil
+    return sim
 end
 
 local function loadDriver(d)
-    local dir = dirname(d) or "lua/drivers/" -- UNDONE: Default path
-    local file = basename(d)
+    local dir = dirName(d) or simulatorPath .. "/drivers/" -- UNDONE: Path separators
+    local file = baseName(d)
 
     if not file:match("%.lua", -4) then
         file = file .. ".lua"
@@ -59,7 +64,7 @@ local function loadDriver(d)
     end
 
     if not driver then
-        errorLog(string.format("No driver returned from %s!\n", basename(d)))
+        errorLog(string.format("No driver returned from %s!\n", baseName(d)))
         return nil
     end
 
@@ -85,44 +90,15 @@ local function initDriver(d)
     table.insert(driverList, driver)
     table.insert(weakDriverList, driver)
 
-    callOptDriverFunc(driver, "initPlugin")
+    callOptTabFunc(driver, "initPlugin")
 end
 
-
--- Convenience log functions
-function log(s, ...)
-    appendLogOutput("LOG", getVarargString(s, ...))
-end
-
-function debug(s, ...)
-    print("Lua DEBUG:", getVarargString(s, ...))
-    io.flush()
-end
-
-function warning(s, ...)
-    appendLogOutput("WARNING", getVarargString(s, ...))
-end
-
-function errorLog(s, ...)
-    appendLogOutput("ERROR", getVarargString(s, ...))
-end
-
-
--- Global driver functions
-local serialInputHandler
-function setSerialInputHandler(func)
-    serialInputHandler = func
-end
-
-local IRCOMMSendHandler
-function setIRCOMMSendHandler(func)
-    IRCOMMSendHandler = func
-end
 
 -- ADC values can either be set by the user interface program
 -- or from drivers. The former overrides the latter.
 local UIADCValues = { }
 
+-- Function called by drivers to get ADC values
 function getADCValue(a)
     if UIADCValues[a] then
         return UIADCValues[a]
@@ -130,7 +106,7 @@ function getADCValue(a)
 
     -- No overridden ADC value, see if a driver has one
     for _, d in ipairs(driverList) do
-        local val = callOptDriverFunc(d, "getADCValue", a)
+        local val = callOptTabFunc(d, "getADCValue", a)
         if val then
             return val
         end
@@ -140,21 +116,21 @@ function getADCValue(a)
     return 0
 end
 
-function getADCPortNames()
-    return { "ADC0", "ADC1", "LS_R", "LS_L", "E_INT1", "MCURRENT_R",
-             "MCURRENT_L", "UBAT" }
-end
-
 
 -- Functions called by C++ code
-function init()
+function init(sim)
     math.randomseed(os.time())
-    setCmPerPixel(robotProperties.cmPerPixel)
-    setRobotLength(robotProperties.robotLength)
+
+    simulatorEnv = loadSimulator(sim)
+    simulatorPath = "lua/" .. sim -- UNDONE
+
+    callOptTabFunc(simulatorEnv, "init")
 end
 
 function initPlugin(drivers)
     assert(tableIsEmpty(driverList) and tableIsEmpty(IOHandleMap))
+
+    callOptTabFunc(simulatorEnv, "initPlugin")
 
     if drivers then
         for _, d in ipairs(drivers) do
@@ -164,12 +140,11 @@ function initPlugin(drivers)
 end
 
 function closePlugin()
-    for _, d in ipairs(driverList) do
-        callOptDriverFunc(d, "closePlugin")
-    end
+    callOptTabFunc(simulatorEnv, "closePlugin")
 
-    serialInputHandler = nil
-    IRCOMMSendHandler = nil
+    for _, d in ipairs(driverList) do
+        callOptTabFunc(d, "closePlugin")
+    end
 
     driverList = { }
     IOHandleMap = { }
@@ -177,20 +152,20 @@ function closePlugin()
     -- Force removal of all collectable data. Since some operations may
     -- take more that one cycle, this function is repeatably called until
     -- no memory is freed.
-    debug("pre-collect")
+    debugLog("pre-collect")
     collectgarbage("collect")
     local memleft = collectgarbage("count")
-    debug("memleft:", memleft)
+    debugLog("memleft:", memleft)
     while true do
         collectgarbage("collect")
         local m = collectgarbage("count")
-        debug("memleft:", m)
+        debugLog("memleft:", m)
         if m == memleft then
             break
         end
         memleft = m
     end
-    debug("post-collect")
+    debugLog("post-collect")
 
     if not tableIsEmpty(weakDriverList) then
         warning("Not all drivers were properly destroyed! Remaining drivers:\n")
@@ -201,6 +176,7 @@ function closePlugin()
 end
 
 function handleIOData(type, data)
+    callOptTabFunc(simulatorEnv, "handleIOData", type, data)
     if IOHandleMap[type] then
         for _, d in ipairs(IOHandleMap[type]) do
             d.handleIOData(type, data)
@@ -209,17 +185,13 @@ function handleIOData(type, data)
 end
 
 function getDriverList()
-    local drivers = { "timer0", "timer1", "timer2", "motor", "adc",
-                      "led", "uart", "portlog", "acs" }
-    local default = { timer0 = true, timer2 = true, motor = true,
-                      adc = true, led = true, uart = true, acs = true }
     local ret, dret = { }, { }
 
-    for _, d in ipairs(drivers) do
-        local driver = loadDriver(d)
+    for _, d in ipairs(simulatorEnv.driverList) do
+        local driver = loadDriver(d.name)
         if driver then
             ret[d] = driver.description or "No description."
-            if default[d] then
+            if d.default then
                 table.insert(dret, d)
             end
         end
@@ -231,33 +203,20 @@ end
 function getDriver(d)
     local driver = loadDriver(d)
     if driver then
-        local name = basename(d)
+        local name = baseName(d)
         name = name:gsub(".lua", "")
         return name, (driver.description or "No description")
     end
 end
 
-function sendSerial(text)
-    if serialInputHandler then
-        serialInputHandler(text)
-    end
-end
-
-function sendIRCOMM(adr, key, toggle)
-    if IRCOMMSendHandler then
-        IRCOMMSendHandler(adr, key, toggle)
-    end
-end
-
 function setUIADCValue(a, v)
-    debug(string.format("setUIADCValue: %s = %s\n", a, tostring(v)))
+    debugLog(string.format("setUIADCValue: %s = %s\n", a, tostring(v)))
     UIADCValues[a] = v
 end
 
 
--- Called by every driver
-function driver(name)
-    debug(string.format("Created driver for %s", tostring(name)))
+-- Called by every simulator (robot, m32)
+function simulator(name)
     local ret = { }
     setmetatable(ret, { __index = _G })
 
@@ -271,4 +230,18 @@ function driver(name)
     return ret
 end
 
-dofile("lua/properties.lua")
+
+-- Called by every driver
+function driver(name)
+    local ret = { }
+    setmetatable(ret, { __index = simulatorEnv })
+
+    -- Neater logging
+    ret.log = function(s, ...) log(string.format("<%s> %s", name, s), ...) end
+    ret.debug = function(s, ...) debugLog(string.format("<%s> %s", name, s), ...) end
+    ret.warning = function(s, ...) warning(string.format("<%s> %s", name, s), ...) end
+    ret.errorLog = function(s, ...) errorLog(string.format("<%s> %s", name, s), ...) end
+
+    setfenv(2, ret)
+    return ret
+end

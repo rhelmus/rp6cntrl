@@ -63,19 +63,23 @@ HEADERS  += rp6simul.h \
 OTHER_FILES += \
     TODO.txt \
     lua/main.lua \
-    lua/drivers/timer0.lua \
-    lua/drivers/timer2.lua \
-    lua/drivers/timer1.lua \
-    lua/drivers/motor.lua \
-    lua/drivers/uart.lua \
-    lua/drivers/portlog.lua \
-    lua/drivers/led.lua \
-    lua/drivers/adc.lua \
-    lua/drivers/acs.lua \
-    lua/properties.lua \
-    lua/drivers/bumper.lua \
-    lua/drivers/light.lua \
-    lua/drivers/ircomm.lua
+    lua/robot/drivers/timer0.lua \
+    lua/robot/drivers/timer2.lua \
+    lua/robot/drivers/timer1.lua \
+    lua/robot/drivers/motor.lua \
+    lua/robot/drivers/uart.lua \
+    lua/robot/drivers/portlog.lua \
+    lua/robot/drivers/led.lua \
+    lua/robot/drivers/adc.lua \
+    lua/robot/drivers/acs.lua \
+    lua/robot/properties.lua \
+    lua/robot/drivers/bumper.lua \
+    lua/robot/drivers/light.lua \
+    lua/robot/drivers/ircomm.lua \
+    lua/robot/robot.lua \
+    lua/utils.lua \
+    lua/m32/m32.lua \
+    lua/m32/properties.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \

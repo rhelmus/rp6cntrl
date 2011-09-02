@@ -155,7 +155,7 @@ local function setCompareRegisterA(data)
         --]]
         -- UNDONE: cpu speed configurable
         local freq = 1000 / getEffectiveSpeedTimerBase()
-        rightEncTimer:setCompareValue(8000000 / (data * freq))
+        rightEncTimer:setCompareValue(robotProperties.clockSpeed / (data * freq))
         if not rightEncTimer:isEnabled() then
             clock.enableTimer(rightEncTimer, true)
         end
@@ -180,7 +180,7 @@ local function setCompareRegisterB(data)
         -- Comments: see setCompareRegisterA
         -- UNDONE: cpu speed configurable
         local freq = 1000 / getEffectiveSpeedTimerBase()
-        leftEncTimer:setCompareValue(8000000 / (data * freq))
+        leftEncTimer:setCompareValue(robotProperties.clockSpeed / (data * freq))
         if not leftEncTimer:isEnabled() then
             clock.enableTimer(leftEncTimer, true)
         end

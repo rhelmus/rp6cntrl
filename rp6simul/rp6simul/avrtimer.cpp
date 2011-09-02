@@ -10,12 +10,13 @@
 
 QDebug operator<<(QDebug dbg, const CTicks &ticks)
 {
-    dbg.nospace() << "CTicks(" << ((ticks.cycles * RP6_CLOCK) + ticks.ticks) << ")";
+    dbg.nospace() << "CTicks(" << ((ticks.cycles * CTicks::CYCLE_LENGTH) + ticks.ticks) << ")";
     return dbg.maybeSpace();
 }
 
 
-CAVRClock::CAVRClock(void) : initClockTime(true)
+CAVRClock::CAVRClock(void) : targetClockSpeed(0), initClockTime(true),
+    totalDeltaTime(0), runsPerSec(0), timeOutsPerSec(0), totalTimeOutTime(0)
 {
     clockTimer = new QTimer(this);
     clockTimer->setInterval(0);
@@ -46,7 +47,9 @@ CAVRTimer *CAVRClock::getClosestTimer()
 
 void CAVRClock::run()
 {
-    static timespec curtime;
+    Q_ASSERT(targetClockSpeed != 0);
+
+    timespec curtime;
     clock_gettime(CLOCK_MONOTONIC, &curtime);
 
     if (initClockTime)
@@ -56,21 +59,17 @@ void CAVRClock::run()
         return;
     }
 
-    static unsigned long delta_total = 0, delta_count = 0;
-    static unsigned long timeout_total = 0, timeout_count = 0;
-    static CTicks tickspersec = 0;
-
     const unsigned long delta = getUSDiff(lastClockTime, curtime);
 
-    const CTicks newticks(remainingTicks + (RP6_CLOCK / 1000000 * delta));
+    const CTicks newticks(remainingTicks + (targetClockSpeed / 1000000 * delta));
     const CTicks finalticks = currentTicks + newticks;
     const CTicks curticks(currentTicks);
 
-    delta_total += delta;
-    delta_count++;
+    totalDeltaTime += delta;
+    runsPerSec++;
 
-    static CAVRTimer *timer;
-    static int timeouts;
+    CAVRTimer *timer;
+    int timeouts;
 
     currentTicks = finalticks; // May be less, see below
     lastClockTime = curtime;
@@ -98,30 +97,29 @@ void CAVRClock::run()
         }
     }
 
-    tickspersec += (currentTicks - curticks);
+    ticksPerSec += (currentTicks - curticks);
     remainingTicks = finalticks - currentTicks;
 
-    timeout_total += timeouts;
-    timeout_count++;
+    timeOutsPerSec += timeouts;
 
-    static unsigned long tottimeouttime = 0;
     clock_gettime(CLOCK_MONOTONIC, &curtime);
-    tottimeouttime += getUSDiff(lastClockTime, curtime);
+    totalTimeOutTime += getUSDiff(lastClockTime, curtime);
 
-    if (delta_total >= 1000000)
+    if (totalDeltaTime >= 1000000)
     {
-        qDebug() << "delta_total:" << delta_total;
-        qDebug() << "AVG delta:" << (delta_total / delta_count);
-        qDebug() << "AVG timeout:" << (timeout_total / timeout_count);
-        qDebug() << "Frequency (ticks/s):" << tickspersec;
-        qDebug() << "avg timeout time:" << tottimeouttime / timeout_count;
-        delta_total = delta_count = 0;
-        timeout_total = timeout_count = 0;
-        tottimeouttime = 0;
+        qDebug() << "totalDeltaTime:" << totalDeltaTime << (void*)this;
+        qDebug() << "runsPerSec:" << runsPerSec << (void*)this;
+        qDebug() << "AVG delta:" << (totalDeltaTime / runsPerSec) << (void*)this;
+        qDebug() << "AVG timeout:" << (timeOutsPerSec / runsPerSec) << (void*)this;
+        qDebug() << "Frequency (ticks/s):" << ticksPerSec << (void*)this;
+        qDebug() << "avg timeout time:" << totalTimeOutTime / runsPerSec << (void*)this;
+        totalDeltaTime = runsPerSec = 0;
+        timeOutsPerSec = 0;
+        totalTimeOutTime = 0;
 
         // UNDONE: Move out of debug code
-        emit clockSpeed(tickspersec.get());
-        tickspersec.reset();
+        emit clockSpeed(ticksPerSec.get());
+        ticksPerSec.reset();
     }
 
     // Relieve CPU a bit

@@ -146,7 +146,7 @@ function initPlugin()
     sendTimer:setCompareValue(7112--[[11779]]) -- called every (1.778/2) ms
     sendTimer:setTimeOut(sendTimeOut)
 
-    setIRCOMMSendHandler(sendIRCOMM)
+    setIRCOMMSendCallback(sendIRCOMM)
 end
 
 function handleIOData(type, data)

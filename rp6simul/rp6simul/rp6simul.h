@@ -42,7 +42,7 @@ class CRP6Simulator : public QMainWindow
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
-    CSimulator *simulator;
+    CSimulator *robotSimulator, *m32Simulator;
     QString currentProjectFile;
     QString currentMapFile;
     bool currentMapIsTemplate;    
@@ -72,6 +72,8 @@ class CRP6Simulator : public QMainWindow
     QTreeWidgetItem *mapHistoryTreeItem;
     QDockWidget *ADCDockWidget;
     QTableWidget *ADCTableWidget;
+    QList<QCheckBox *> ADCOverrideCheckBoxes;
+    QList<QSpinBox *> ADCOverrideSpinBoxes;
     QTableWidget *IORegisterTableWidget;
 
     QString logTextBuffer;
@@ -96,15 +98,16 @@ class CRP6Simulator : public QMainWindow
 #endif
     volatile bool robotIsBlocked;
     QMap<CBumper *, int> bumperLuaCallbacks;
-    QList<QCheckBox *> ADCOverrideCheckBoxes;
-    QList<QSpinBox *> ADCOverrideSpinBoxes;
+    int serialSendLuaCallback, IRCOMMSendLuaCallback;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
     static CRP6Simulator *instance;
 
     void initSimulators(void);
-    void initLua(lua_State *l);
+    void registerLuaGeneric(lua_State *l);
+    void registerLuaRobot(lua_State *l);
+    void registerLuaM32(lua_State *l);
 
     void createMenus(void);
     void setToolBarToolTips(void);
@@ -155,6 +158,8 @@ class CRP6Simulator : public QMainWindow
     static int luaCreateLightSensor(lua_State *l);
     static int luaLightSensorGetLight(lua_State *l);
     static int luaLightSensorDestr(lua_State *l);
+    static int luaSetSerialSendCallback(lua_State *l);
+    static int luaSetIRCOMMSendCallback(lua_State *l);
 
 private slots:
     void updateClockDisplay(unsigned long hz);
@@ -196,6 +201,8 @@ signals:
     void motorDriveSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
     void newIRCOMMText(const QString &);
+    void receivedSerialSendCallback(bool);
+    void receivedIRCOMMSendCallback(bool);
 };
 
 #endif // RP6SIMUL_H
