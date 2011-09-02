@@ -24,6 +24,11 @@ local ADCInfo = {
     ADCEnabled = false,
 }
 
+local function getADCPortNames()
+    return { "ADC0", "ADC1", "LS_R", "LS_L", "E_INT1", "MCURRENT_R",
+             "MCURRENT_L", "UBAT" }
+end
+
 local function getADCPort(data)
     for p=0,7 do
         -- Skip 4: not used by RP6

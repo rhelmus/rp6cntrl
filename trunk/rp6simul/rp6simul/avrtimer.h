@@ -12,20 +12,19 @@
 
 class QTimer;
 
-// RP6 is running at 8 mhz. UNDONE: Make this configurable
-enum { RP6_CLOCK = 8000000 };
-
 class CTicks
 {
-    unsigned long cycles; // Completed 1 second cycles
+    enum { CYCLE_LENGTH = 1000000 };
+
+    unsigned long cycles; // Completed cycles
     unsigned long ticks; // Ticks of current incomplete cycle
 
     void clamp(void)
     {
-        while (ticks > RP6_CLOCK)
+        while (ticks > CYCLE_LENGTH)
         {
             cycles++;
-            ticks -= RP6_CLOCK;
+            ticks -= CYCLE_LENGTH;
         }
     }
 
@@ -39,7 +38,7 @@ public:
 
     void reset(void) { cycles = ticks = 0; }
     void set(unsigned long t) { cycles = 0; ticks = t; clamp(); }
-    unsigned long get(void) const { return (cycles * RP6_CLOCK) + ticks; }
+    unsigned long get(void) const { return (cycles * CYCLE_LENGTH) + ticks; }
 
     CTicks &operator+=(const CTicks &other)
     {
@@ -64,10 +63,10 @@ public:
         else
         {
             t -= ticks;
-            while (t > RP6_CLOCK)
+            while (t > CYCLE_LENGTH)
             {
                 cycles--;
-                t -= RP6_CLOCK;
+                t -= CYCLE_LENGTH;
                 Q_ASSERT(cycles);
             }
         }
@@ -99,7 +98,7 @@ public:
         else
         {
             c--;
-            t = RP6_CLOCK - (other.ticks - ticks);
+            t = CYCLE_LENGTH - (other.ticks - ticks);
         }
 
         return CTicks(c, t);
@@ -200,11 +199,17 @@ public:
 private:
     Q_OBJECT
 
+    unsigned long targetClockSpeed;
     TTimerList timerList;
     CTicks currentTicks, remainingTicks;
     QTimer *clockTimer;
     timespec lastClockTime;
     bool initClockTime;
+
+    // Timer stats: used for debugging and calculating effective speed
+    unsigned long totalDeltaTime, runsPerSec, timeOutsPerSec;
+    unsigned long totalTimeOutTime;
+    CTicks ticksPerSec;
 
     CAVRTimer *getClosestTimer(void);
 
@@ -215,6 +220,7 @@ public:
     CAVRClock(void);
     ~CAVRClock(void);
 
+    void setTargetClockSpeed(unsigned long t) { targetClockSpeed = t; }
     CAVRTimer *createTimer(CAVRTimer::TTimeOut t, void *d);
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);

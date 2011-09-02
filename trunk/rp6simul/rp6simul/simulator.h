@@ -107,6 +107,7 @@ class CSimulator : public QObject
     static int luaAvrGetIORegister(lua_State *l);
     static int luaAvrSetIORegister(lua_State *l);
     static int luaAvrExecISR(lua_State *l);
+    static int luaClockSetTargetSpeed(lua_State *l);
     static int luaClockCreateTimer(lua_State *l);
     static int luaClockEnableTimer(lua_State *l);
     static int luaTimerDestr(lua_State *l);
@@ -130,7 +131,7 @@ public:
     explicit CSimulator(QObject *parent = 0);
     ~CSimulator(void);
 
-    void startLua(void);
+    void startLua(const char *name);
     lua_State *getLuaState(void) const { return luaState; }
     bool loadProjectFile(const QSettings &settings);
     void execISR(EISRTypes type);
