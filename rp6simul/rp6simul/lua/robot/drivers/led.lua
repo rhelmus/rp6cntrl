@@ -56,9 +56,9 @@ end
 function initPlugin()
     for i=1,6 do
         local propname = "led" .. tostring(i)
-        LEDInfo.LEDs[i] = createLED(robotProperties[propname].pos,
-                                    robotProperties[propname].color,
-                                    robotProperties[propname].radius)
+        LEDInfo.LEDs[i] = createLED(properties[propname].pos,
+                                    properties[propname].color,
+                                    properties[propname].radius)
     end
 end
 

@@ -67,7 +67,6 @@ OTHER_FILES += \
     lua/robot/drivers/timer2.lua \
     lua/robot/drivers/timer1.lua \
     lua/robot/drivers/motor.lua \
-    lua/robot/drivers/uart.lua \
     lua/robot/drivers/portlog.lua \
     lua/robot/drivers/led.lua \
     lua/robot/drivers/adc.lua \
@@ -79,7 +78,11 @@ OTHER_FILES += \
     lua/robot/robot.lua \
     lua/utils.lua \
     lua/m32/m32.lua \
-    lua/m32/properties.lua
+    lua/m32/properties.lua \
+    lua/shared_drivers/uart.lua \
+    lua/shared_drivers/timer2.lua \
+    lua/shared_drivers/timer1.lua \
+    lua/shared_drivers/timer0.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \

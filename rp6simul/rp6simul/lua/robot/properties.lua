@@ -35,7 +35,7 @@ local ACSDistances =
     high = 50 / cmPerPixel
 }
 
-robotProperties =
+properties =
 {
     clockSpeed = 8000000,
     cmPerPixel = cmPerPixel,

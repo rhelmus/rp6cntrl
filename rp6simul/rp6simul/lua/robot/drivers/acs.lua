@@ -82,7 +82,7 @@ local function maybeReceivePulse(sensor)
             dist = ACSInfo.rightIRSensor:getHitDistance()
         end
         log(string.format("dist: %d\n", dist))
-        if dist <= robotProperties.ACSLeft.distance[ACSInfo.power] then
+        if dist <= properties.ACSLeft.distance[ACSInfo.power] then
             -- Execute ISR used by RP6 lib to detect IR pulses
             avr.execISR(avr.ISR_INT2_vect)
         end
@@ -91,16 +91,16 @@ end
 
 
 function initPlugin()
-    ACSInfo.leftIRSensor = createIRSensor(robotProperties.ACSLeft.pos,
-                                          robotProperties.ACSLeft.color,
-                                          robotProperties.ACSLeft.radius,
-                                          robotProperties.ACSLeft.angle,
-                                          robotProperties.ACSLeft.distance.high)
-    ACSInfo.rightIRSensor = createIRSensor(robotProperties.ACSRight.pos,
-                                           robotProperties.ACSRight.color,
-                                           robotProperties.ACSRight.radius,
-                                           robotProperties.ACSRight.angle,
-                                           robotProperties.ACSRight.distance.high)
+    ACSInfo.leftIRSensor = createIRSensor(properties.ACSLeft.pos,
+                                          properties.ACSLeft.color,
+                                          properties.ACSLeft.radius,
+                                          properties.ACSLeft.angle,
+                                          properties.ACSLeft.distance.high)
+    ACSInfo.rightIRSensor = createIRSensor(properties.ACSRight.pos,
+                                           properties.ACSRight.color,
+                                           properties.ACSRight.radius,
+                                           properties.ACSRight.angle,
+                                           properties.ACSRight.distance.high)
 end
 
 function handleIOData(type, data)

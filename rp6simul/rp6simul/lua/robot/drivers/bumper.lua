@@ -21,12 +21,12 @@ function initPlugin()
         end
     end
 
-    bumperLeft = createBumper(robotProperties["bumperLeft"].points,
-                              robotProperties["bumperLeft"].color)
+    bumperLeft = createBumper(properties["bumperLeft"].points,
+                              properties["bumperLeft"].color)
     bumperLeft:setCallback(makecallback(avr.IO_PINB, avr.PINB0))
 
-    bumperRight = createBumper(robotProperties["bumperRight"].points,
-                               robotProperties["bumperRight"].color)
+    bumperRight = createBumper(properties["bumperRight"].points,
+                               properties["bumperRight"].color)
     bumperRight:setCallback(makecallback(avr.IO_PINC, avr.PINC6))
 end
 

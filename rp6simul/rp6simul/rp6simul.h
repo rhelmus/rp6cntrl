@@ -59,9 +59,12 @@ class CRP6Simulator : public QMainWindow
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
     QPlainTextEdit *logWidget;
-    QPlainTextEdit *serialOutputWidget;
-    QLineEdit *serialInputWidget;
-    QPushButton *serialSendButton;
+    QPlainTextEdit *robotSerialOutputWidget;
+    QLineEdit *robotSerialInputWidget;
+    QPushButton *robotSerialSendButton;
+    QPlainTextEdit *m32SerialOutputWidget;
+    QLineEdit *m32SerialInputWidget;
+    QPushButton *m32SerialSendButton;
     QPlainTextEdit *IRCOMMOutputWidget;
     QSpinBox *IRCOMMAddressWidget, *IRCOMMKeyWidget;
     QCheckBox *IRCOMMToggleWidget;
@@ -78,8 +81,8 @@ class CRP6Simulator : public QMainWindow
 
     QString logTextBuffer;
     QMutex logBufferMutex;
-    QString serialTextBuffer;
-    QMutex serialBufferMutex;
+    QString robotSerialTextBuffer, m32SerialTextBuffer;
+    QMutex robotSerialBufferMutex, m32SerialBufferMutex;
     QList<QStringList> robotStatusUpdateBuffer;
     QMutex robotStatusMutex;
     QMap<CLED *, bool> changedLEDs;
@@ -98,7 +101,8 @@ class CRP6Simulator : public QMainWindow
 #endif
     volatile bool robotIsBlocked;
     QMap<CBumper *, int> bumperLuaCallbacks;
-    int serialSendLuaCallback, IRCOMMSendLuaCallback;
+    int robotSerialSendLuaCallback, m32SerialSendLuaCallback;
+    int IRCOMMSendLuaCallback;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -116,7 +120,11 @@ class CRP6Simulator : public QMainWindow
     QWidget *createProjectPlaceHolderWidget(void);
     QWidget *createRobotWidget(void);
     QWidget *createRobotSceneWidget(void);
-    QWidget *createLogWidgets(void);
+    QWidget *createBottomTabs(void);
+    QWidget *createLogTab(void);
+    QWidget *createSerialRobotTab(void);
+    QWidget *createSerialM32Tab(void);
+    QWidget *createIRCOMMTab(void);
     QDockWidget *createStatusDock(void);
     QDockWidget *createADCDock(void);
     QDockWidget *createRegisterDock(void);
@@ -135,7 +143,8 @@ class CRP6Simulator : public QMainWindow
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
-    static int luaAppendSerialOutput(lua_State *l);
+    static int luaAppendRobotSerialOutput(lua_State *l);
+    static int luaAppendM32SerialOutput(lua_State *l);
     static int luaSetDriverLists(lua_State *l);
     static int luaSetCmPerPixel(lua_State *l);
     static int luaSetRobotLength(lua_State *l);
@@ -158,11 +167,13 @@ class CRP6Simulator : public QMainWindow
     static int luaCreateLightSensor(lua_State *l);
     static int luaLightSensorGetLight(lua_State *l);
     static int luaLightSensorDestr(lua_State *l);
-    static int luaSetSerialSendCallback(lua_State *l);
+    static int luaSetRobotSerialSendCallback(lua_State *l);
+    static int luaSetM32SerialSendCallback(lua_State *l);
     static int luaSetIRCOMMSendCallback(lua_State *l);
 
 private slots:
-    void updateClockDisplay(unsigned long hz);
+    void updateRobotClockDisplay(unsigned long hz);
+    void updateM32ClockDisplay(unsigned long hz);
     void timedUIUpdate(void);
     void timedLEDUpdate(void);
     void newProject(void);
@@ -182,7 +193,8 @@ private slots:
     void applyADCTable(void);
     void setRobotIsBlocked(bool b) { robotIsBlocked = b; }
     void setLuaBumper(CBumper *b, bool e);
-    void sendSerialText(void);
+    void sendRobotSerialText(void);
+    void sendM32SerialText(void);
     void sendIRCOMM(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);
@@ -201,7 +213,8 @@ signals:
     void motorDriveSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
     void newIRCOMMText(const QString &);
-    void receivedSerialSendCallback(bool);
+    void receivedRobotSerialSendCallback(bool);
+    void receivedM32SerialSendCallback(bool);
     void receivedIRCOMMSendCallback(bool);
 };
 

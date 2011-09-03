@@ -67,6 +67,11 @@ enum EIORegisterTypes
     IO_GICR,
     IO_MCUCSR,
 
+    // SPI
+    IO_SPCR,
+    IO_SPSR,
+    IO_SPDR,
+
     IO_END
 };
 
@@ -322,5 +327,21 @@ typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
 #define BORF    2
 #define EXTRF   1
 #define PORF    0
+
+// SPSR
+#define SPIF    7
+#define WCOL    6
+#define SPI2X   0
+
+// SPCR
+#define SPIE    7
+#define SPE     6
+#define DORD    5
+#define MSTR    4
+#define CPOL    3
+#define CPHA    2
+#define SPR1    1
+#define SPR0    0
+
 
 #endif

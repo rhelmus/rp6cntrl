@@ -95,4 +95,10 @@ extern NRP6SimulGlue::CIORegister MCUCR;
 extern NRP6SimulGlue::CIORegister GICR;
 extern NRP6SimulGlue::CIORegister MCUCSR;
 
+// SPI
+extern NRP6SimulGlue::CIORegister SPCR;
+extern NRP6SimulGlue::CIORegister SPSR;
+extern NRP6SimulGlue::CIORegister SPDR;
+
+
 #endif // RP6SIMUL_IOREGISTERS_H

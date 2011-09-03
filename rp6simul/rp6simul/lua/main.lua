@@ -43,11 +43,20 @@ local function loadSimulator(s)
 end
 
 local function loadDriver(d)
-    local dir = dirName(d) or simulatorPath .. "/drivers/" -- UNDONE: Path separators
+    local dir = dirName(d)
     local file = baseName(d)
 
     if not file:match("%.lua", -4) then
         file = file .. ".lua"
+    end
+
+    -- Pick a default directory?
+    if not dir then
+        -- UNDONE: Path separators
+        dir = simulatorPath .. "/drivers/"
+        if not fileExists(dir .. file) then
+            dir = "lua/shared_drivers/"
+        end
     end
 
     local chunk, stat = loadfile(dir .. file)

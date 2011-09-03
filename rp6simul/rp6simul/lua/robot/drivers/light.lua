@@ -6,8 +6,8 @@ description = "Driver for the light sensors."
 local leftLightSensor, rightLightSensor
 
 function initPlugin()
-    leftLightSensor = createLightSensor(robotProperties.leftLDR.pos)
-    rightLightSensor = createLightSensor(robotProperties.rightLDR.pos)
+    leftLightSensor = createLightSensor(properties.leftLDR.pos)
+    rightLightSensor = createLightSensor(properties.rightLDR.pos)
 end
 
 function getADCValue(a)
