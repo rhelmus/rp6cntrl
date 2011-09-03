@@ -24,6 +24,15 @@ function dirName(p)
     return string.match(p, "/*.*/")
 end
 
+function fileExists(f)
+    local f = io.open(f, "r")
+    if not f then
+        return false
+    end
+    f:close()
+    return true
+end
+
 function tableIsEmpty(t)
     return next(t) == nil
 end

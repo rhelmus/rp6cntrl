@@ -45,7 +45,8 @@ CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QMainWindow(parent), currentMapIsTemplate(false), robotIsBlocked(false),
-    serialSendLuaCallback(0), IRCOMMSendLuaCallback(0)
+    robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
+    IRCOMMSendLuaCallback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -61,7 +62,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     setCentralWidget(splitter);
 
     splitter->addWidget(createMainWidget());
-    splitter->addWidget(createLogWidgets());
+    splitter->addWidget(createBottomTabs());
     splitter->setSizes(QList<int>() << 600 << 300);
 
     createMenus();
@@ -122,16 +123,15 @@ CRP6Simulator::~CRP6Simulator()
 void CRP6Simulator::initSimulators()
 {
     robotSimulator = new CSimulator(this);
-    connect(robotSimulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
-            SLOT(updateClockDisplay(unsigned long)));
+    connect(robotSimulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)),
+            SLOT(updateRobotClockDisplay(unsigned long)));
     registerLuaGeneric(robotSimulator->getLuaState());
     registerLuaRobot(robotSimulator->getLuaState());
     robotSimulator->startLua("robot");
 
     m32Simulator = new CSimulator(this);
-    // UNDONE
-//    connect(m32Simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)), this,
-//            SLOT(updateClockDisplay(unsigned long)));
+    connect(m32Simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)),
+            SLOT(updateM32ClockDisplay(unsigned long)));
     registerLuaGeneric(m32Simulator->getLuaState());
     registerLuaM32(m32Simulator->getLuaState());
     m32Simulator->startLua("m32");
@@ -140,15 +140,16 @@ void CRP6Simulator::initSimulators()
 void CRP6Simulator::registerLuaGeneric(lua_State *l)
 {
     NLua::registerFunction(l, luaAppendLogOutput, "appendLogOutput");
-    NLua::registerFunction(l, luaAppendSerialOutput, "appendSerialOutput");
     NLua::registerFunction(l, luaUpdateRobotStatus, "updateRobotStatus");
-    NLua::registerFunction(l, luaSetSerialSendCallback, "setSerialSendCallback");
 }
 
 void CRP6Simulator::registerLuaRobot(lua_State *l)
 {
     NLua::registerFunction(l, luaSetCmPerPixel, "setCmPerPixel");
     NLua::registerFunction(l, luaSetRobotLength, "setRobotLength");
+    NLua::registerFunction(l, luaSetRobotSerialSendCallback,
+                           "setSerialSendCallback");
+    NLua::registerFunction(l, luaAppendRobotSerialOutput, "appendSerialOutput");
     NLua::registerFunction(l, luaLogIRCOMM, "logIRCOMM");
     NLua::registerFunction(l, luaRobotIsBlocked, "robotIsBlocked");
     NLua::registerFunction(l, luaSetMotorPower, "setMotorPower");
@@ -178,6 +179,9 @@ void CRP6Simulator::registerLuaRobot(lua_State *l)
 
 void CRP6Simulator::registerLuaM32(lua_State *l)
 {
+    NLua::registerFunction(l, luaSetM32SerialSendCallback,
+                           "setSerialSendCallback");
+    NLua::registerFunction(l, luaAppendM32SerialOutput, "appendSerialOutput");
 }
 
 void CRP6Simulator::createMenus()
@@ -467,40 +471,79 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     return mapStackedWidget;
 }
 
-QWidget *CRP6Simulator::createLogWidgets()
+QWidget *CRP6Simulator::createBottomTabs()
 {
     QTabWidget *ret = new QTabWidget;
     ret->setTabPosition(QTabWidget::South);
+    ret->addTab(createLogTab(), "log");
+    ret->addTab(createSerialRobotTab(), "serial - robot");
+    ret->addTab(createSerialM32Tab(), "serial - m32");
+    ret->addTab(createIRCOMMTab(), "IRCOMM");
+    return ret;
+}
 
-    // Log tab
-    ret->addTab(logWidget = new QPlainTextEdit, "log");
+QWidget *CRP6Simulator::createLogTab()
+{
+    logWidget = new QPlainTextEdit;
     logWidget->setReadOnly(true);
+    return logWidget;
+}
 
-    // serial tab
-    QWidget *w = new QWidget(ret);
-    ret->addTab(w, "serial");
-    QGridLayout *grid = new QGridLayout(w);
+QWidget *CRP6Simulator::createSerialRobotTab()
+{
+    QWidget *ret = new QWidget;
+    QGridLayout *grid = new QGridLayout(ret);
 
-    grid->addWidget(serialOutputWidget = new QPlainTextEdit, 0, 0, 1, 3);
-    serialOutputWidget->setReadOnly(true);
+    grid->addWidget(robotSerialOutputWidget = new QPlainTextEdit, 0, 0, 1, 3);
+    robotSerialOutputWidget->setReadOnly(true);
 
-    grid->addWidget(serialInputWidget = new QLineEdit, 1, 0);
+    grid->addWidget(robotSerialInputWidget = new QLineEdit, 1, 0);
 
-    grid->addWidget(serialSendButton = new QPushButton("Send"), 1, 1);
-    serialSendButton->setEnabled(false);
-    connect(serialSendButton, SIGNAL(clicked()), this, SLOT(sendSerialText()));
-    connect(serialInputWidget, SIGNAL(returnPressed()), serialSendButton,
-            SLOT(click()));
-    connect(this, SIGNAL(receivedSerialSendCallback(bool)), serialSendButton,
-            SLOT(setEnabled(bool)));
+    grid->addWidget(robotSerialSendButton = new QPushButton("Send"), 1, 1);
+    robotSerialSendButton->setEnabled(false);
+    connect(robotSerialSendButton, SIGNAL(clicked()), this, SLOT(sendRobotSerialText()));
+    connect(robotSerialInputWidget, SIGNAL(returnPressed()),
+            robotSerialSendButton, SLOT(click()));
+    connect(this, SIGNAL(receivedRobotSerialSendCallback(bool)),
+            robotSerialSendButton, SLOT(setEnabled(bool)));
 
     QPushButton *button = new QPushButton("Clear");
-    connect(button, SIGNAL(clicked()), serialOutputWidget, SLOT(clear()));
+    connect(button, SIGNAL(clicked()), robotSerialOutputWidget, SLOT(clear()));
     grid->addWidget(button, 1, 2);
 
-    // IRCOMM tab
-    ret->addTab(w = new QWidget, "IRCOMM");
-    grid = new QGridLayout(w);
+    return ret;
+}
+
+QWidget *CRP6Simulator::createSerialM32Tab()
+{
+    QWidget *ret = new QWidget;
+    QGridLayout *grid = new QGridLayout(ret);
+
+    grid->addWidget(m32SerialOutputWidget = new QPlainTextEdit, 0, 0, 1, 3);
+    m32SerialOutputWidget->setReadOnly(true);
+
+    grid->addWidget(m32SerialInputWidget = new QLineEdit, 1, 0);
+
+    grid->addWidget(m32SerialSendButton = new QPushButton("Send"), 1, 1);
+    m32SerialSendButton->setEnabled(false);
+    connect(m32SerialSendButton, SIGNAL(clicked()), this,
+            SLOT(sendM32SerialText()));
+    connect(m32SerialInputWidget, SIGNAL(returnPressed()), m32SerialSendButton,
+            SLOT(click()));
+    connect(this, SIGNAL(receivedM32SerialSendCallback(bool)),
+            m32SerialSendButton, SLOT(setEnabled(bool)));
+
+    QPushButton *button = new QPushButton("Clear");
+    connect(button, SIGNAL(clicked()), m32SerialOutputWidget, SLOT(clear()));
+    grid->addWidget(button, 1, 2);
+
+    return ret;
+}
+
+QWidget *CRP6Simulator::createIRCOMMTab()
+{
+    QWidget *ret = new QWidget;
+    QGridLayout *grid = new QGridLayout(ret);
 
     grid->addWidget(IRCOMMOutputWidget = new QPlainTextEdit, 0, 0, 1, -1);
     IRCOMMOutputWidget->setReadOnly(true);
@@ -535,8 +578,10 @@ QWidget *CRP6Simulator::createLogWidgets()
     connect(this, SIGNAL(receivedIRCOMMSendCallback(bool)), IRCOMMSendButton,
             SLOT(setEnabled(bool)));
 
-    grid->addWidget(button = new QPushButton("Clear"), 1, 7);
+    QPushButton *button = new QPushButton("Clear");
+    grid->addWidget(button, 1, 7);
     connect(button, SIGNAL(clicked()), IRCOMMOutputWidget, SLOT(clear()));
+
     return ret;
 }
 
@@ -907,7 +952,7 @@ void CRP6Simulator::appendRobotStatusUpdate(const QStringList &strtree)
 
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     QMutexLocker loglocker(&instance->logBufferMutex);
 
     const char *type = luaL_checkstring(l, 1);
@@ -928,11 +973,19 @@ int CRP6Simulator::luaAppendLogOutput(lua_State *l)
     return 0;
 }
 
-int CRP6Simulator::luaAppendSerialOutput(lua_State *l)
+int CRP6Simulator::luaAppendRobotSerialOutput(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
-    QMutexLocker seriallocker(&instance->serialBufferMutex);
-    instance->serialTextBuffer += luaL_checkstring(l, 1);
+    // NLua::CLuaLocker lualocker(l);
+    QMutexLocker seriallocker(&instance->robotSerialBufferMutex);
+    instance->robotSerialTextBuffer += luaL_checkstring(l, 1);
+    return 0;
+}
+
+int CRP6Simulator::luaAppendM32SerialOutput(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    QMutexLocker seriallocker(&instance->m32SerialBufferMutex);
+    instance->m32SerialTextBuffer += luaL_checkstring(l, 1);
     return 0;
 }
 
@@ -972,7 +1025,7 @@ int CRP6Simulator::luaSetRobotLength(lua_State *l)
 
 int CRP6Simulator::luaLogIRCOMM(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     const int adr = luaL_checkint(l, 1);
     const int key = luaL_checkint(l, 2);
     const bool toggle = NLua::checkBoolean(l, 3);
@@ -988,7 +1041,7 @@ int CRP6Simulator::luaLogIRCOMM(lua_State *l)
 
 int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     const int nargs = lua_gettop(l);
     QStringList strtree;
 
@@ -1001,14 +1054,14 @@ int CRP6Simulator::luaUpdateRobotStatus(lua_State *l)
 
 int CRP6Simulator::luaRobotIsBlocked(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     lua_pushboolean(l, instance->robotIsBlocked);
     return 1;
 }
 
 int CRP6Simulator::luaCreateBumper(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     // points
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1059,7 +1112,7 @@ int CRP6Simulator::luaCreateBumper(lua_State *l)
 
 int CRP6Simulator::luaBumperSetCallback(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CBumper *b = NLua::checkClassData<CBumper>(l, 1, "bumper");
     luaL_checktype(l, 2, LUA_TFUNCTION);
     if (instance->bumperLuaCallbacks[b])
@@ -1072,7 +1125,7 @@ int CRP6Simulator::luaBumperSetCallback(lua_State *l)
 int CRP6Simulator::luaBumperDestr(lua_State *l)
 {
     qDebug() << "Removing bumper";
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CBumper *b = NLua::checkClassData<CBumper>(l, 1, "bumper");
     if (instance->bumperLuaCallbacks[b])
     {
@@ -1087,7 +1140,7 @@ int CRP6Simulator::luaBumperDestr(lua_State *l)
 
 int CRP6Simulator::luaCreateLED(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1130,7 +1183,7 @@ int CRP6Simulator::luaCreateLED(lua_State *l)
 
 int CRP6Simulator::luaLEDSetEnabled(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
     QMutexLocker LEDlocker(&instance->robotLEDMutex);
     instance->changedLEDs[led] = NLua::checkBoolean(l, 2);
@@ -1140,7 +1193,7 @@ int CRP6Simulator::luaLEDSetEnabled(lua_State *l)
 int CRP6Simulator::luaLEDDestr(lua_State *l)
 {
     qDebug() << "Removing LED";
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
     instance->robotScene->getRobotItem()->removeLED(led);
     instance->robotWidget->removeLED(led);
@@ -1150,7 +1203,7 @@ int CRP6Simulator::luaLEDDestr(lua_State *l)
 
 int CRP6Simulator::luaSetMotorPower(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     const char *motor = luaL_checkstring(l, 1);
     const int power = luaL_checkint(l, 2);
@@ -1172,7 +1225,7 @@ int CRP6Simulator::luaSetMotorPower(lua_State *l)
 
 int CRP6Simulator::luaSetMotorDriveSpeed(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     const char *motor = luaL_checkstring(l, 1);
     const int speed = luaL_checkint(l, 2);
@@ -1191,7 +1244,7 @@ int CRP6Simulator::luaSetMotorDriveSpeed(lua_State *l)
 
 int CRP6Simulator::luaSetMotorMoveSpeed(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     const char *motor = luaL_checkstring(l, 1);
     const int speed = luaL_checkint(l, 2);
@@ -1213,7 +1266,7 @@ int CRP6Simulator::luaSetMotorMoveSpeed(lua_State *l)
 
 int CRP6Simulator::luaSetMotorDir(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     const char *ldir = luaL_checkstring(l, 1);
     const char *rdir = luaL_checkstring(l, 2);
@@ -1244,7 +1297,7 @@ int CRP6Simulator::luaSetMotorDir(lua_State *l)
 
 int CRP6Simulator::luaCreateIRSensor(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1290,7 +1343,7 @@ int CRP6Simulator::luaCreateIRSensor(lua_State *l)
 
 int CRP6Simulator::luaIRSensorGetHitDistance(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CIRSensor *ir = NLua::checkClassData<CIRSensor>(l, 1, "irsensor");
     lua_pushnumber(l, ir->getHitDistance());
     return 1;
@@ -1299,7 +1352,7 @@ int CRP6Simulator::luaIRSensorGetHitDistance(lua_State *l)
 int CRP6Simulator::luaIRSensorDestr(lua_State *l)
 {
     qDebug() << "Removing IR sensor";
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CIRSensor *ir = NLua::checkClassData<CIRSensor>(l, 1, "irsensor");
     instance->robotScene->getRobotItem()->removeIRSensor(ir);
     instance->robotWidget->removeIRSensor(ir);
@@ -1309,7 +1362,7 @@ int CRP6Simulator::luaIRSensorDestr(lua_State *l)
 
 int CRP6Simulator::luaCreateLightSensor(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
 
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
@@ -1330,7 +1383,7 @@ int CRP6Simulator::luaCreateLightSensor(lua_State *l)
 
 int CRP6Simulator::luaLightSensorGetLight(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CLightSensor *light = NLua::checkClassData<CLightSensor>(l, 1, "lightsensor");
     lua_pushinteger(l, light->getLight());
     return 1;
@@ -1339,28 +1392,40 @@ int CRP6Simulator::luaLightSensorGetLight(lua_State *l)
 int CRP6Simulator::luaLightSensorDestr(lua_State *l)
 {
     qDebug() << "Removing light sensor";
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     CLightSensor *light = NLua::checkClassData<CLightSensor>(l, 1, "lightsensor");
     instance->robotScene->getRobotItem()->removeLightSensor(light);
     delete light;
     return 0;
 }
 
-int CRP6Simulator::luaSetSerialSendCallback(lua_State *l)
+int CRP6Simulator::luaSetRobotSerialSendCallback(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     luaL_checktype(l, 1, LUA_TFUNCTION);
-    if (instance->serialSendLuaCallback)
-        luaL_unref(l, LUA_REGISTRYINDEX, instance->serialSendLuaCallback);
+    if (instance->robotSerialSendLuaCallback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->robotSerialSendLuaCallback);
     lua_pushvalue(l, 1);
-    instance->serialSendLuaCallback = luaL_ref(l, LUA_REGISTRYINDEX);
-    instance->emit receivedSerialSendCallback(true);
+    instance->robotSerialSendLuaCallback = luaL_ref(l, LUA_REGISTRYINDEX);
+    instance->emit receivedRobotSerialSendCallback(true);
+    return 0;
+}
+
+int CRP6Simulator::luaSetM32SerialSendCallback(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    if (instance->m32SerialSendLuaCallback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->m32SerialSendLuaCallback);
+    lua_pushvalue(l, 1);
+    instance->m32SerialSendLuaCallback = luaL_ref(l, LUA_REGISTRYINDEX);
+    instance->emit receivedM32SerialSendCallback(true);
     return 0;
 }
 
 int CRP6Simulator::luaSetIRCOMMSendCallback(lua_State *l)
 {
-    NLua::CLuaLocker lualocker(l);
+    // NLua::CLuaLocker lualocker(l);
     luaL_checktype(l, 1, LUA_TFUNCTION);
     if (instance->IRCOMMSendLuaCallback)
         luaL_unref(l, LUA_REGISTRYINDEX, instance->IRCOMMSendLuaCallback);
@@ -1370,7 +1435,7 @@ int CRP6Simulator::luaSetIRCOMMSendCallback(lua_State *l)
     return 0;
 }
 
-void CRP6Simulator::updateClockDisplay(unsigned long hz)
+void CRP6Simulator::updateRobotClockDisplay(unsigned long hz)
 {
     double mhz = static_cast<double>(hz) / 1000000.0;
     QString s = QString::number(mhz, 'g', 3);
@@ -1380,7 +1445,20 @@ void CRP6Simulator::updateClockDisplay(unsigned long hz)
         s = s.leftJustified(4, '0');
     }
 
-    appendRobotStatusUpdate(QStringList() << "AVR" << "RP6 clock (MHz)" << s);
+    appendRobotStatusUpdate(QStringList() << "robot" << "AVR" << "clock (MHz)" << s);
+}
+
+void CRP6Simulator::updateM32ClockDisplay(unsigned long hz)
+{
+    double mhz = static_cast<double>(hz) / 1000000.0;
+    QString s = QString::number(mhz, 'g', 3);
+    if ((s.length() < 3) && !s.contains('.'))
+    {
+        s += ".";
+        s = s.leftJustified(4, '0');
+    }
+
+    appendRobotStatusUpdate(QStringList() << "m32" << "AVR" << "clock (MHz)" << s);
 }
 
 void CRP6Simulator::newProject()
@@ -1575,15 +1653,26 @@ void CRP6Simulator::timedUIUpdate()
         logTextBuffer.clear();
     }
 
-    QMutexLocker serialocker(&instance->serialBufferMutex);
-    if (!serialTextBuffer.isEmpty())
+    QMutexLocker rserialocker(&instance->robotSerialBufferMutex);
+    if (!robotSerialTextBuffer.isEmpty())
     {
         // Append text, without adding a new paragraph
-        QTextCursor cur = serialOutputWidget->textCursor();
+        QTextCursor cur = robotSerialOutputWidget->textCursor();
         cur.movePosition(QTextCursor::End);
-        serialOutputWidget->setTextCursor(cur);
-        serialOutputWidget->insertPlainText(serialTextBuffer);
-        serialTextBuffer.clear();
+        robotSerialOutputWidget->setTextCursor(cur);
+        robotSerialOutputWidget->insertPlainText(robotSerialTextBuffer);
+        robotSerialTextBuffer.clear();
+    }
+
+    QMutexLocker mserialocker(&instance->m32SerialBufferMutex);
+    if (!m32SerialTextBuffer.isEmpty())
+    {
+        // Append text, without adding a new paragraph
+        QTextCursor cur = m32SerialOutputWidget->textCursor();
+        cur.movePosition(QTextCursor::End);
+        m32SerialOutputWidget->setTextCursor(cur);
+        m32SerialOutputWidget->insertPlainText(m32SerialTextBuffer);
+        m32SerialTextBuffer.clear();
     }
 
     QMutexLocker statlocker(&robotStatusMutex);
@@ -1671,7 +1760,7 @@ void CRP6Simulator::runPlugin()
     if (!robotSimulator->runPlugin() || !m32Simulator->runPlugin())
         return;
 
-    serialOutputWidget->clear();
+    robotSerialOutputWidget->clear();
     robotStatusTreeWidget->clear();
     pluginUpdateUITimer->start();
     pluginUpdateLEDsTimer->start();
@@ -1683,7 +1772,7 @@ void CRP6Simulator::runPlugin()
 
 void CRP6Simulator::stopPlugin()
 {
-    if (serialSendLuaCallback || IRCOMMSendLuaCallback ||
+    if (robotSerialSendLuaCallback || IRCOMMSendLuaCallback ||
         !bumperLuaCallbacks.isEmpty())
     {
         // Need to do this before calling CSimulator::stopPlugin() to make sure
@@ -1694,11 +1783,11 @@ void CRP6Simulator::stopPlugin()
             luaL_unref(robotSimulator->getLuaState(), LUA_REGISTRYINDEX, ref);
         bumperLuaCallbacks.clear();
 
-        if (serialSendLuaCallback)
+        if (robotSerialSendLuaCallback)
         {
             luaL_unref(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
-                       serialSendLuaCallback);
-            serialSendLuaCallback = 0;
+                       robotSerialSendLuaCallback);
+            robotSerialSendLuaCallback = 0;
         }
 
         if (IRCOMMSendLuaCallback)
@@ -1709,6 +1798,13 @@ void CRP6Simulator::stopPlugin()
         }
     }
 
+    if (m32SerialSendLuaCallback)
+    {
+        NLua::CLuaLocker lualocker(m32Simulator->getLuaState());
+        luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                   m32SerialSendLuaCallback);
+        m32SerialSendLuaCallback = 0;
+    }
 
     robotSimulator->stopPlugin();
     m32Simulator->stopPlugin();
@@ -1724,7 +1820,7 @@ void CRP6Simulator::stopPlugin()
     stopPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
 
-    serialSendButton->setEnabled(false);
+    robotSerialSendButton->setEnabled(false);
     IRCOMMSendButton->setEnabled(false);
 
     robotIsBlocked = false;
@@ -1824,18 +1920,32 @@ void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
     lua_call(robotSimulator->getLuaState(), 1, 0); // UNDONE: error handling
 }
 
-void CRP6Simulator::sendSerialText()
+void CRP6Simulator::sendRobotSerialText()
 {
     NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
     lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
-                serialSendLuaCallback);
+                robotSerialSendLuaCallback);
     lua_pushstring(robotSimulator->getLuaState(),
-                   qPrintable(serialInputWidget->text() + "\n"));
+                   qPrintable(robotSerialInputWidget->text() + "\n"));
     lua_call(robotSimulator->getLuaState(), 1, 0);
 
-    serialOutputWidget->appendPlainText(QString("> %1\n").arg(serialInputWidget->text()));
+    robotSerialOutputWidget->appendPlainText(QString("> %1\n").arg(robotSerialInputWidget->text()));
 
-    serialInputWidget->clear();
+    robotSerialInputWidget->clear();
+}
+
+void CRP6Simulator::sendM32SerialText()
+{
+    NLua::CLuaLocker lualocker(m32Simulator->getLuaState());
+    lua_rawgeti(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                m32SerialSendLuaCallback);
+    lua_pushstring(m32Simulator->getLuaState(),
+                   qPrintable(m32SerialInputWidget->text() + "\n"));
+    lua_call(m32Simulator->getLuaState(), 1, 0);
+
+    m32SerialOutputWidget->appendPlainText(QString("> %1\n").arg(m32SerialInputWidget->text()));
+
+    m32SerialInputWidget->clear();
 }
 
 void CRP6Simulator::sendIRCOMM()

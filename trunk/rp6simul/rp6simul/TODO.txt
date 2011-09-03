@@ -52,11 +52,21 @@
 - reset plugin action (stop+start)
 - BUG: lua timer destroyed after CSimulator is
 - robot widget: show motor speeds?
-- Check high simulated CPU speeds
 - powerON/powerOFF currently don't affect encoders and such
 - acs: min hit distance?
 - Update default drivers
 - Destruction: instance may be zero when it shouldn't yet
 - Test/verify atomic register array
+- Test/verify reduced lua locks
 - Auto toggle for IRCOMM sending?
 - Reset ADC after project/plugin load?
+- m32 support:
+    - CPU speed reporting
+    - Improve error checking on starting plugin etc?
+    - ADC and IO register widgets
+    - serial tab
+    - Enabling/disabling m32 in project settings
+        - Disable m32 related widgets?
+        - Disable robot option (m32 only)
+    - Extend loadCustomDriverInfo()
+- power LED

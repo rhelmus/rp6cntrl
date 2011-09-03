@@ -16,11 +16,16 @@ driverList =
     { name = "uart", default  = true },
 }
 
+-- Override for convenience
+local oldUpdateRobotStatus = updateRobotStatus
+function updateRobotStatus(...)
+    oldUpdateRobotStatus("robot", ...)
+end
 
 function init()
-    clock.setTargetSpeed(robotProperties.clockSpeed)
-    setCmPerPixel(robotProperties.cmPerPixel)
-    setRobotLength(robotProperties.robotLength)
+    clock.setTargetSpeed(properties.clockSpeed)
+    setCmPerPixel(properties.cmPerPixel)
+    setRobotLength(properties.robotLength)
 end
 
 function closePlugin()

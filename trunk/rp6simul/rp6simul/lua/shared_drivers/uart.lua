@@ -100,7 +100,7 @@ local function setBaudRate(data)
 
     -- UNDONE: There seems to be a little rounding (int cutoff) error
     -- when calculating back to the desired bps.
-    local baud = (robotProperties.clockSpeed / (data + 1)) / 16
+    local baud = (properties.clockSpeed / (data + 1)) / 16
     log(string.format("Setting UART baud rate to %d (%d bps)\n", data, baud))
     updateRobotStatus("UART", "Baudrate (bps)", string.format("%d", baud))
     UARTInfo.baudRate = data

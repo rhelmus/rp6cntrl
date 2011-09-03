@@ -1,4 +1,4 @@
-m32Properties =
+properties =
 {
     clockSpeed = 16000000,
 }
