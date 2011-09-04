@@ -57,7 +57,7 @@
 - Update default drivers
 - Destruction: instance may be zero when it shouldn't yet
 - Test/verify atomic register array
-- Test/verify reduced lua locks
+- Test/verify reduced lua locks (if done: remove comments and commented stuff)
 - Auto toggle for IRCOMM sending?
 - Reset ADC after project/plugin load?
 - m32 support:
