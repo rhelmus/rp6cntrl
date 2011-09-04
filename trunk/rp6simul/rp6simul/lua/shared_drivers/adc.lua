@@ -1,8 +1,6 @@
 local ret = driver(...)
 
--- UNDONE: m32 support
-
--- ADC ports (RP6)
+-- ADC ports - RP6
 --      0: ADC0
 --      1: ADC1
 --      2: Light right
@@ -10,8 +8,18 @@ local ret = driver(...)
 --      5: Motor current right
 --      6: Motor current left
 --      7: Battery
+--
+-- ADC ports - M32
+--      0: MIC
+--      1: KEYPAD
+--      2: ADC2
+--      3: ADC3
+--      5: ADC4
+--      6: ADC5
+--      7: ADC6
+--      8: ADC7
 
-description = "Driver for the RP6 ADC channels."
+description = "Driver for the ADC channels."
 
 handledIORegisters = {
     avr.IO_ADMUX,
@@ -24,39 +32,14 @@ local ADCInfo = {
     ADCEnabled = false,
 }
 
-local function getADCPortNames()
-    return { "ADC0", "ADC1", "LS_R", "LS_L", "E_INT1", "MCURRENT_R",
-             "MCURRENT_L", "UBAT" }
-end
-
 local function getADCPort(data)
     for p=0,7 do
-        -- Skip 4: not used by RP6
         -- Mask by 7(0b111): Only look at first 3 bits
-        if p ~= 4 and (bit.bitAnd(data, 7) == p) then
+        if (bit.bitAnd(data, 7) == p) then
             return getADCPortNames()[p+1]
         end
     end
 end
-
-local function getPortString(port)
-    if port == 0 then
-        return "ADC0"
-    elseif port == 1 then
-        return "ADC1"
-    elseif port == 2 then
-        return "Right light sensor"
-    elseif port == 3 then
-        return "Left light sensor"
-    elseif port == 5 then
-        return "Right motor current"
-    elseif port == 6 then
-        return "Left motor current"
-    elseif port == 7 then
-        return "Battery"
-    end
-end
-
 
 function initPlugin()
 end

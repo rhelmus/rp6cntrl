@@ -22,14 +22,26 @@ function updateRobotStatus(...)
     oldUpdateRobotStatus("robot", ...)
 end
 
+
+-- Used by ADC driver
+function getADCPortNames()
+    return { "ADC0", "ADC1", "LS_R", "LS_L", "E_INT1", "MCURRENT_R",
+             "MCURRENT_L", "UBAT" }
+end
+
+
 function init()
     clock.setTargetSpeed(properties.clockSpeed)
     setCmPerPixel(properties.cmPerPixel)
     setRobotLength(properties.robotLength)
+    setRobotM32Scale(properties.m32Scale)
+    setRobotM32Slot("front", properties.m32Front.pos, properties.m32Front.rotation)
+    setRobotM32Slot("back", properties.m32Back.pos, properties.m32Back.rotation)
 end
 
 function closePlugin()
 end
+
 
 dofile("lua/robot/properties.lua")
 

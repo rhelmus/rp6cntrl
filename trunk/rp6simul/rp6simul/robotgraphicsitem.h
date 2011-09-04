@@ -26,6 +26,13 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     QList<CIRSensor *> IRSensors;
     QTimer *sensorUpdateTimer;
     QList<CLightSensor *> lightSensors;
+    QPixmap m32Pixmap;
+    QSize origM32Size;
+    float m32Scale;
+    QPointF m32Positions[SLOT_END];
+    float m32Rotations[SLOT_END];
+    EM32Slot activeM32Slot;
+    bool m32PixmapDirty;
     bool isBlocked;
     int skipFrames;
 
@@ -34,6 +41,7 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     CHandleGraphicsItem *pressedHandle;
 
     void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
+    void updateM32Pixmap(void);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
     qreal getPixmapScale(void) const;
@@ -58,6 +66,9 @@ public:
 
     void setCmPerPixel(float c) { cmPerPixel = c * getPixmapScale(); }
     void setRobotLength(float l) { robotLength = l; }
+    void setM32Slot(EM32Slot s, const QPointF &p, float r);
+    void setM32Scale(float s) { m32Scale = s; m32PixmapDirty = true; }
+    void setActiveM32Slot(EM32Slot s) { activeM32Slot = s; m32PixmapDirty = true; }
     void addLED(CLED *l);
     void removeLED(CLED *l);
     void drawLEDs(QPainter *painter) const;

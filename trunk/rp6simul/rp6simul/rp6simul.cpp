@@ -147,6 +147,8 @@ void CRP6Simulator::registerLuaRobot(lua_State *l)
 {
     NLua::registerFunction(l, luaSetCmPerPixel, "setCmPerPixel");
     NLua::registerFunction(l, luaSetRobotLength, "setRobotLength");
+    NLua::registerFunction(l, luaSetRobotM32Slot, "setRobotM32Slot");
+    NLua::registerFunction(l, luaSetRobotM32Scale, "setRobotM32Scale");
     NLua::registerFunction(l, luaSetRobotSerialSendCallback,
                            "setSerialSendCallback");
     NLua::registerFunction(l, luaAppendRobotSerialOutput, "appendSerialOutput");
@@ -744,6 +746,9 @@ void CRP6Simulator::openProjectFile(const QString &file)
     if (!verifySettingsFile(prsettings))
         return;
 
+    // UNDONE
+    robotScene->getRobotItem()->setActiveM32Slot(SLOT_FRONT);
+
     prsettings.beginGroup("robot");
     if (!robotSimulator->loadProjectFile(prsettings))
         return;
@@ -1020,6 +1025,43 @@ int CRP6Simulator::luaSetRobotLength(lua_State *l)
     // This function should only be called by init(), where we do
     // not have to worry about threads
     instance->robotScene->getRobotItem()->setRobotLength(luaL_checknumber(l, 1));
+    return 0;
+}
+
+int CRP6Simulator::luaSetRobotM32Slot(lua_State *l)
+{
+    // This function should only be called by init(), where we do
+    // not have to worry about threads
+    const char *s = luaL_checkstring(l, 1);
+
+    EM32Slot slot;
+    if (!strcmp(s, "front"))
+        slot = SLOT_FRONT;
+    else if (!strcmp(s, "back"))
+        slot = SLOT_BACK;
+
+    // position
+    luaL_checktype(l, 2, LUA_TTABLE);
+
+    lua_rawgeti(l, 2, 1);
+    const float x = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    lua_rawgeti(l, 2, 2);
+    const float y = luaL_checknumber(l, -1);
+    lua_pop(l, 1);
+
+    const float rot = luaL_checknumber(l, 3);
+
+    instance->robotScene->getRobotItem()->setM32Slot(slot, QPointF(x, y), rot);
+    return 0;
+}
+
+int CRP6Simulator::luaSetRobotM32Scale(lua_State *l)
+{
+    // This function should only be called by init(), where we do
+    // not have to worry about threads
+    instance->robotScene->getRobotItem()->setM32Scale(luaL_checknumber(l, 1));
     return 0;
 }
 

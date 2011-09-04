@@ -21,18 +21,19 @@ local robotWidthCm = 11.3
 local robotWidthPx = 565
 local cmPerPixel = robotWidthCm / robotWidthPx
 
+local robotPicWidth = 637 -- Full width of rp6-top.png image
+
 local green = { 0, 255, 0 }
 local red = { 255, 0, 0 }
 local darkblue = { 0, 0, 192 }
 local transblue = { 0, 0, 255, 80 }
 
--- In px
--- UNDONE
+-- In px. Real life measurements :)
 local ACSDistances =
 {
-    low = 15 / cmPerPixel,
-    medium = 30 / cmPerPixel,
-    high = 50 / cmPerPixel
+    low = 11 / cmPerPixel,
+    medium = 23 / cmPerPixel,
+    high = 32 / cmPerPixel
 }
 
 properties =
@@ -41,17 +42,24 @@ properties =
     cmPerPixel = cmPerPixel,
     robotLength = 18.9, -- in cm, used for rotation
 
-    led1 = { pos = { 458, 209 }, shape = "ellips", radius = 10, color = green },
-    led2 = { pos = { 458, 184 }, shape = "ellips", radius = 10, color = red },
-    led3 = { pos = { 458, 158 }, shape = "ellips", radius = 10, color = red },
-    led4 = { pos = { 191, 209 }, shape = "ellips", radius = 10, color = green },
-    led5 = { pos = { 191, 181 }, shape = "ellips", radius = 10, color = red },
-    led6 = { pos = { 191, 156 }, shape = "ellips", radius = 10, color = red },
+    -- Normally the scale should equal (robotWidthPx/robotPicWidth), since
+    -- the robot- and m32 board are equally wide. However due the imperfect
+    -- images a small correctection factor is applied
+    m32Scale = robotWidthPx / robotPicWidth * 1.08,
+
+    m32Front = { pos = { 22, 60 }, rotation = 180 },
+    m32Back = { pos = { 12, 540 }, rotation = 0 },
+
+    led1 = { pos = { 458, 209 }, radius = 10, color = green },
+    led2 = { pos = { 458, 184 }, radius = 10, color = red },
+    led3 = { pos = { 458, 158 }, radius = 10, color = red },
+    led4 = { pos = { 191, 209 }, radius = 10, color = green },
+    led5 = { pos = { 191, 181 }, radius = 10, color = red },
+    led6 = { pos = { 191, 156 }, radius = 10, color = red },
 
     ACSLeft =
     {
         pos = { 181, 62 },
-        shape = "ellips",
         radius = 11,
         color = darkblue,
         angle = 357, -- UNDONE
@@ -60,7 +68,6 @@ properties =
     ACSRight =
     {
         pos = { 465, 64 },
-        shape = "ellips",
         radius = 11,
         color = darkblue,
         angle = 3, -- UNDONE
@@ -69,17 +76,15 @@ properties =
 
     bumperLeft =
     {
-        shape = "polygon",
         points = { { 119, -1 }, { 210, -1 }, { 319, 23 }, { 125, 28 } },
         color = transblue
     },
     bumperRight =
     {
-        shape = "polygon",
         points = { { 322, 23 }, { 439, 2 }, { 523, 12 }, { 525, 28 }, { 515, 44 } },
         color = transblue
     },
 
-    leftLDR = { pos = { 290, 70 }, shape = "point" },
-    rightLDR = { pos = { 353, 70 }, shape = "point" },
+    leftLDR = { pos = { 290, 70 } },
+    rightLDR = { pos = { 353, 70 } },
 }

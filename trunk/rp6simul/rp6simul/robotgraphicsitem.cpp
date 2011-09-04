@@ -75,11 +75,16 @@ float getRobotFrameSpeed(int motorspeed, float frametime,
 }
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
-    : CResizablePixmapGraphicsItem(parent), skipFrames(0), pressedHandle(0)
+    : CResizablePixmapGraphicsItem(parent), m32Scale(1.0),
+      activeM32Slot(SLOT_END), m32PixmapDirty(false), skipFrames(0),
+      pressedHandle(0)
 {
     QPixmap pm("../resource/rp6-top.png");
     origRobotSize = pm.size();
     setPixmap(pm.scaledToWidth(120, Qt::SmoothTransformation), false);
+
+    origM32Size = QImage("../resource/m32-top.png").size();
+    m32Rotations[SLOT_FRONT] = m32Rotations[SLOT_BACK] = 0.0;
 
     setTransformOriginPoint(boundingRect().center());
     setResizable(false);
@@ -125,6 +130,24 @@ void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
     handle->setPos(hrect.topLeft());
 
     handles[pos] = handle;
+}
+
+void CRobotGraphicsItem::updateM32Pixmap()
+{
+    if (activeM32Slot == SLOT_END)
+        return;
+
+    const float w = boundingRect().width() * m32Scale;
+    m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+
+    const QPointF c(m32Pixmap.rect().center());
+    QTransform tr;
+    tr.translate(c.x(), c.y());
+    tr.rotate(m32Rotations[activeM32Slot]);
+    tr.translate(-c.x(), -c.y());
+    m32Pixmap = m32Pixmap.transformed(tr, Qt::SmoothTransformation);
+
+    m32PixmapDirty = false;
 }
 
 QPointF CRobotGraphicsItem::mapDeltaPos(qreal x, qreal y) const
@@ -431,6 +454,12 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 {
     CResizablePixmapGraphicsItem::paint(painter, option, widget);
 
+    if (m32PixmapDirty)
+        updateM32Pixmap();
+
+    if (!m32Pixmap.isNull()) // null if active slot isn't set yet
+        painter->drawPixmap(m32Positions[activeM32Slot], m32Pixmap);
+
     foreach (CIRSensor *ir, IRSensors)
     {
         // Start with line which has a zero degree angle
@@ -474,6 +503,13 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 
     painter->drawLine(line);
 #endif
+}
+
+void CRobotGraphicsItem::setM32Slot(EM32Slot s, const QPointF &p, float r)
+{
+    m32Positions[s] = p * getPixmapScale();
+    m32Rotations[s] = r;
+    m32PixmapDirty = true;
 }
 
 void CRobotGraphicsItem::addLED(CLED *l)

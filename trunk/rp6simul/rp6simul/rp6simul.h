@@ -12,6 +12,7 @@
 
 enum EMotor { MOTOR_LEFT=0, MOTOR_RIGHT, MOTOR_END };
 enum EMotorDirection { MOTORDIR_FWD=0, MOTORDIR_BWD, MOTORDIR_END };
+enum EM32Slot { SLOT_FRONT=0, SLOT_BACK, SLOT_END };
 
 Q_DECLARE_METATYPE(EMotor)
 Q_DECLARE_METATYPE(EMotorDirection)
@@ -148,6 +149,8 @@ class CRP6Simulator : public QMainWindow
     static int luaSetDriverLists(lua_State *l);
     static int luaSetCmPerPixel(lua_State *l);
     static int luaSetRobotLength(lua_State *l);
+    static int luaSetRobotM32Slot(lua_State *l);
+    static int luaSetRobotM32Scale(lua_State *l);
     static int luaLogIRCOMM(lua_State *l);
     static int luaUpdateRobotStatus(lua_State *l);
     static int luaRobotIsBlocked(lua_State *l);
