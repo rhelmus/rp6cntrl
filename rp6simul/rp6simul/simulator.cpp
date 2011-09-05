@@ -75,6 +75,11 @@ const char *IORegisterStringArray[IO_END] = {
     "MCUCR",
     "GICR",
     "MCUCSR",
+
+    // SPI
+    "SPCR",
+    "SPSR",
+    "SPDR",
 };
 
 
