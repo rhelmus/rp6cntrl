@@ -63,11 +63,7 @@ HEADERS  += rp6simul.h \
 OTHER_FILES += \
     TODO.txt \
     lua/main.lua \
-    lua/robot/drivers/timer0.lua \
-    lua/robot/drivers/timer2.lua \
-    lua/robot/drivers/timer1.lua \
     lua/robot/drivers/motor.lua \
-    lua/robot/drivers/portlog.lua \
     lua/robot/drivers/led.lua \
     lua/robot/drivers/acs.lua \
     lua/robot/properties.lua \
@@ -82,7 +78,10 @@ OTHER_FILES += \
     lua/shared_drivers/timer2.lua \
     lua/shared_drivers/timer1.lua \
     lua/shared_drivers/timer0.lua \
-    lua/shared_drivers/adc.lua
+    lua/shared_drivers/adc.lua \
+    lua/shared_drivers/portlog.lua \
+    lua/m32/drivers/spi.lua \
+    lua/m32/drivers/led.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \
@@ -146,3 +145,6 @@ else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
     LIBS += -llua
 }
+
+
+

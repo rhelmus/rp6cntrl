@@ -1,7 +1,5 @@
 local ret = driver(...)
 
--- UNDONE: m32 leds support
-
 -- Leds (RP6):
 --      1: PORTC, pin 4
 --      2: PORTC, pin 5
