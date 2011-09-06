@@ -100,5 +100,12 @@ extern NRP6SimulGlue::CIORegister SPCR;
 extern NRP6SimulGlue::CIORegister SPSR;
 extern NRP6SimulGlue::CIORegister SPDR;
 
+// TWI
+extern NRP6SimulGlue::CIORegister TWBR;
+extern NRP6SimulGlue::CIORegister TWCR;
+extern NRP6SimulGlue::CIORegister TWSR;
+extern NRP6SimulGlue::CIORegister TWDR;
+extern NRP6SimulGlue::CIORegister TWAR;
+
 
 #endif // RP6SIMUL_IOREGISTERS_H

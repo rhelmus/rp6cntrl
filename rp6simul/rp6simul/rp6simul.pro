@@ -81,7 +81,8 @@ OTHER_FILES += \
     lua/shared_drivers/adc.lua \
     lua/shared_drivers/portlog.lua \
     lua/m32/drivers/spi.lua \
-    lua/m32/drivers/led.lua
+    lua/m32/drivers/led.lua \
+    lua/shared_drivers/twi.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \
@@ -145,6 +146,7 @@ else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
     LIBS += -llua
 }
+
 
 
 

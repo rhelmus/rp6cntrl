@@ -80,6 +80,13 @@ const char *IORegisterStringArray[IO_END] = {
     "SPCR",
     "SPSR",
     "SPDR",
+
+    // TWI
+    "TWBR",
+    "TWCR",
+    "TWSR",
+    "TWDR",
+    "TWAR",
 };
 
 

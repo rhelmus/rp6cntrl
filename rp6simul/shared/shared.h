@@ -72,6 +72,13 @@ enum EIORegisterTypes
     IO_SPSR,
     IO_SPDR,
 
+    // TWI
+    IO_TWBR,
+    IO_TWCR,
+    IO_TWSR,
+    IO_TWDR,
+    IO_TWAR,
+
     IO_END
 };
 
@@ -342,6 +349,34 @@ typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
 #define CPHA    2
 #define SPR1    1
 #define SPR0    0
+
+// TWCR
+#define TWINT   7
+#define TWEA    6
+#define TWSTA   5
+#define TWSTO   4
+#define TWWC    3
+#define TWEN    2
+#define TWIE    0
+
+// TWAR
+#define TWA6    7
+#define TWA5    6
+#define TWA4    5
+#define TWA3    4
+#define TWA2    3
+#define TWA1    2
+#define TWA0    1
+#define TWGCE   0
+
+// TWSR
+#define TWS7    7
+#define TWS6    6
+#define TWS5    5
+#define TWS4    4
+#define TWS3    3
+#define TWPS1   1
+#define TWPS0   0
 
 
 #endif
