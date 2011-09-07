@@ -32,6 +32,9 @@ enum EISRTypes
     // IR receiver
     ISR_INT2_vect,
 
+    // TWI
+    ISR_TWI_vect,
+
     ISR_END
 };
 

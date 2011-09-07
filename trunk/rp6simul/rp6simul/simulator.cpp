@@ -120,6 +120,7 @@ QString constructISRFunc(EISRTypes type)
     case ISR_INT0_vect: f = "INT0_vect"; break;
     case ISR_INT1_vect: f = "INT1_vect"; break;
     case ISR_INT2_vect: f = "INT2_vect"; break;
+    case ISR_TWI_vect: f = "TWI_vect"; break;
     default: Q_ASSERT(false); break;
     }
 
