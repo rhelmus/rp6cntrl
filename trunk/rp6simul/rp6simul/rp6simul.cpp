@@ -2047,3 +2047,8 @@ bool CRP6Simulator::loadCustomDriverInfo(const QString &file, QString &name,
 
     return ok;
 }
+
+QList<CSimulator *> CRP6Simulator::getSimulators() const
+{
+    return QList<CSimulator *>() << robotSimulator << m32Simulator;
+}

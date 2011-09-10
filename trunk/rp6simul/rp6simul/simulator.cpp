@@ -127,12 +127,45 @@ QString constructISRFunc(EISRTypes type)
     return "ISR_" + f;
 }
 
+QList<QVariant> packLuaTWIData(lua_State *l, int start, int end)
+{
+    QList<QVariant> ret;
+
+    for (int i=start; i<=end; ++i)
+    {
+        switch (lua_type(l, i))
+        {
+        case LUA_TNUMBER: ret << (double)lua_tonumber(l, i); break;
+        case LUA_TBOOLEAN: ret << (bool)lua_toboolean(l, i); break;
+        case LUA_TSTRING: ret << QString(lua_tostring(l, i)); break;
+        default: qFatal("Unsupported TWI arg type\n"); break;
+        }
+    }
+
+    return ret;
+}
+
+void pushPackedLuaTWIData(lua_State *l, const QList<QVariant> &list)
+{
+    foreach (QVariant v, list)
+    {
+        // Limit to double, boolean and string
+        switch (v.type())
+        {
+        case QVariant::Double: lua_pushnumber(l, v.toDouble()); break;
+        case QVariant::Bool: lua_pushboolean(l, v.toBool()); break;
+        case QVariant::String: lua_pushstring(l, qPrintable(v.toString())); break;
+        default: Q_ASSERT(false); break;
+        }
+    }
+}
+
 }
 
 
 CSimulator::CSimulator(QObject *parent) :
     QObject(parent), pluginMainThread(0), quitPlugin(false),
-    ISRExecMutex(QMutex::Recursive)
+    ISRExecMutex(QMutex::Recursive), luaTWIHandler(0)
 {
     initLua();
     initAVRClock();
@@ -390,6 +423,30 @@ void CSimulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(SPR1);
     SET_LUA_CONSTANT(SPR0);
 
+     // TWI
+    SET_LUA_CONSTANT(TWINT);
+    SET_LUA_CONSTANT(TWEA);
+    SET_LUA_CONSTANT(TWSTA);
+    SET_LUA_CONSTANT(TWSTO);
+    SET_LUA_CONSTANT(TWWC);
+    SET_LUA_CONSTANT(TWEN);
+    SET_LUA_CONSTANT(TWIE);
+    SET_LUA_CONSTANT(TWA6);
+    SET_LUA_CONSTANT(TWA5);
+    SET_LUA_CONSTANT(TWA4);
+    SET_LUA_CONSTANT(TWA3);
+    SET_LUA_CONSTANT(TWA2);
+    SET_LUA_CONSTANT(TWA1);
+    SET_LUA_CONSTANT(TWA0);
+    SET_LUA_CONSTANT(TWGCE);
+    SET_LUA_CONSTANT(TWS7);
+    SET_LUA_CONSTANT(TWS6);
+    SET_LUA_CONSTANT(TWS5);
+    SET_LUA_CONSTANT(TWS4);
+    SET_LUA_CONSTANT(TWS3);
+    SET_LUA_CONSTANT(TWPS1);
+    SET_LUA_CONSTANT(TWPS0);
+
     // ISRs
     SET_LUA_CONSTANT(ISR_USART_RXC_vect);
     SET_LUA_CONSTANT(ISR_TIMER0_COMP_vect);
@@ -398,6 +455,7 @@ void CSimulator::setLuaAVRConstants()
     SET_LUA_CONSTANT(ISR_INT0_vect);
     SET_LUA_CONSTANT(ISR_INT1_vect);
     SET_LUA_CONSTANT(ISR_INT2_vect);
+    SET_LUA_CONSTANT(ISR_TWI_vect);
 
 #undef SET_LUA_CONSTANT
 }
@@ -421,6 +479,9 @@ void CSimulator::initLua()
     NLua::registerFunction(luaState, luaAvrSetIORegister, "setIORegister",
                            "avr", this);
     NLua::registerFunction(luaState, luaAvrExecISR, "execISR", "avr", this);
+    NLua::registerFunction(luaState, luaAvrSetTWIMSGHandler, "setTWIMSGHandler",
+                           "avr", this);
+    NLua::registerFunction(luaState, luaAvrSendTWIMSG, "sendTWIMSG", "avr", this);
 
     // clock
     NLua::registerFunction(luaState, luaClockSetTargetSpeed, "setTargetSpeed",
@@ -665,6 +726,32 @@ void CSimulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
     IORegisterData[type] = data;
 }
 
+QList<QVariant> CSimulator::execTWILuaHandler(const char *msg,
+                                              const QList<QVariant> &args)
+{
+    QMutexLocker twilocker(&luaTWIHandlerMutex);
+    if (luaTWIHandler == 0)
+        return QList<QVariant>();
+    NLua::CLuaLocker lualocker(luaState);
+
+    const int oldtop = lua_gettop(luaState);
+
+    lua_rawgeti(luaState, LUA_REGISTRYINDEX, luaTWIHandler);
+    lua_pushstring(luaState, msg);
+    pushPackedLuaTWIData(luaState, args);
+    lua_call(luaState, 1 + args.size(), -1);
+
+    const int end = lua_gettop(luaState);
+    QList<QVariant> ret;
+    if (end != oldtop)
+    {
+        ret = packLuaTWIData(luaState, oldtop+1, end);
+        lua_pop(luaState, end-oldtop);
+    }
+
+    return ret;
+}
+
 void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
                                  void *data)
 {
@@ -745,6 +832,56 @@ int CSimulator::luaAvrExecISR(lua_State *l)
     CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     const EISRTypes isr = static_cast<EISRTypes>(luaL_checkint(l, 1));
     instance->execISR(isr);
+    return 0;
+}
+
+int CSimulator::luaAvrSetTWIMSGHandler(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    lua_pushvalue(l, 1);
+
+    QMutexLocker twilock(&instance->luaTWIHandlerMutex);
+    if (instance->luaTWIHandler != 0)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->luaTWIHandler);
+    instance->luaTWIHandler = luaL_ref(l, LUA_REGISTRYINDEX);
+    return 0;
+}
+
+int CSimulator::luaAvrSendTWIMSG(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
+
+    const char *msg = luaL_checkstring(l, 1);
+    const int nargs = lua_gettop(l);
+    QList<QVariant> args(packLuaTWIData(l, 2, nargs));
+
+    // Send to anyone...driver needs to check if it actually needs it
+    // NOTE: handleret[0] states if the message was accepted or not
+    QList<CSimulator *> simulators(CRP6Simulator::getInstance()->getSimulators());
+    QList<QVariant> handlerret;
+    foreach (CSimulator *sim, simulators)
+    {
+        if (sim == instance)
+            continue;
+        handlerret = sim->execTWILuaHandler(msg, args);
+        Q_ASSERT(!handlerret.isEmpty());
+
+        // Break if handler function accepted msg (ie. it returned something)
+        // UNDONE: What to do with general calls?
+        if (handlerret[0].toBool())
+            break;
+    }
+
+    if (handlerret[0].toBool())
+    {
+        handlerret.pop_front();
+        pushPackedLuaTWIData(l, handlerret);
+        return handlerret.size();
+    }
+
     return 0;
 }
 
@@ -1084,6 +1221,13 @@ void CSimulator::stopPlugin()
     // UNDONE: Thread safe?
     while (AVRClock->isActive())
         ;
+
+    QMutexLocker twilock(&luaTWIHandlerMutex);
+    if (luaTWIHandler != 0)
+    {
+        luaL_unref(luaState, LUA_REGISTRYINDEX, luaTWIHandler);
+        luaTWIHandler = 0;
+    }
 
     lua_getglobal(luaState, "closePlugin");
     lua_call(luaState, 0, 0);
