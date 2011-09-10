@@ -138,6 +138,7 @@ QList<QVariant> packLuaTWIData(lua_State *l, int start, int end)
         case LUA_TNUMBER: ret << (double)lua_tonumber(l, i); break;
         case LUA_TBOOLEAN: ret << (bool)lua_toboolean(l, i); break;
         case LUA_TSTRING: ret << QString(lua_tostring(l, i)); break;
+        case LUA_TNIL: /* nothing */ break;
         default: qFatal("Unsupported TWI arg type\n"); break;
         }
     }
@@ -1191,7 +1192,10 @@ void CSimulator::execISR(EISRTypes type)
         }
     }
 
-    ISRCacheArray[type]();
+    // Store func to avoid thread locks
+    TISR isr = ISRCacheArray[type];
+    lock.unlock();
+    isr();
 }
 
 bool CSimulator::runPlugin()
