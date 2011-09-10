@@ -3,7 +3,7 @@
 - Error handling; check UNDONE's
 - Thread safety:
       - More?
-- IO register class: test all operators (addition, subtraction, ...)
+- IO register class: test all operators (addition, subtraction, ... (printf), etc)
 - Check delta for avrtimer when avr thread is running at 100%
 - Fix checkDelay for ioregister class
     - Settings
