@@ -80,6 +80,8 @@ class CSimulator : public QObject
     TISR ISRCacheArray[ISR_END];
     bool ISRFailedArray[ISR_END];
     QMutex ISRExecMutex;
+    int luaTWIHandler;
+    QMutex luaTWIHandlerMutex;
 
     QString currentPluginFileName;
     QStringList currentDriverList;
@@ -95,6 +97,8 @@ class CSimulator : public QObject
     void checkPluginThreadDelay(void);
     TIORegisterData getIORegister(EIORegisterTypes type) const;
     void setIORegister(EIORegisterTypes type, TIORegisterData data);
+    QList<QVariant> execTWILuaHandler(const char *msg,
+                                      const QList<QVariant> &args);
 
     // Callbacks for RP6 plugin
     static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
@@ -110,6 +114,8 @@ class CSimulator : public QObject
     static int luaAvrGetIORegister(lua_State *l);
     static int luaAvrSetIORegister(lua_State *l);
     static int luaAvrExecISR(lua_State *l);
+    static int luaAvrSetTWIMSGHandler(lua_State *l);
+    static int luaAvrSendTWIMSG(lua_State *l);
     static int luaClockSetTargetSpeed(lua_State *l);
     static int luaClockCreateTimer(lua_State *l);
     static int luaClockEnableTimer(lua_State *l);

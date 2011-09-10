@@ -209,6 +209,7 @@ public:
     static CRP6Simulator *getInstance(void) { return instance; }
     bool loadCustomDriverInfo(const QString &file, QString &name,
                               QString &desc);
+    QList<CSimulator *> getSimulators(void) const;
 
 signals:
     // These are emitted by the class itself to easily thread-synchronize

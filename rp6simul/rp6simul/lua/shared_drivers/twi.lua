@@ -3,7 +3,9 @@ local ret = driver(...)
 description = "Driver for the two-wire interface (TWI). Both slave and master mode."
 
 handledIORegisters = {
+    avr.IO_TWAR,
     avr.IO_TWBR,
+    avr.IO_TWDR,
     avr.IO_TWSR,
     avr.IO_TWCR,
 }
@@ -12,39 +14,110 @@ handledIORegisters = {
 local TWIInfo =
 {
     state = "idle",
+    slaveAddress = nil, -- nil: not a slave (uninitialized)
+    slaveData = nil,
 }
 
 
-local function handleMasterEvent(data)
-    if not bit.isSet(data, avr.TWEN) then
-        return
+local function isMaster()
+    return TWIInfo.slaveAddress == nil
+end
+
+local function TWIMSGHandler(msg, ...)
+    -- UNDONE: general calls
+
+    log("Received TWI MSG:", msg, ..., "\n")
+
+    local maybeexecisr, accept, ret = false, false, nil
+    local TWCR = avr.getIORegister(avr.IO_TWCR)
+
+    if isMaster() then
+        if msg == "sendslavedata" then
+            assert(TWIInfo.state == "mread")
+            ret = bit.isSet(TWCR, TWEA)
+            local d = selectOne(..., 1)
+            avr.setIORegister(avr.IO_TWDR, d)
+            avr.setIORegister(avr.IO_TWSR, (ret and 0x50) or 0x58)
+            log("Received master data:", d, "\n")
+            maybeexecisr = true
+            accept = true
+        end
+    else
+        if msg == "sendslavereadadr" or "sendslavewriteadr" then
+            local adr = selectOne(..., 1)
+            if adr == TWIInfo.slaveAddress then
+                TWIInfo.state = ((msg == "sendslavereadadr") and "sread") or "swrite"
+                ret = bit.isSet(TWCR, TWEA)
+                if TWIInfo.state == "sread" then
+                    local ack = selectOne(..., 2)
+                    if ack then
+                        avr.setIORegister(avr.IO_TWSR, 0xA8)
+                    end
+                else
+                    avr.setIORegister(avr.IO_TWSR, (ret and 0x60) or 0x68)
+                end
+                maybeexecisr = true
+                accept = true
+            end
+        elseif msg == "sendslavedata" then
+            assert(TWIInfo.state == "sread")
+            ret = bit.isSet(TWCR, TWEA)
+            local d = selectOne(..., 1)
+            avr.setIORegister(avr.IO_TWDR, d)
+            avr.setIORegister(avr.IO_TWSR, (ret and 0x80) or 0x88)
+            log("Received slave data:", d, "\n")
+            maybeexecisr = true
+            accept = true
+        end
     end
 
+    if maybeexecisr and bit.isSet(TWCR, avr.TWIE) then
+        avr.execISR(avr.ISR_TWI_vect)
+    end
+
+    return accept, (accept and ret) or nil
+end
+
+local function handleMasterEvent(data)
     -- UNDONE
 
     -- Master start condition?
     if bit.isSet(data, avr.TWINT, avr.TWSTA) and
-       not bit.isSet(data, avr.TWSTO)
+       not bit.isSet(data, avr.TWSTO) then
         if TWIInfo.state ~= "idle" then
             log("Master restart condition\n")
+            avr.setIORegister(avr.IO_TWSR, 0x10)
         else
             log("Master start condition\n")
+            avr.setIORegister(avr.IO_TWSR, 0x08)
         end
-        if doint then
-
         TWIInfo.state = "mstart"
     -- SLA+W / SLA+R?
     elseif bit.isSet(data, avr.TWINT) and
-           not bit.isSet(data, avr.TWSTA, avr.TWSTO)
-        if TWIInfo.state == "idle" then
+           not bit.isSet(data, avr.TWSTA) and not bit.isSet(data, avr.TWSTO) then
+        if TWIInfo.state ~= "idle" then
             local d = avr.getIORegister(avr.IO_TWDR)
-            if bit.isSet(d, 1) then -- MR read
-                TWIInfo.state = "mread"
-                d = bit.unSet(d, 1)
-                log(string.format("SLA+R: %d\n", d))
-            else -- MR write
-                TWIInfo.state = "mwrite"
-                log(string.format("SLA+W: %d\n", d))
+            if TWIInfo.state == "mstart" then -- Address?
+                if bit.isSet(d, 0) then -- MR read
+                    TWIInfo.state = "mread"
+                    d = bit.unSet(d, 0)
+                    log(string.format("SLA+R: %d\n", d))
+                    local mack = bit.isSet(data, avr.TWEA)
+                    local sack = avr.sendTWIMSG("sendslavereadadr", d, mack)
+                    avr.setIORegister(avr.IO_TWSR, (sack and 0x40) or 0x48)
+                else -- MR write
+                    TWIInfo.state = "mwrite"
+                    log(string.format("SLA+W: %d\n", d))
+                    local ack = avr.sendTWIMSG("sendslavewriteadr", d)
+                    log("ack:", tostring(ack), "\n")
+                    avr.setIORegister(avr.IO_TWSR, (ack and 0x18) or 0x20)
+                end
+            else -- plain data
+                if TWIInfo.state == "mwrite" then
+                    local ack = avr.sendTWIMSG("sendslavedata",
+                                               avr.getIORegister(avr.IO_TWDR))
+                    avr.setIORegister(avr.IO_TWSR, (ack and 0x28) or 0x30)
+                end
             end
         else
             warning("Ignoring data: SLA+R/W received without master start condition!\n")
@@ -52,12 +125,43 @@ local function handleMasterEvent(data)
         end
     -- Master stop condition?
     elseif bit.isSet(data, avr.TWINT, avr.TWSTO) and
-           not bit.isSet(data, avr.TWSTA)
+           not bit.isSet(data, avr.TWSTA) then
         log("Master stop condition\n")
+        avr.sendTWIMSG("stopslave")
+        TWIInfo.state = "idle"
     else
         warning("Ignoring unknown master event\n")
         return
     end
+
+    data = bit.unSet(data, avr.TWINT)
+    avr.setIORegister(avr.IO_TWCR, data)
+
+    if bit.isSet(data, avr.TWIE) then
+        avr.execISR(avr.ISR_TWI_vect)
+    end
+end
+
+local function handleSlaveEvent(data)
+    -- Specs say that TWSTO must be zero when writing
+    if not bit.isSet(data, avr.TWSTO) then
+        if TWIInfo.slaveData ~= nil then -- data set?
+            local ack = avr.sendTWIMSG("sendslavedata", TWIInfo.slaveData)
+            TWIInfo.slaveData = nil
+            if ack then
+                if bit.isSet(data, avr.TWEA)
+                    avr.setIORegister(avr.IO_TWSR, 0xB8)
+                else
+                    avr.setIORegister(avr.IO_TWSR, 0xC8)
+                end
+            else
+                avr.setIORegister(avr.IO_TWSR, 0xC0)
+            end
+        end
+    end
+
+    data = bit.unSet(data, avr.TWINT)
+    avr.setIORegister(avr.IO_TWCR, data)
 
     if bit.isSet(data, avr.TWIE) then
         avr.execISR(avr.ISR_TWI_vect)
@@ -71,23 +175,35 @@ function initPlugin()
     avr.setIORegister(avr.IO_TWSR, tonumber(11111000, 2))
     avr.setIORegister(avr.IO_TWDR, tonumber(11111111, 2))
     avr.setIORegister(avr.IO_TWAR, tonumber(11111110, 2))
+
+    avr.setTWIMSGHandler(TWIMSGHandler)
 end
 
 function handleIOData(type, data)
-    if type == avr.IO_TWBR then -- Bitrate
+    if type == avr.IO_TWAR then -- Slave address
+        TWIInfo.slaveAddress = data
+    elseif type == avr.IO_TWBR and isMaster() then -- Bitrate
         -- From atmega32 docs: freq=CPU_clock/(16+2*TWBR*4^prescaler)
         -- Note that the driver currently does not handle any prescalers
         local freq = properties.clockSpeed / (16+2*data)
         log(string.format("Setting bit rate to %d (%d Hz)\n", data, freq))
         updateRobotStatus("TWI", "bitrate", data)
         updateRobotStatus("TWI", "frequency (Hz)", freq)
-    elseif type == avr.IO_TWSR then -- Prescaler (on write access)
+    elseif type == avr.IO_TWDR and not isMaster() then
+        if bin.isSet(avr.getIORegister(avr.IO_TWCR, avr.TWEN)) then
+            TWIInfo.slaveData = data
+        end
+    elseif type == avr.IO_TWSR and isMaster() then -- Prescaler (on write access)
         if data ~= 0 then
             errorLog("TWI driver does not support any prescaler!")
         end
     elseif type == avr.IO_TWCR then
-        if bit.isSet(data, avr.TWINT) then
-            handleMasterEvent(data)
+        if bit.isSet(data, avr.TWINT) and bit.isSet(data, avr.TWEN) then
+            if isMaster() then
+                handleMasterEvent(data)
+            else
+                handleSlaveEvent(data)
+            end
         end
     end
 end
