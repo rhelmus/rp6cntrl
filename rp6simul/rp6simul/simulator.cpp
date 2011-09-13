@@ -738,35 +738,6 @@ void CSimulator::setIORegister(EIORegisterTypes type, TIORegisterData data)
     IORegisterData[type] = data;
 }
 
-QList<QVariant> CSimulator::execTWILuaHandler(const char *msg,
-                                              const QList<QVariant> &args)
-{
-    QMutexLocker twilocker(&luaTWIHandlerMutex);
-    const int handlerref = luaTWIHandler;
-    twilocker.unlock();
-
-    if (luaTWIHandler == 0)
-        return QList<QVariant>();
-    NLua::CLuaLocker lualocker(luaState);
-
-    const int oldtop = lua_gettop(luaState);
-
-    lua_rawgeti(luaState, LUA_REGISTRYINDEX, handlerref);
-    lua_pushstring(luaState, msg);
-    pushPackedLuaTWIData(luaState, args);
-    lua_call(luaState, 1 + args.size(), -1);
-
-    const int end = lua_gettop(luaState);
-    QList<QVariant> ret;
-    if (end != oldtop)
-    {
-        ret = packLuaTWIData(luaState, oldtop+1, end);
-        lua_pop(luaState, end-oldtop);
-    }
-
-    return ret;
-}
-
 void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
                                  void *data)
 {
@@ -875,31 +846,6 @@ int CSimulator::luaAvrSendTWIMSG(lua_State *l)
 
     instance->emit luaTWIMSGSend(msg, args);
 
-#if 0
-    // Send to anyone...driver needs to check if it actually needs it
-    // NOTE: handleret[0] states if the message was accepted or not
-    QList<CSimulator *> simulators(CRP6Simulator::getInstance()->getSimulators());
-    QList<QVariant> handlerret;
-    foreach (CSimulator *sim, simulators)
-    {
-        if (sim == instance)
-            continue;
-        handlerret = sim->execTWILuaHandler(msg, args);
-        Q_ASSERT(!handlerret.isEmpty());
-
-        // Break if handler function accepted msg (ie. it returned something)
-        // UNDONE: What to do with general calls?
-        if (handlerret[0].toBool())
-            break;
-    }
-
-    if (handlerret[0].toBool())
-    {
-        handlerret.pop_front();
-        pushPackedLuaTWIData(l, handlerret);
-        return handlerret.size();
-    }
-#endif
     return 0;
 }
 
