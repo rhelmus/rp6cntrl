@@ -92,6 +92,16 @@ const char *IORegisterStringArray[IO_END] = {
 
 namespace {
 
+static int luaPanicCallback(lua_State *l)
+{
+    // UNDONE (might not be a gui thread)
+//    QMessageBox::critical(CRP6Simulator::getInstance(), "Lua error",
+//                          lua_tostring(l, 1));
+    qWarning() << "Lua error:" << lua_tostring(l, -1);
+    Q_ASSERT(false);
+    return 0;
+}
+
 inline CSimulator *getInstanceFromData(void *d)
 {
     return reinterpret_cast<CSimulator *>(d);
@@ -471,6 +481,7 @@ void CSimulator::initLua()
     NLua::addLuaLockState(luaState);
 
     luaL_openlibs(luaState);
+    lua_atpanic(luaState, luaPanicCallback);
     setLuaIOTypes();
     setLuaAVRConstants();
 
@@ -731,13 +742,16 @@ QList<QVariant> CSimulator::execTWILuaHandler(const char *msg,
                                               const QList<QVariant> &args)
 {
     QMutexLocker twilocker(&luaTWIHandlerMutex);
+    const int handlerref = luaTWIHandler;
+    twilocker.unlock();
+
     if (luaTWIHandler == 0)
         return QList<QVariant>();
     NLua::CLuaLocker lualocker(luaState);
 
     const int oldtop = lua_gettop(luaState);
 
-    lua_rawgeti(luaState, LUA_REGISTRYINDEX, luaTWIHandler);
+    lua_rawgeti(luaState, LUA_REGISTRYINDEX, handlerref);
     lua_pushstring(luaState, msg);
     pushPackedLuaTWIData(luaState, args);
     lua_call(luaState, 1 + args.size(), -1);
@@ -859,6 +873,9 @@ int CSimulator::luaAvrSendTWIMSG(lua_State *l)
     const int nargs = lua_gettop(l);
     QList<QVariant> args(packLuaTWIData(l, 2, nargs));
 
+    instance->emit luaTWIMSGSend(msg, args);
+
+#if 0
     // Send to anyone...driver needs to check if it actually needs it
     // NOTE: handleret[0] states if the message was accepted or not
     QList<CSimulator *> simulators(CRP6Simulator::getInstance()->getSimulators());
@@ -882,7 +899,7 @@ int CSimulator::luaAvrSendTWIMSG(lua_State *l)
         pushPackedLuaTWIData(l, handlerret);
         return handlerret.size();
     }
-
+#endif
     return 0;
 }
 
@@ -1140,6 +1157,23 @@ int CSimulator::luaBitShiftRight(lua_State *l)
     const int bits = luaL_checkint(l, 2);
     lua_pushinteger(l, (data >> bits));
     return 1;
+}
+
+void CSimulator::handleLuaTWIMSG(const QString &msg, const QList<QVariant> &args)
+{
+    // UNDONE: Do we actually need a mutex for this at all?
+    QMutexLocker twilocker(&luaTWIHandlerMutex);
+    const int handlerref = luaTWIHandler;
+    twilocker.unlock();
+
+    if (luaTWIHandler == 0)
+        return;
+
+    NLua::CLuaLocker lualocker(luaState);
+    lua_rawgeti(luaState, LUA_REGISTRYINDEX, handlerref);
+    lua_pushstring(luaState, qPrintable(msg));
+    pushPackedLuaTWIData(luaState, args);
+    lua_call(luaState, 1 + args.size(), 0);
 }
 
 void CSimulator::startLua(const char *name)

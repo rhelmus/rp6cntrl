@@ -135,6 +135,11 @@ void CRP6Simulator::initSimulators()
     registerLuaGeneric(m32Simulator->getLuaState());
     registerLuaM32(m32Simulator->getLuaState());
     m32Simulator->startLua("m32");
+
+    connect(robotSimulator, SIGNAL(luaTWIMSGSend(QString,QList<QVariant>)),
+            m32Simulator, SLOT(handleLuaTWIMSG(QString,QList<QVariant>)));
+    connect(m32Simulator, SIGNAL(luaTWIMSGSend(QString,QList<QVariant>)),
+            robotSimulator, SLOT(handleLuaTWIMSG(QString,QList<QVariant>)));
 }
 
 void CRP6Simulator::registerLuaGeneric(lua_State *l)
