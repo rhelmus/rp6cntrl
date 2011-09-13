@@ -136,6 +136,9 @@ class CSimulator : public QObject
     static int luaBitShiftLeft(lua_State *l);
     static int luaBitShiftRight(lua_State *l);
 
+private slots:
+    void handleLuaTWIMSG(const QString &msg, const QList<QVariant> &args);
+
 public:
     explicit CSimulator(QObject *parent = 0);
     ~CSimulator(void);
@@ -153,6 +156,9 @@ public:
     const TIORegisterData *getIORegisterArray(void) const { return IORegisterData; }
     QReadWriteLock &getIORegisterLock(void) { return IORegisterReadWriteLock; }
 #endif
+
+signals:
+    void luaTWIMSGSend(const QString &msg, const QList<QVariant> &args);
 };
 
 #endif // SIMULATOR_H
