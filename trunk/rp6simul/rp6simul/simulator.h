@@ -97,8 +97,6 @@ class CSimulator : public QObject
     void checkPluginThreadDelay(void);
     TIORegisterData getIORegister(EIORegisterTypes type) const;
     void setIORegister(EIORegisterTypes type, TIORegisterData data);
-    QList<QVariant> execTWILuaHandler(const char *msg,
-                                      const QList<QVariant> &args);
 
     // Callbacks for RP6 plugin
     static void IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
