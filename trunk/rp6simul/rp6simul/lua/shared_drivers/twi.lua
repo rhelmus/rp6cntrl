@@ -15,6 +15,7 @@ local TWIInfo =
 {
     state = "idle",
     slaveAddress = nil, -- nil: not a slave (uninitialized)
+    acceptGenCall = nil,
     slaveData = nil,
 }
 
@@ -56,27 +57,60 @@ local function TWIMSGHandler(msg, ...)
             maybeexecisr = true
         end
     else
-        if msg == "slavereadadr" or msg == "slavewriteadr" then
+        if msg == "slavereadadr" then
             local adr = selectOne(1, ...)
             if adr == TWIInfo.slaveAddress then
-                if msg == "slavereadadr" then
+                avr.sendTWIMSG("sreadadrack", ack)
+                if ack then
                     TWIInfo.state = "swrite"
-                    avr.sendTWIMSG("sreadadrack", ack)
-                    if ack then
-                        avr.setIORegister(avr.IO_TWSR, 0xA8)
-                    end
+                    avr.setIORegister(avr.IO_TWSR, 0xA8)
+                    maybeexecisr = true
                 else
-                    TWIInfo.state = "sread"
-                    avr.setIORegister(avr.IO_TWSR, (ack and 0x60) or 0x68)
-                    avr.sendTWIMSG("swriteadrack", ack)
+                    TWIInfo.state = "idle"
                 end
-                maybeexecisr = true
+            else
+                -- Wrong address, send NACK
+                -- UNDONE: Is this correct?
+                -- UNDONE: Multiple slaves
+                avr.sendTWIMSG("sreadadrack", false)
+                TWIInfo.state = "idle"
             end
-        elseif msg == "mdata" and TWIInfo.state == "sread" then
+        elseif msg == "slavewriteadr" then
+            local adr = selectOne(1, ...)
+            if adr == TWIInfo.slaveAddress then
+                avr.sendTWIMSG("swriteadrack", ack)
+                if ack then
+                    TWIInfo.state = "sread"
+                    avr.setIORegister(avr.IO_TWSR, 0x60)
+                    maybeexecisr = true
+                else
+                    TWIInfo.state = "idle"
+                end
+            elseif adr == 0 and TWIInfo.acceptGenCall then
+                avr.sendTWIMSG("swriteadrack", ack)
+                if ack then
+                    TWIInfo.state = "sreadgen"
+                    avr.setIORegister(avr.IO_TWSR, 0x70)
+                    maybeexecisr = true
+                else
+                    TWIInfo.state = "idle"
+                end
+            else
+                -- Wrong address, send NACK
+                -- UNDONE: Is this correct?
+                -- UNDONE: Multiple slaves
+                avr.sendTWIMSG("swriteadrack", false)
+            end
+        elseif msg == "mdata" and
+               (TWIInfo.state == "sread" or TWIInfo.state == "sreadgen") then
             avr.sendTWIMSG("swriteack", ack)
             local d = selectOne(1, ...)
             avr.setIORegister(avr.IO_TWDR, d)
-            avr.setIORegister(avr.IO_TWSR, (ack and 0x80) or 0x88)
+            if TWIInfo.state == "sread" then
+                avr.setIORegister(avr.IO_TWSR, (ack and 0x80) or 0x88)
+            else -- sreadgen
+                avr.setIORegister(avr.IO_TWSR, (ack and 0x90) or 0x98)
+            end
             log("Received slave data:", d, ack, "\n")
             maybeexecisr = true
         elseif msg == "mreadack" and TWIInfo.state == "swrite" then
@@ -197,9 +231,12 @@ end
 
 function handleIOData(type, data)
     if type == avr.IO_TWAR then -- Slave address
-        TWIInfo.slaveAddress = data
-        log(string.format("Setting slave address to %d\n", data))
-        updateRobotStatus("TWI", "slave adr", data)
+        TWIInfo.slaveAddress = bit.unSet(data, 0)
+        TWIInfo.acceptGenCall = bit.isSet(data, 0)
+        log(string.format("Setting slave address to %d\n", TWIInfo.slaveAddress))
+        log(string.format("Slave accepts gen calls: %s\n", tostring(TWIInfo.acceptGenCall)))
+        updateRobotStatus("TWI", "slave adr", TWIInfo.slaveAddress)
+        updateRobotStatus("TWI", "accept gen call", tostring(TWIInfo.acceptGenCall))
     elseif type == avr.IO_TWBR and isMaster() then -- Bitrate
         -- From atmega32 docs: freq=CPU_clock/(16+2*TWBR*4^prescaler)
         -- Note that the driver currently does not handle any prescalers
