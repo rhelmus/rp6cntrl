@@ -84,6 +84,7 @@ local function setDataRegister(data)
     if UARTInfo.transmitterEnabled then
         -- Can/want/need we to buffer this?
         local ch = string.char(data)
+        log("ch:", ch, data, "\n")
         appendSerialOutput(ch)
         UARTInfo.dataSend = UARTInfo.dataSend + 1
         updateRobotStatus("UART", "Data send", UARTInfo.dataSend)
@@ -124,6 +125,9 @@ function initPlugin()
     -- UNDONE: Move out of driver
     avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
     avr.setIORegister(avr.IO_UCSRC, bit.set(0, avr.URSEL, avr.UCSZ0, avr.UCSZ1))
+
+    -- Update data register even when set with previous value!
+    avr.setIORegisterIgnoreEqual(avr.IO_UDR, true)
 
     setSerialSendCallback(sendSerial)
 end

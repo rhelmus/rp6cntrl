@@ -15,6 +15,8 @@
 #include "simulator.h"
 #include "utils.h"
 
+#include "qextserialport.h"
+
 #include <QtGui>
 
 namespace {
@@ -99,6 +101,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
             SLOT(timedLEDUpdate()));
     pluginUpdateLEDsTimer->setInterval(50);
 
+    initSerialPort();
     initSimulators();
 
 
@@ -118,6 +121,32 @@ CRP6Simulator::~CRP6Simulator()
 
     instance = 0;
     NLua::clearLuaLockStates();
+}
+
+void CRP6Simulator::initSerialPort()
+{
+    // UNDONE: port config
+    robotSerialDevice = new QextSerialPort("/dev/pts/3",
+                                         QextSerialPort::EventDriven);
+    robotSerialDevice->setParent(this);
+    robotSerialDevice->setBaudRate(BAUD38400);
+    robotSerialDevice->setFlowControl(FLOW_OFF);
+    robotSerialDevice->setParity(PAR_NONE);
+    robotSerialDevice->setDataBits(DATA_8);
+    robotSerialDevice->setStopBits(STOP_1);
+
+    if (robotSerialDevice->open(QIODevice::ReadWrite) == true)
+    {
+        connect(robotSerialDevice, SIGNAL(readyRead()),
+                SLOT(handleRobotSerialDeviceData()));
+        //        connect(port, SIGNAL(dsrChanged(bool)), this, SLOT(onDsrChanged(bool)));
+        qDebug() << "listening for data on" << robotSerialDevice->portName();
+    }
+    else
+        qDebug() << "device failed to open:" << robotSerialDevice->errorString();
+
+    robotSerialDevice->setDtr(false);
+    robotSerialDevice->setRts(false);
 }
 
 void CRP6Simulator::initSimulators()
@@ -510,7 +539,8 @@ QWidget *CRP6Simulator::createSerialRobotTab()
 
     grid->addWidget(robotSerialSendButton = new QPushButton("Send"), 1, 1);
     robotSerialSendButton->setEnabled(false);
-    connect(robotSerialSendButton, SIGNAL(clicked()), this, SLOT(sendRobotSerialText()));
+    connect(robotSerialSendButton, SIGNAL(clicked()), this,
+            SLOT(sendRobotSerialText()));
     connect(robotSerialInputWidget, SIGNAL(returnPressed()),
             robotSerialSendButton, SLOT(click()));
     connect(this, SIGNAL(receivedRobotSerialSendCallback(bool)),
@@ -1484,6 +1514,26 @@ int CRP6Simulator::luaSetIRCOMMSendCallback(lua_State *l)
     return 0;
 }
 
+void CRP6Simulator::handleRobotSerialDeviceData()
+{
+    if (robotSerialSendLuaCallback == 0)
+        return;
+
+    // UNDONE: Ignore data if not running(? callback == 0 in that case)
+
+    QByteArray bytes;
+    bytes.resize(robotSerialDevice->bytesAvailable());
+    if (robotSerialDevice->read(bytes.data(), bytes.size()) == -1)
+        return;
+    qDebug() << "Received from robot serial device:" << bytes.size() << bytes;
+
+    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
+    lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
+                robotSerialSendLuaCallback);
+    lua_pushstring(robotSimulator->getLuaState(), bytes.constData());
+    lua_call(robotSimulator->getLuaState(), 1, 0);
+}
+
 void CRP6Simulator::updateRobotClockDisplay(unsigned long hz)
 {
     double mhz = static_cast<double>(hz) / 1000000.0;
@@ -1710,6 +1760,10 @@ void CRP6Simulator::timedUIUpdate()
         cur.movePosition(QTextCursor::End);
         robotSerialOutputWidget->setTextCursor(cur);
         robotSerialOutputWidget->insertPlainText(robotSerialTextBuffer);
+
+        if (robotSerialDevice->isWritable())
+            robotSerialDevice->write(robotSerialTextBuffer.toLatin1());
+
         robotSerialTextBuffer.clear();
     }
 
@@ -2053,9 +2107,4 @@ bool CRP6Simulator::loadCustomDriverInfo(const QString &file, QString &name,
     lua_pop(robotSimulator->getLuaState(), 2);
 
     return ok;
-}
-
-QList<CSimulator *> CRP6Simulator::getSimulators() const
-{
-    return QList<CSimulator *>() << robotSimulator << m32Simulator;
 }

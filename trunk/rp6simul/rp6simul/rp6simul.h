@@ -31,6 +31,8 @@ class QTabWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 
+class QextSerialPort;
+
 class CBumper;
 class CLED;
 class CProjectWizard;
@@ -43,6 +45,7 @@ class CRP6Simulator : public QMainWindow
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
+    QextSerialPort *robotSerialDevice;
     CSimulator *robotSimulator, *m32Simulator;
     QString currentProjectFile;
     QString currentMapFile;
@@ -109,6 +112,7 @@ class CRP6Simulator : public QMainWindow
 
     static CRP6Simulator *instance;
 
+    void initSerialPort(void);
     void initSimulators(void);
     void registerLuaGeneric(lua_State *l);
     void registerLuaRobot(lua_State *l);
@@ -175,6 +179,7 @@ class CRP6Simulator : public QMainWindow
     static int luaSetIRCOMMSendCallback(lua_State *l);
 
 private slots:
+    void handleRobotSerialDeviceData(void);
     void updateRobotClockDisplay(unsigned long hz);
     void updateM32ClockDisplay(unsigned long hz);
     void timedUIUpdate(void);
@@ -209,7 +214,6 @@ public:
     static CRP6Simulator *getInstance(void) { return instance; }
     bool loadCustomDriverInfo(const QString &file, QString &name,
                               QString &desc);
-    QList<CSimulator *> getSimulators(void) const;
 
 signals:
     // These are emitted by the class itself to easily thread-synchronize

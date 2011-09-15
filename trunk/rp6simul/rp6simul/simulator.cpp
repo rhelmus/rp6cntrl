@@ -490,6 +490,8 @@ void CSimulator::initLua()
                            "avr", this);
     NLua::registerFunction(luaState, luaAvrSetIORegister, "setIORegister",
                            "avr", this);
+    NLua::registerFunction(luaState, luaAvrSetIORegisterIgnoreEqual,
+                           "setIORegisterIgnoreEqual", "avr", this);
     NLua::registerFunction(luaState, luaAvrExecISR, "execISR", "avr", this);
     NLua::registerFunction(luaState, luaAvrSetTWIMSGHandler, "setTWIMSGHandler",
                            "avr", this);
@@ -742,7 +744,8 @@ void CSimulator::IORegisterSetCB(EIORegisterTypes type, TIORegisterData value,
                                  void *data)
 {
     CSimulator *instance = getInstanceFromData(data);
-    if (instance->getIORegister(type) != value)
+    if (instance->IORegisterDataIgnoreEqual[type] ||
+        (instance->getIORegister(type) != value))
     {
         instance->setIORegister(type, value);
 
@@ -809,6 +812,15 @@ int CSimulator::luaAvrSetIORegister(lua_State *l)
     const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
     const int data = luaL_checkint(l, 2);
     instance->setIORegister(type, data);
+    return 0;
+}
+
+int CSimulator::luaAvrSetIORegisterIgnoreEqual(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
+    const EIORegisterTypes type = static_cast<EIORegisterTypes>(luaL_checkint(l, 1));
+    instance->IORegisterDataIgnoreEqual[type] = NLua::checkBoolean(l, 2);
     return 0;
 }
 
@@ -1217,7 +1229,10 @@ void CSimulator::stopPlugin()
     lua_call(luaState, 0, 0);
 
     for (int i=0; i<IO_END; ++i)
+    {
         IORegisterData[i] = 0;
+        IORegisterDataIgnoreEqual[i] = false;
+    }
 
     ISRsEnabled = false;
     for (int i=0; i<ISR_END; ++i)

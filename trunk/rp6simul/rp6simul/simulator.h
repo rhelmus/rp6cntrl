@@ -74,6 +74,7 @@ class CSimulator : public QObject
     TIORegisterData IORegisterData[IO_END];
     mutable QReadWriteLock IORegisterReadWriteLock;
 #endif
+    bool IORegisterDataIgnoreEqual[IO_END];
 
     bool ISRsEnabled;
     typedef void (*TISR)(void);
@@ -111,6 +112,7 @@ class CSimulator : public QObject
     // Lua bindings
     static int luaAvrGetIORegister(lua_State *l);
     static int luaAvrSetIORegister(lua_State *l);
+    static int luaAvrSetIORegisterIgnoreEqual(lua_State *l);
     static int luaAvrExecISR(lua_State *l);
     static int luaAvrSetTWIMSGHandler(lua_State *l);
     static int luaAvrSendTWIMSG(lua_State *l);

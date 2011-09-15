@@ -11,7 +11,9 @@ TEMPLATE = app
 
 DEFINES += USEATOMIC
 
-INCLUDEPATH += ../shared/
+INCLUDEPATH += ../shared/ ../qextserialport/
+
+LIBS += -L../qextserialport/build -lqextserialport
 
 SOURCES += main.cpp\
         rp6simul.cpp \
