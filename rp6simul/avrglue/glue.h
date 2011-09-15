@@ -23,11 +23,11 @@ void sei(void);
 #define PSTR(s) (s)
 #define pgm_read_word(addr) (*addr)
 #define pgm_read_byte_near(addr) (*addr)
-// ...
+// UNDONE: More ...?
 
 // progmem utility functions
 #define strcmp_P strcmp
-// ...
+// UNDONE: More ...?
 
 #include "ioregisters.h"
 
