@@ -107,6 +107,7 @@ class CRP6Simulator : public QMainWindow
     QMap<CBumper *, int> bumperLuaCallbacks;
     int robotSerialSendLuaCallback, m32SerialSendLuaCallback;
     int IRCOMMSendLuaCallback;
+    int luaHandleExtInt1Callback;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -178,6 +179,8 @@ class CRP6Simulator : public QMainWindow
     static int luaSetRobotSerialSendCallback(lua_State *l);
     static int luaSetM32SerialSendCallback(lua_State *l);
     static int luaSetIRCOMMSendCallback(lua_State *l);
+    static int luaSetExtInt1Handler(lua_State *l);
+    static int luaSetExtInt1Enabled(lua_State *l);
 
 private slots:
     void handleRobotSerialDeviceData(void);
