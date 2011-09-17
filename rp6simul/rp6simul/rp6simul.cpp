@@ -251,6 +251,8 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
                            "setSerialSendCallback");
     NLua::registerFunction(l, luaAppendM32SerialOutput, "appendSerialOutput");
     NLua::registerFunction(l, luaSetExtInt1Handler, "setExtInt1Handler");
+    NLua::registerFunction(l, luaSetExtEEPROM, "setExtEEPROM");
+    NLua::registerFunction(l, luaGetExtEEPROM, "getExtEEPROM");
 }
 
 void CRP6Simulator::createMenus()
@@ -1023,6 +1025,30 @@ void CRP6Simulator::appendRobotStatusUpdate(const QStringList &strtree)
         robotStatusUpdateBuffer.append(strtree);
 }
 
+QVariantList CRP6Simulator::getExtEEPROM() const
+{
+    CProjectSettings prsettings(currentProjectFile);
+    if (!verifySettingsFile(prsettings))
+        return QVariantList();
+
+    prsettings.beginGroup("m32");
+    QVariantList eeprom;
+
+    if (prsettings.contains("exteeprom"))
+        return prsettings.value("exteeprom").toList();
+
+    // Initialize EEPROM with 255 as value for each byte
+    // The external EEPROM is 32 kB in size
+    QVariantList ret;
+    const int size = 32 * 1024;
+    for (int i=0; i<size; ++i)
+        ret << 255;
+
+    prsettings.setValue("exteeprom", ret); // Cache
+
+    return ret;
+}
+
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
@@ -1571,6 +1597,42 @@ int CRP6Simulator::luaSetExtInt1Enabled(lua_State *l)
     }
 
     return 0;
+}
+
+int CRP6Simulator::luaSetExtEEPROM(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const int adr = luaL_checkint(l, 1);
+    const uint8_t data = luaL_checkint(l, 2);
+
+    QVariantList eeprom(instance->getExtEEPROM());
+
+    if (eeprom.isEmpty())
+        return 0; // Something went wrong
+
+    eeprom[adr] = data;
+
+    CProjectSettings prsettings(instance->currentProjectFile);
+    if (verifySettingsFile(prsettings))
+        prsettings.setValue("m32/exteeprom", eeprom);
+    return 0;
+}
+
+int CRP6Simulator::luaGetExtEEPROM(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const int adr = luaL_checkint(l, 1);
+
+    QVariantList eeprom(instance->getExtEEPROM());
+
+    if (eeprom.isEmpty())
+        lua_pushinteger(l, 255); // Something went wrong (255 is def. value)
+    else
+        lua_pushinteger(l, eeprom[adr].toUInt());
+
+    return 1;
 }
 
 void CRP6Simulator::handleRobotSerialDeviceData()

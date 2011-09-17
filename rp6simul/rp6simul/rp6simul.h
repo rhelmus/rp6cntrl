@@ -147,6 +147,7 @@ class CRP6Simulator : public QMainWindow
     void addMapHistoryFile(const QString &file);
     QString getLogOutput(ELogType type, QString text) const;
     void appendRobotStatusUpdate(const QStringList &strtree);
+    QVariantList getExtEEPROM(void) const;
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
@@ -181,6 +182,8 @@ class CRP6Simulator : public QMainWindow
     static int luaSetIRCOMMSendCallback(lua_State *l);
     static int luaSetExtInt1Handler(lua_State *l);
     static int luaSetExtInt1Enabled(lua_State *l);
+    static int luaSetExtEEPROM(lua_State *l);
+    static int luaGetExtEEPROM(lua_State *l);
 
 private slots:
     void handleRobotSerialDeviceData(void);

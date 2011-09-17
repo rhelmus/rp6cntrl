@@ -10,7 +10,6 @@ local driverEnabled = false
 
 local function handleExtInt1(e)
     if not driverEnabled then
-        warning("Driver disabled\n")
         return
     end
 

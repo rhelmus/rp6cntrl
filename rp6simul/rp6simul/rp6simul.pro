@@ -86,7 +86,8 @@ OTHER_FILES += \
     lua/m32/drivers/led.lua \
     lua/shared_drivers/twi.lua \
     lua/robot/drivers/extint1.lua \
-    lua/m32/drivers/extint1.lua
+    lua/m32/drivers/extint1.lua \
+    lua/m32/drivers/exteeprom.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \
@@ -150,6 +151,7 @@ else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
     LIBS += -llua
 }
+
 
 
 

@@ -1040,6 +1040,8 @@ int CSimulator::luaBitUnPack(lua_State *l)
         lua_pushinteger(l, (low & 0xFF) | ((high & 0xFF) << 8));
     else if (size == 16)
         lua_pushinteger(l, (low & 0xFFFF) | ((high & 0xFFFF) << 16));
+    else
+        luaL_argerror(l, 3, "unPack size should be 8 or 16");
 
     return 1;
 }
