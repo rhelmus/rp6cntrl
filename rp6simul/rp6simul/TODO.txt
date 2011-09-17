@@ -70,3 +70,4 @@
         - Disable robot option (m32 only)
     - Extend loadCustomDriverInfo()
 - power LED
+- autodetect F_CPU?

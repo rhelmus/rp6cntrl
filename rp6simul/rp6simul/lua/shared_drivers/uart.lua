@@ -84,7 +84,6 @@ local function setDataRegister(data)
     if UARTInfo.transmitterEnabled then
         -- Can/want/need we to buffer this?
         local ch = string.char(data)
-        log("ch:", ch, data, "\n")
         appendSerialOutput(ch)
         UARTInfo.dataSend = UARTInfo.dataSend + 1
         updateRobotStatus("UART", "Data send", UARTInfo.dataSend)
