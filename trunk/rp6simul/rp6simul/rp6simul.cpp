@@ -41,6 +41,23 @@ void activateDockTab(QObject *p, const QString &tab)
     qDebug() << "Warning: couldn't activate dock tab" << tab << "(not found)";
 }
 
+QByteArray handSerialDeviceData(QextSerialPort *dev, lua_State *l, int luacb)
+{
+    QByteArray bytes;
+    bytes.resize(dev->bytesAvailable());
+    if (dev->read(bytes.data(), bytes.size()) == -1)
+        return QByteArray();
+
+    qDebug() << dev->portName() << ":" << bytes;
+
+    NLua::CLuaLocker lualocker(l);
+    lua_rawgeti(l, LUA_REGISTRYINDEX, luacb);
+    lua_pushstring(l, bytes.constData());
+    lua_call(l, 1, 0);
+
+    return bytes;
+}
+
 }
 
 CRP6Simulator *CRP6Simulator::instance = 0;
@@ -101,7 +118,21 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
             SLOT(timedLEDUpdate()));
     pluginUpdateLEDsTimer->setInterval(50);
 
-    initSerialPort();
+    // UNDONE: port config and only open if set
+    robotSerialDevice = new QextSerialPort("/dev/pts/3",
+                                           QextSerialPort::EventDriven);
+    connect(robotSerialDevice, SIGNAL(readyRead()),
+            SLOT(handleRobotSerialDeviceData()));
+    initSerialPort(robotSerialDevice);
+    openSerialPort(robotSerialDevice);
+
+    m32SerialDevice = new QextSerialPort("/dev/pts/4",
+                                           QextSerialPort::EventDriven);
+    connect(m32SerialDevice, SIGNAL(readyRead()),
+            SLOT(handleM32SerialDeviceData()));
+    initSerialPort(m32SerialDevice);
+    openSerialPort(m32SerialDevice);
+
     initSimulators();
 
 
@@ -123,30 +154,28 @@ CRP6Simulator::~CRP6Simulator()
     NLua::clearLuaLockStates();
 }
 
-void CRP6Simulator::initSerialPort()
+void CRP6Simulator::initSerialPort(QextSerialPort *port)
 {
-    // UNDONE: port config
-    robotSerialDevice = new QextSerialPort("/dev/pts/3",
-                                         QextSerialPort::EventDriven);
-    robotSerialDevice->setParent(this);
-    robotSerialDevice->setBaudRate(BAUD38400);
-    robotSerialDevice->setFlowControl(FLOW_OFF);
-    robotSerialDevice->setParity(PAR_NONE);
-    robotSerialDevice->setDataBits(DATA_8);
-    robotSerialDevice->setStopBits(STOP_1);
+    port->setParent(this);
+    // UNDONE: Config
+    port->setBaudRate(BAUD38400);
+    port->setFlowControl(FLOW_OFF);
+    port->setParity(PAR_NONE);
+    port->setDataBits(DATA_8);
+    port->setStopBits(STOP_1);
+}
 
-    if (robotSerialDevice->open(QIODevice::ReadWrite) == true)
+void CRP6Simulator::openSerialPort(QextSerialPort *port)
+{
+    if (port->open(QIODevice::ReadWrite) == true)
     {
-        connect(robotSerialDevice, SIGNAL(readyRead()),
-                SLOT(handleRobotSerialDeviceData()));
-        //        connect(port, SIGNAL(dsrChanged(bool)), this, SLOT(onDsrChanged(bool)));
-        qDebug() << "listening for data on" << robotSerialDevice->portName();
+        qDebug() << "listening for data on" << port->portName();
+        port->setDtr(false);
+        port->setRts(false);
     }
     else
-        qDebug() << "device failed to open:" << robotSerialDevice->errorString();
-
-    robotSerialDevice->setDtr(false);
-    robotSerialDevice->setRts(false);
+        QMessageBox::critical(this, "Serial port error",
+                              QString("Failed to open serial port:\n%1").arg(port->errorString()));
 }
 
 void CRP6Simulator::initSimulators()
@@ -1521,17 +1550,31 @@ void CRP6Simulator::handleRobotSerialDeviceData()
 
     // UNDONE: Ignore data if not running(? callback == 0 in that case)
 
-    QByteArray bytes;
-    bytes.resize(robotSerialDevice->bytesAvailable());
-    if (robotSerialDevice->read(bytes.data(), bytes.size()) == -1)
-        return;
-    qDebug() << "Received from robot serial device:" << bytes.size() << bytes;
+    QByteArray txt = handSerialDeviceData(robotSerialDevice,
+                                          robotSimulator->getLuaState(),
+                                          robotSerialSendLuaCallback);
 
-    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
-    lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
-                robotSerialSendLuaCallback);
-    lua_pushstring(robotSimulator->getLuaState(), bytes.constData());
-    lua_call(robotSimulator->getLuaState(), 1, 0);
+    QTextCharFormat cf(robotSerialOutputWidget->currentCharFormat());
+    cf.setForeground(Qt::lightGray);
+    robotSerialOutputWidget->setCurrentCharFormat(cf);
+    robotSerialOutputWidget->appendPlainText(txt);
+}
+
+void CRP6Simulator::handleM32SerialDeviceData()
+{
+    if (m32SerialSendLuaCallback == 0)
+        return;
+
+    // UNDONE: Ignore data if not running(? callback == 0 in that case)
+
+    QByteArray txt = handSerialDeviceData(m32SerialDevice,
+                                          m32Simulator->getLuaState(),
+                                          m32SerialSendLuaCallback);
+
+    QTextCharFormat cf(m32SerialOutputWidget->currentCharFormat());
+    cf.setForeground(Qt::lightGray);
+    m32SerialOutputWidget->setCurrentCharFormat(cf);
+    m32SerialOutputWidget->appendPlainText(txt);
 }
 
 void CRP6Simulator::updateRobotClockDisplay(unsigned long hz)
@@ -1759,6 +1802,9 @@ void CRP6Simulator::timedUIUpdate()
         QTextCursor cur = robotSerialOutputWidget->textCursor();
         cur.movePosition(QTextCursor::End);
         robotSerialOutputWidget->setTextCursor(cur);
+        QTextCharFormat cf(robotSerialOutputWidget->currentCharFormat());
+        cf.setForeground(Qt::black);
+        robotSerialOutputWidget->setCurrentCharFormat(cf);
         robotSerialOutputWidget->insertPlainText(robotSerialTextBuffer);
 
         if (robotSerialDevice->isWritable())
@@ -1774,7 +1820,14 @@ void CRP6Simulator::timedUIUpdate()
         QTextCursor cur = m32SerialOutputWidget->textCursor();
         cur.movePosition(QTextCursor::End);
         m32SerialOutputWidget->setTextCursor(cur);
+        QTextCharFormat cf(m32SerialOutputWidget->currentCharFormat());
+        cf.setForeground(Qt::black);
+        m32SerialOutputWidget->setCurrentCharFormat(cf);
         m32SerialOutputWidget->insertPlainText(m32SerialTextBuffer);
+
+        if (m32SerialDevice->isWritable())
+            m32SerialDevice->write(m32SerialTextBuffer.toLatin1());
+
         m32SerialTextBuffer.clear();
     }
 
@@ -2032,6 +2085,9 @@ void CRP6Simulator::sendRobotSerialText()
                    qPrintable(robotSerialInputWidget->text() + "\n"));
     lua_call(robotSimulator->getLuaState(), 1, 0);
 
+    QTextCharFormat cf(robotSerialOutputWidget->currentCharFormat());
+    cf.setForeground(Qt::red);
+    robotSerialOutputWidget->setCurrentCharFormat(cf);
     robotSerialOutputWidget->appendPlainText(QString("> %1\n").arg(robotSerialInputWidget->text()));
 
     robotSerialInputWidget->clear();
