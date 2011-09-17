@@ -65,7 +65,7 @@ CRP6Simulator *CRP6Simulator::instance = 0;
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QMainWindow(parent), currentMapIsTemplate(false), robotIsBlocked(false),
     robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
-    IRCOMMSendLuaCallback(0)
+    IRCOMMSendLuaCallback(0), luaHandleExtInt1Callback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -224,6 +224,7 @@ void CRP6Simulator::registerLuaRobot(lua_State *l)
     NLua::registerFunction(l, luaSetMotorMoveSpeed, "setMotorMoveSpeed");
     NLua::registerFunction(l, luaSetMotorDir, "setMotorDir");
     NLua::registerFunction(l, luaSetIRCOMMSendCallback, "setIRCOMMSendCallback");
+    NLua::registerFunction(l, luaSetExtInt1Enabled, "setExtInt1Enabled");
 
     // LED class
     NLua::registerFunction(l, luaCreateLED, "createLED");
@@ -249,6 +250,7 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
     NLua::registerFunction(l, luaSetM32SerialSendCallback,
                            "setSerialSendCallback");
     NLua::registerFunction(l, luaAppendM32SerialOutput, "appendSerialOutput");
+    NLua::registerFunction(l, luaSetExtInt1Handler, "setExtInt1Handler");
 }
 
 void CRP6Simulator::createMenus()
@@ -1543,6 +1545,34 @@ int CRP6Simulator::luaSetIRCOMMSendCallback(lua_State *l)
     return 0;
 }
 
+int CRP6Simulator::luaSetExtInt1Handler(lua_State *l)
+{
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    if (instance->luaHandleExtInt1Callback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->luaHandleExtInt1Callback);
+    lua_pushvalue(l, 1);
+    instance->luaHandleExtInt1Callback = luaL_ref(l, LUA_REGISTRYINDEX);
+
+    return 0;
+}
+
+int CRP6Simulator::luaSetExtInt1Enabled(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    if (instance->luaHandleExtInt1Callback != 0)
+    {
+        const bool e = NLua::checkBoolean(l, 1);
+        NLua::CLuaLocker lock(instance->m32Simulator->getLuaState());
+        lua_rawgeti(instance->m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                    instance->luaHandleExtInt1Callback);
+        lua_pushboolean(instance->m32Simulator->getLuaState(), e);
+        lua_call(instance->m32Simulator->getLuaState(), 1, 0);
+    }
+
+    return 0;
+}
+
 void CRP6Simulator::handleRobotSerialDeviceData()
 {
     if (robotSerialSendLuaCallback == 0)
@@ -1954,12 +1984,23 @@ void CRP6Simulator::stopPlugin()
         }
     }
 
-    if (m32SerialSendLuaCallback)
+    if (m32SerialSendLuaCallback || luaHandleExtInt1Callback)
     {
         NLua::CLuaLocker lualocker(m32Simulator->getLuaState());
-        luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
-                   m32SerialSendLuaCallback);
-        m32SerialSendLuaCallback = 0;
+
+        if (m32SerialSendLuaCallback)
+        {
+            luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                       m32SerialSendLuaCallback);
+            m32SerialSendLuaCallback = 0;
+        }
+
+        if (luaHandleExtInt1Callback)
+        {
+            luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                       luaHandleExtInt1Callback);
+            luaHandleExtInt1Callback = 0;
+        }
     }
 
     robotSimulator->stopPlugin();
