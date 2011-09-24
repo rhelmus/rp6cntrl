@@ -5,7 +5,6 @@
 #include "shared.h"
 
 #include <stdint.h>
-#include <time.h>
 
 namespace NRP6SimulGlue {
 

@@ -63,9 +63,11 @@ QByteArray handSerialDeviceData(QextSerialPort *dev, lua_State *l, int luacb)
 CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
-    QMainWindow(parent), currentMapIsTemplate(false), robotIsBlocked(false),
-    robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
-    IRCOMMSendLuaCallback(0), luaHandleExtInt1Callback(0)
+    QMainWindow(parent), audioCurrentCycle(0.0), audioFrequency(0.0),
+    currentMapIsTemplate(false),
+    robotIsBlocked(false), robotSerialSendLuaCallback(0),
+    m32SerialSendLuaCallback(0), IRCOMMSendLuaCallback(0),
+    luaHandleExtInt1Callback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -133,6 +135,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     initSerialPort(m32SerialDevice);
     openSerialPort(m32SerialDevice);
 
+    initSDL();
     initSimulators();
 
 
@@ -152,6 +155,8 @@ CRP6Simulator::~CRP6Simulator()
 
     instance = 0;
     NLua::clearLuaLockStates();
+
+    SDL_Quit();
 }
 
 void CRP6Simulator::initSerialPort(QextSerialPort *port)
@@ -173,9 +178,35 @@ void CRP6Simulator::openSerialPort(QextSerialPort *port)
         port->setDtr(false);
         port->setRts(false);
     }
-    else
+    else // UNDONE
         QMessageBox::critical(this, "Serial port error",
                               QString("Failed to open serial port:\n%1").arg(port->errorString()));
+}
+
+void CRP6Simulator::initSDL()
+{
+    if (SDL_Init(SDL_INIT_AUDIO))
+    {
+        // UNDONE
+        QMessageBox::critical(this, "SDL init error",
+                              QString("Failed to initialize SDL:\n%1").arg(SDL_GetError()));
+        return;
+    }
+
+    SDL_AudioSpec spec, retspec;
+
+    spec.freq = AUDIO_SAMPLERATE;
+    spec.format = AUDIO_S16SYS;
+    spec.channels = 1;
+    spec.samples = 512;
+    spec.callback = SDLAudioCallback;
+
+    if (SDL_OpenAudio(&spec, &retspec))
+    {
+        // UNDONE
+        QMessageBox::critical(this, "Audio error",
+                              QString("Failed to open audio device:\n%1").arg(SDL_GetError()));
+    }
 }
 
 void CRP6Simulator::initSimulators()
@@ -253,6 +284,8 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
     NLua::registerFunction(l, luaSetExtInt1Handler, "setExtInt1Handler");
     NLua::registerFunction(l, luaSetExtEEPROM, "setExtEEPROM");
     NLua::registerFunction(l, luaGetExtEEPROM, "getExtEEPROM");
+    NLua::registerFunction(l, luaSetBeeperEnabled, "setBeeperEnabled");
+    NLua::registerFunction(l, luaSetBeeperFrequency, "setBeeperFrequency");
 }
 
 void CRP6Simulator::createMenus()
@@ -1049,6 +1082,37 @@ QVariantList CRP6Simulator::getExtEEPROM() const
     return ret;
 }
 
+void CRP6Simulator::SDLAudioCallback(void *, Uint8 *stream, int length)
+{
+    // Based on http://www.dgames.org/beep-sound-with-sdl/
+
+    // Convert to 16 bit stream
+    Sint16 *stream16 = (Sint16 *)stream;
+    int length16 = length / 2;
+
+    // Non-aliased square wave, code taken from Audacity (effects/ToneGen.cpp)
+    const double pre2PI = 2 * M_PI;
+    const double pre4divPI = 4. / M_PI;
+
+    for(int i=0; i<length16; ++i)
+    {
+        // Scaling
+        const float b = (1. + cos((pre2PI * instance->audioFrequency)/AUDIO_SAMPLERATE))/pre4divPI;
+        float f = pre4divPI *
+                sin(pre2PI * instance->audioCurrentCycle / AUDIO_SAMPLERATE);
+        for(int k=3; (k<200) && (k * instance->audioFrequency < AUDIO_SAMPLERATE/2.); k+=2)
+        {
+            // Hanning Window in freq domain
+            const float a = 1. + cos((pre2PI * k * instance->audioFrequency)/AUDIO_SAMPLERATE);
+            // calc harmonic, apply window, scale to amplitude of fundamental
+            f += a * sin(pre2PI * instance->audioCurrentCycle/AUDIO_SAMPLERATE * k)/(b*k);
+        }
+        // UNDONE: configurable amplitude (volume)
+        stream16[i] = 32760/5.0 * f;
+        instance->audioCurrentCycle += instance->audioFrequency;
+    }
+}
+
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
@@ -1635,6 +1699,39 @@ int CRP6Simulator::luaGetExtEEPROM(lua_State *l)
     return 1;
 }
 
+int CRP6Simulator::luaSetBeeperEnabled(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const bool e = NLua::checkBoolean(l, 1);
+    const bool playing = (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING);
+
+    if (e != playing)
+    {
+        if (e) // Initialize?
+            instance->audioCurrentCycle = 0.0;
+
+        // UNDONE: Check if audio is enabled/not in error state
+        SDL_PauseAudio(!e);
+    }
+
+    return 0;
+}
+
+int CRP6Simulator::luaSetBeeperFrequency(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const float freq = luaL_checknumber(l, 1);
+
+    // UNDONE: Check if audio is enabled/not in error state
+    SDL_LockAudio();
+    instance->audioFrequency = freq;
+    SDL_UnlockAudio();
+
+    return 0;
+}
+
 void CRP6Simulator::handleRobotSerialDeviceData()
 {
     if (robotSerialSendLuaCallback == 0)
@@ -2020,6 +2117,8 @@ void CRP6Simulator::runPlugin()
 
 void CRP6Simulator::stopPlugin()
 {
+    SDL_PauseAudio(1);
+
     if (robotSerialSendLuaCallback || IRCOMMSendLuaCallback ||
         !bumperLuaCallbacks.isEmpty())
     {
