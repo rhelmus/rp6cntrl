@@ -1,35 +1,11 @@
 #include "glue.h"
 
-#include <signal.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
-
 namespace {
 NRP6SimulGlue::TEnableISRsCB enableISRsCallback = 0;
 }
 
 namespace NRP6SimulGlue {
-
 void *callBackData;
-
-void debugOut(const char *s...)
-{
-    char *txt;
-    va_list v;
-
-    va_start(v, s);
-    vasprintf(&txt, s, v);
-    va_end(v);
-
-    printf("DEBUG: %s\n", txt);
-    fflush(stdout);
-
-    free(txt);
-}
-
 }
 
 void cli(void)

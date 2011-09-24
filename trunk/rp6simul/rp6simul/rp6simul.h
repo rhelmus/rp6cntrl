@@ -3,6 +3,8 @@
 
 #include <QtGui/QMainWindow>
 
+#include <SDL/SDL.h>
+
 #include <QList>
 #include <QMutex>
 #include <QString>
@@ -45,7 +47,10 @@ class CRP6Simulator : public QMainWindow
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
 
+    enum { AUDIO_SAMPLERATE = 22050 };
+
     QextSerialPort *robotSerialDevice, *m32SerialDevice;
+    float audioCurrentCycle, audioFrequency;
     CSimulator *robotSimulator, *m32Simulator;
     QString currentProjectFile;
     QString currentMapFile;
@@ -115,6 +120,7 @@ class CRP6Simulator : public QMainWindow
 
     void initSerialPort(QextSerialPort *port);
     void openSerialPort(QextSerialPort *port);
+    void initSDL(void);
     void initSimulators(void);
     void registerLuaGeneric(lua_State *l);
     void registerLuaRobot(lua_State *l);
@@ -148,6 +154,9 @@ class CRP6Simulator : public QMainWindow
     QString getLogOutput(ELogType type, QString text) const;
     void appendRobotStatusUpdate(const QStringList &strtree);
     QVariantList getExtEEPROM(void) const;
+
+    // SDL audio callback
+    static void SDLAudioCallback(void *, Uint8 *stream, int length);
 
     // Lua bindings
     static int luaAppendLogOutput(lua_State *l);
@@ -184,6 +193,8 @@ class CRP6Simulator : public QMainWindow
     static int luaSetExtInt1Enabled(lua_State *l);
     static int luaSetExtEEPROM(lua_State *l);
     static int luaGetExtEEPROM(lua_State *l);
+    static int luaSetBeeperEnabled(lua_State *l);
+    static int luaSetBeeperFrequency(lua_State *l);
 
 private slots:
     void handleRobotSerialDeviceData(void);

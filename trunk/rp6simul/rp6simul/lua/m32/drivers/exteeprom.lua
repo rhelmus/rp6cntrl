@@ -25,7 +25,7 @@ local function handleEEPROMData(data)
         elseif data == 0x04 then EEPROMInfo.writeEnabled = false
         elseif data == 0x05 then EEPROMInfo.state = "readstat"
         elseif data == 0x01 then -- write status
-            error("Setting write status register is unsupported!\n");
+            errorLog("Setting write status register is unsupported!\n");
         end
     elseif (EEPROMInfo.state == "read" or EEPROMInfo.state == "write") and
             not EEPROMInfo.address then
@@ -46,11 +46,11 @@ local function handleEEPROMData(data)
         if not EEPROMInfo.writeEnabled then
             warning("Ignoring EEPROM write: writing disabled\n")
         else
+            setExtEEPROM(EEPROMInfo.address, data)
+
             -- The EEPROM spec tells us that only the 6 lower bit are
             -- incremented, thus when exceeding the page size (64) a
-            -- rollover occurs. Note that reading is always contineous.
-
-            setExtEEPROM(EEPROMInfo.address, data)
+            -- rollover occurs. Note that reading is always continuous.
 
             -- Increment, but only keep 6 lowest bits
             inc = bit.bitAnd(EEPROMInfo.address + 1, tonumber(111111, 2))
