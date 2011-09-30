@@ -6,6 +6,7 @@
 #include "shared.h"
 
 #include <time.h>
+#include <sys/time.h>
 
 #include <QLibrary>
 #include <QMutex>
@@ -88,6 +89,9 @@ class CSimulator : public QObject
     QStringList currentDriverList;
     QLibrary RP6Plugin;
 
+    static timeval startTimeMS;
+    static bool timeMSInitialized;
+
     void setLuaIOTypes(void);
     void setLuaAVRConstants(void);
     void initLua(void);
@@ -119,6 +123,7 @@ class CSimulator : public QObject
     static int luaClockSetTargetSpeed(lua_State *l);
     static int luaClockCreateTimer(lua_State *l);
     static int luaClockEnableTimer(lua_State *l);
+    static int luaClockGetTimeMS(lua_State *l);
     static int luaTimerDestr(lua_State *l);
     static int luaTimerSetCompareValue(lua_State *l);
     static int luaTimerSetPrescaler(lua_State *l);

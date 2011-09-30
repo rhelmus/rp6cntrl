@@ -174,10 +174,19 @@ void pushPackedLuaTWIData(lua_State *l, const QList<QVariant> &list)
 }
 
 
+timeval CSimulator::startTimeMS;
+bool CSimulator::timeMSInitialized = false;
+
 CSimulator::CSimulator(QObject *parent) :
     QObject(parent), pluginMainThread(0), quitPlugin(false),
     ISRExecMutex(QMutex::Recursive), luaTWIHandler(0)
 {
+    if (!timeMSInitialized)
+    {
+        gettimeofday(&startTimeMS, 0);
+        timeMSInitialized = true;
+    }
+
     initLua();
     initAVRClock();
 }
@@ -504,6 +513,7 @@ void CSimulator::initLua()
                            "clock", this);
     NLua::registerFunction(luaState, luaClockEnableTimer, "enableTimer",
                            "clock", this);
+    NLua::registerFunction(luaState, luaClockGetTimeMS, "getTimeMS", "clock");
 
     // timer class
     NLua::registerClassFunction(luaState, luaTimerSetCompareValue,
@@ -887,6 +897,18 @@ int CSimulator::luaClockEnableTimer(lua_State *l)
     const bool e = NLua::checkBoolean(l, 2);
     instance->AVRClock->enableTimer(timer, e);
     return 0;
+}
+
+int CSimulator::luaClockGetTimeMS(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    timeval current;
+    gettimeofday(&current, NULL);
+    lua_pushinteger(l, ((current.tv_sec-startTimeMS.tv_sec) * 1000 ) +
+                    ((current.tv_usec-startTimeMS.tv_usec) / 1000));
+
+    return 1;
 }
 
 int CSimulator::luaTimerDestr(lua_State *l)

@@ -7,8 +7,12 @@ http://www.freeseamlesstextures.com/
 Icons:
 - Oxygen theme
 - Mouse arrow: DMZ (http://jimmac.musichall.cz/themes.php)
+- Clapping hands: http://www.clker.com/
 
 Self:
 - RP6 texture
 - Grid icon
 Do whatever you like with it (or send an improved version).
+
+clapping-hands.wav:
+http://free-loops.com/
