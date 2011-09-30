@@ -30,6 +30,7 @@ class QSpinBox;
 class QStackedWidget;
 class QTableWidget;
 class QTabWidget;
+class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -46,11 +47,16 @@ class CRP6Simulator : public QMainWindow
     Q_OBJECT
 
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
-
     enum { AUDIO_SAMPLERATE = 22050 };
+    enum EHandClapMode { CLAP_SOFT, CLAP_NORMAL, CLAP_LOUD };
 
     QextSerialPort *robotSerialDevice, *m32SerialDevice;
     float audioCurrentCycle, audioFrequency;
+    bool playingBeep;
+    SDL_AudioCVT handClapCVT;
+    EHandClapMode handClapMode;
+    bool playingHandClap;
+    int handClapSoundPos;
     CSimulator *robotSimulator, *m32Simulator;
     QString currentProjectFile;
     QString currentMapFile;
@@ -59,6 +65,7 @@ class CRP6Simulator : public QMainWindow
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
     QAction *runPluginAction, *stopPluginAction;
+    QToolButton *handClapButton;
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
     QStackedWidget *mainStackedWidget;
@@ -113,6 +120,7 @@ class CRP6Simulator : public QMainWindow
     int robotSerialSendLuaCallback, m32SerialSendLuaCallback;
     int IRCOMMSendLuaCallback;
     int luaHandleExtInt1Callback;
+    int luaHandleSoundCallback;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -189,12 +197,13 @@ class CRP6Simulator : public QMainWindow
     static int luaSetRobotSerialSendCallback(lua_State *l);
     static int luaSetM32SerialSendCallback(lua_State *l);
     static int luaSetIRCOMMSendCallback(lua_State *l);
-    static int luaSetExtInt1Handler(lua_State *l);
+    static int luaSetExtInt1Callback(lua_State *l);
     static int luaSetExtInt1Enabled(lua_State *l);
     static int luaSetExtEEPROM(lua_State *l);
     static int luaGetExtEEPROM(lua_State *l);
     static int luaSetBeeperEnabled(lua_State *l);
     static int luaSetBeeperFrequency(lua_State *l);
+    static int luaSetSoundCallback(lua_State *l);
 
 private slots:
     void handleRobotSerialDeviceData(void);
@@ -211,6 +220,8 @@ private slots:
     void loadMap(void);
     void runPlugin(void);
     void stopPlugin(void);
+    void doHandClap(void);
+    void setHandClapMode(int m);
     void tabViewChanged(int index);
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);

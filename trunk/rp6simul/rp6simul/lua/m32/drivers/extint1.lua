@@ -26,7 +26,7 @@ end
 
 
 function initPlugin()
-    setExtInt1Handler(handleExtInt1)
+    setExtInt1Callback(handleExtInt1)
 end
 
 function handleIOData(type, data)

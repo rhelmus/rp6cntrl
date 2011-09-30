@@ -64,10 +64,11 @@ CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QMainWindow(parent), audioCurrentCycle(0.0), audioFrequency(0.0),
-    currentMapIsTemplate(false),
-    robotIsBlocked(false), robotSerialSendLuaCallback(0),
-    m32SerialSendLuaCallback(0), IRCOMMSendLuaCallback(0),
-    luaHandleExtInt1Callback(0)
+    playingBeep(false), handClapMode(CLAP_NORMAL), playingHandClap(false),
+    handClapSoundPos(0), currentMapIsTemplate(false), robotIsBlocked(false),
+    robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
+    IRCOMMSendLuaCallback(0), luaHandleExtInt1Callback(0),
+    luaHandleSoundCallback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -129,7 +130,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     openSerialPort(robotSerialDevice);
 
     m32SerialDevice = new QextSerialPort("/dev/pts/4",
-                                           QextSerialPort::EventDriven);
+                                         QextSerialPort::EventDriven);
     connect(m32SerialDevice, SIGNAL(readyRead()),
             SLOT(handleM32SerialDeviceData()));
     initSerialPort(m32SerialDevice);
@@ -156,6 +157,8 @@ CRP6Simulator::~CRP6Simulator()
     instance = 0;
     NLua::clearLuaLockStates();
 
+    delete [] handClapCVT.buf;
+    SDL_CloseAudio();
     SDL_Quit();
 }
 
@@ -185,6 +188,8 @@ void CRP6Simulator::openSerialPort(QextSerialPort *port)
 
 void CRP6Simulator::initSDL()
 {
+    handClapCVT.buf = 0;
+
     if (SDL_Init(SDL_INIT_AUDIO))
     {
         // UNDONE
@@ -206,7 +211,29 @@ void CRP6Simulator::initSDL()
         // UNDONE
         QMessageBox::critical(this, "Audio error",
                               QString("Failed to open audio device:\n%1").arg(SDL_GetError()));
+        return;
     }
+
+    // Based on http://www.libsdl.org/intro.en/usingsound.html
+    SDL_AudioSpec wave;
+    Uint8 *data;
+    Uint32 dlen;
+
+    if (SDL_LoadWAV("../resource/clapping-hands.wav", &wave, &data, &dlen) == NULL)
+    {
+        // UNDONE
+        QMessageBox::critical(this, "Audio error",
+                              QString("Failed to load clapping sound:\n%1").arg(SDL_GetError()));
+        return;
+    }
+
+    SDL_BuildAudioCVT(&handClapCVT, wave.format, wave.channels, wave.freq,
+                      AUDIO_S16SYS, 1, AUDIO_SAMPLERATE);
+    handClapCVT.buf = new Uint8[dlen*handClapCVT.len_mult];
+    memcpy(handClapCVT.buf, data, dlen);
+    handClapCVT.len = dlen;
+    SDL_ConvertAudio(&handClapCVT);
+    SDL_FreeWAV(data);
 }
 
 void CRP6Simulator::initSimulators()
@@ -281,11 +308,12 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
     NLua::registerFunction(l, luaSetM32SerialSendCallback,
                            "setSerialSendCallback");
     NLua::registerFunction(l, luaAppendM32SerialOutput, "appendSerialOutput");
-    NLua::registerFunction(l, luaSetExtInt1Handler, "setExtInt1Handler");
+    NLua::registerFunction(l, luaSetExtInt1Callback, "setExtInt1Callback");
     NLua::registerFunction(l, luaSetExtEEPROM, "setExtEEPROM");
     NLua::registerFunction(l, luaGetExtEEPROM, "getExtEEPROM");
     NLua::registerFunction(l, luaSetBeeperEnabled, "setBeeperEnabled");
     NLua::registerFunction(l, luaSetBeeperFrequency, "setBeeperFrequency");
+    NLua::registerFunction(l, luaSetSoundCallback, "setSoundCallback");
 }
 
 void CRP6Simulator::createMenus()
@@ -367,6 +395,23 @@ void CRP6Simulator::createToolbars()
     stopPluginAction->setShortcut(tr("esc"));
     stopPluginAction->setEnabled(false);
 
+    toolb->addSeparator();
+
+    QSignalMapper *signalm = new QSignalMapper(this);
+    connect(signalm, SIGNAL(mapped(int)), SLOT(setHandClapMode(int)));
+    toolb->addWidget(handClapButton = new QToolButton);
+    handClapButton->setIcon(QIcon("../resource/clapping-hands.png"));
+    handClapButton->setText("normal");
+    handClapButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    connect(handClapButton, SIGNAL(clicked(bool)), SLOT(doHandClap()));
+    QMenu *menu = new QMenu("Clap");
+    handClapButton->setMenu(menu);
+    QAction *a = menu->addAction("Soft", signalm, SLOT(map()));
+    signalm->setMapping(a, CLAP_SOFT);
+    a = menu->addAction("Normal (default)", signalm, SLOT(map()));
+    signalm->setMapping(a, CLAP_NORMAL);
+    a = menu->addAction("Loud", signalm, SLOT(map()));
+    signalm->setMapping(a, CLAP_LOUD);
 
     addToolBar(editMapToolBar = new QToolBar("Edit map"));
     editMapToolBar->setEnabled(false);
@@ -375,9 +420,9 @@ void CRP6Simulator::createToolbars()
     connect(editMapActionGroup, SIGNAL(triggered(QAction*)), this,
             SLOT(changeSceneMouseMode(QAction*)));
 
-    QAction *a = editMapToolBar->addAction(QIcon("../resource/viewmag_.png"),
-                                           "Zoom map out", robotScene,
-                                           SLOT(zoomSceneOut()));
+    a = editMapToolBar->addAction(QIcon("../resource/viewmag_.png"),
+                                  "Zoom map out", robotScene,
+                                  SLOT(zoomSceneOut()));
     a->setShortcut(QKeySequence("-"));
 
     a = editMapToolBar->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
@@ -1084,32 +1129,59 @@ QVariantList CRP6Simulator::getExtEEPROM() const
 
 void CRP6Simulator::SDLAudioCallback(void *, Uint8 *stream, int length)
 {
-    // Based on http://www.dgames.org/beep-sound-with-sdl/
-
-    // Convert to 16 bit stream
-    Sint16 *stream16 = (Sint16 *)stream;
-    int length16 = length / 2;
-
-    // Non-aliased square wave, code taken from Audacity (effects/ToneGen.cpp)
-    const double pre2PI = 2 * M_PI;
-    const double pre4divPI = 4. / M_PI;
-
-    for(int i=0; i<length16; ++i)
+    if (instance->playingHandClap)
     {
-        // Scaling
-        const float b = (1. + cos((pre2PI * instance->audioFrequency)/AUDIO_SAMPLERATE))/pre4divPI;
-        float f = pre4divPI *
-                sin(pre2PI * instance->audioCurrentCycle / AUDIO_SAMPLERATE);
-        for(int k=3; (k<200) && (k * instance->audioFrequency < AUDIO_SAMPLERATE/2.); k+=2)
+        const int amount =
+                qMin(length, (instance->handClapCVT.len_cvt-instance->handClapSoundPos));
+
+        int volume = SDL_MIX_MAXVOLUME;
+        if (instance->handClapMode == CLAP_NORMAL)
+            volume *= 0.75;
+        else if (instance->handClapMode == CLAP_SOFT)
+            volume *= 0.5;
+
+        SDL_MixAudio(stream, &instance->handClapCVT.buf[instance->handClapSoundPos],
+                     amount, volume);
+        instance->handClapSoundPos += amount;
+
+        // Done?
+        if (instance->handClapSoundPos >= instance->handClapCVT.len)
         {
-            // Hanning Window in freq domain
-            const float a = 1. + cos((pre2PI * k * instance->audioFrequency)/AUDIO_SAMPLERATE);
-            // calc harmonic, apply window, scale to amplitude of fundamental
-            f += a * sin(pre2PI * instance->audioCurrentCycle/AUDIO_SAMPLERATE * k)/(b*k);
+            instance->playingHandClap = false;
+            if (!instance->playingBeep)
+                SDL_PauseAudio(1);
         }
-        // UNDONE: configurable amplitude (volume)
-        stream16[i] = 32760/5.0 * f;
-        instance->audioCurrentCycle += instance->audioFrequency;
+    }
+    else
+    {
+        // Based on http://www.dgames.org/beep-sound-with-sdl/
+
+        // Convert to 16 bit stream
+        Sint16 *stream16 = (Sint16 *)stream;
+        int length16 = length / 2;
+
+        // Non-aliased square wave, code taken from Audacity (effects/ToneGen.cpp)
+        const double pre2PI = 2 * M_PI;
+        const double pre4divPI = 4. / M_PI;
+
+        for(int i=0; i<length16; ++i)
+        {
+            // Scaling
+            const float b = (1. + cos((pre2PI * instance->audioFrequency)/AUDIO_SAMPLERATE))/pre4divPI;
+            float f = pre4divPI *
+                    sin(pre2PI * instance->audioCurrentCycle / AUDIO_SAMPLERATE);
+            for(int k=3; (k<200) && (k * instance->audioFrequency < AUDIO_SAMPLERATE/2.); k+=2)
+            {
+                // Hanning Window in freq domain
+                const float a = 1. + cos((pre2PI * k * instance->audioFrequency)/AUDIO_SAMPLERATE);
+                // calc harmonic, apply window, scale to amplitude of fundamental
+                f += a * sin(pre2PI * instance->audioCurrentCycle/AUDIO_SAMPLERATE * k)/(b*k);
+            }
+
+            // UNDONE: configurable amplitude (volume)
+            stream16[i] = 32760/5.0 * f;
+            instance->audioCurrentCycle += instance->audioFrequency;
+        }
     }
 }
 
@@ -1635,7 +1707,7 @@ int CRP6Simulator::luaSetIRCOMMSendCallback(lua_State *l)
     return 0;
 }
 
-int CRP6Simulator::luaSetExtInt1Handler(lua_State *l)
+int CRP6Simulator::luaSetExtInt1Callback(lua_State *l)
 {
     luaL_checktype(l, 1, LUA_TFUNCTION);
     if (instance->luaHandleExtInt1Callback)
@@ -1708,6 +1780,8 @@ int CRP6Simulator::luaSetBeeperEnabled(lua_State *l)
 
     if (e != playing)
     {
+        instance->playingBeep = e;
+
         if (e) // Initialize?
             instance->audioCurrentCycle = 0.0;
 
@@ -1728,6 +1802,17 @@ int CRP6Simulator::luaSetBeeperFrequency(lua_State *l)
     SDL_LockAudio();
     instance->audioFrequency = freq;
     SDL_UnlockAudio();
+
+    return 0;
+}
+
+int CRP6Simulator::luaSetSoundCallback(lua_State *l)
+{
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    if (instance->luaHandleSoundCallback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->luaHandleSoundCallback);
+    lua_pushvalue(l, 1);
+    instance->luaHandleSoundCallback = luaL_ref(l, LUA_REGISTRYINDEX);
 
     return 0;
 }
@@ -2145,7 +2230,8 @@ void CRP6Simulator::stopPlugin()
         }
     }
 
-    if (m32SerialSendLuaCallback || luaHandleExtInt1Callback)
+    if (m32SerialSendLuaCallback || luaHandleExtInt1Callback ||
+        luaHandleSoundCallback)
     {
         NLua::CLuaLocker lualocker(m32Simulator->getLuaState());
 
@@ -2161,6 +2247,13 @@ void CRP6Simulator::stopPlugin()
             luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
                        luaHandleExtInt1Callback);
             luaHandleExtInt1Callback = 0;
+        }
+
+        if (luaHandleSoundCallback)
+        {
+            luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                       luaHandleSoundCallback);
+            luaHandleSoundCallback = 0;
         }
     }
 
@@ -2182,6 +2275,51 @@ void CRP6Simulator::stopPlugin()
     IRCOMMSendButton->setEnabled(false);
 
     robotIsBlocked = false;
+}
+
+void CRP6Simulator::doHandClap()
+{
+    if (!playingHandClap)
+    {
+        if (luaHandleSoundCallback)
+        {
+            NLua::CLuaLocker lualock(m32Simulator->getLuaState());
+            lua_rawgeti(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                        luaHandleSoundCallback);
+            switch (handClapMode)
+            {
+            case CLAP_SOFT:
+                lua_pushstring(m32Simulator->getLuaState(), "soft");
+                break;
+            case CLAP_NORMAL:
+                lua_pushstring(m32Simulator->getLuaState(), "normal");
+                break;
+            case CLAP_LOUD:
+                lua_pushstring(m32Simulator->getLuaState(), "loud");
+                break;
+            }
+            lua_call(m32Simulator->getLuaState(), 1, 0);
+        }
+
+        if (handClapCVT.buf)
+        {
+            handClapSoundPos = 0;
+            playingHandClap = true;
+            SDL_PauseAudio(0);
+        }
+    }
+}
+
+void CRP6Simulator::setHandClapMode(int m)
+{
+    handClapMode = static_cast<EHandClapMode>(m);
+    qDebug() << "Hand clap:" << m;
+    switch (handClapMode)
+    {
+    case CLAP_SOFT: handClapButton->setText("soft"); break;
+    case CLAP_NORMAL: handClapButton->setText("normal"); break;
+    case CLAP_LOUD: handClapButton->setText("loud"); break;
+    }
 }
 
 void CRP6Simulator::tabViewChanged(int index)
