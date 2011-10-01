@@ -41,7 +41,83 @@ void activateDockTab(QObject *p, const QString &tab)
     qDebug() << "Warning: couldn't activate dock tab" << tab << "(not found)";
 }
 
-QByteArray handSerialDeviceData(QextSerialPort *dev, lua_State *l, int luacb)
+QTableWidget *createADCTableWidget(const QStringList &adclist)
+{
+    QTableWidget *ret = new QTableWidget(adclist.size(), 2);
+    ret->setHorizontalHeaderLabels(QStringList() << "override" << "value");
+    ret->setVerticalHeaderLabels(adclist);
+
+    for (int i=0; i<ret->rowCount(); ++i)
+    {
+        QWidget *cw = new QWidget;
+        QHBoxLayout *chbox = new QHBoxLayout(cw);
+        chbox->setAlignment(Qt::AlignCenter);
+        chbox->setMargin(0);
+
+        QCheckBox *check = new QCheckBox;
+        chbox->addWidget(check);
+        ret->setCellWidget(i, 0, cw);
+
+        QSpinBox *spin = new QSpinBox;
+        spin->setRange(0, 1023); // UNDONE? ADC may have lower max
+        spin->setEnabled(false);
+        QObject::connect(check, SIGNAL(toggled(bool)), spin,
+                         SLOT(setEnabled(bool)));
+        ret->setCellWidget(i, 1, spin);
+    }
+
+    ret->resizeRowsToContents();
+    ret->resizeColumnToContents(0);
+
+    return ret;
+}
+
+QCheckBox *getADCTableCheckBox(QTableWidget *tablew, int row, int col)
+{
+    // NOTE: checkboxes are actually child widgets
+    QWidget *w = tablew->cellWidget(row, col);
+    QList<QCheckBox *> l(w->findChildren<QCheckBox *>());
+    Q_ASSERT(l.size() == 1);
+    return l[0];
+}
+
+void applyADCTable(lua_State *l, QTableWidget *tablew)
+{
+    NLua::CLuaLocker lualocker(l);
+    lua_getglobal(l, "setUIADCValue");
+    const int findex = lua_gettop(l);
+
+    for (int i=0; i<tablew->rowCount(); ++i)
+    {
+        QSpinBox *spin = qobject_cast<QSpinBox *>(tablew->cellWidget(i, 1));
+
+        lua_pushvalue(l, findex);
+        lua_pushstring(l, qPrintable(tablew->verticalHeaderItem(i)->text()));
+
+        if (spin->isEnabled())
+            lua_pushinteger(l, spin->value());
+        else
+            lua_pushnil(l); // nil: don't override
+
+        lua_call(l, 2, 0);
+    }
+
+    lua_pop(l, 1); // Pop function
+}
+
+QToolButton *createKeyButton(int key)
+{
+    const QString txt = QString::number(key);
+    QToolButton *ret = new QToolButton;
+    ret->setText(txt);
+    ret->setToolTip(QString("M32 key pad button %1").arg(key));
+    const QRect rect(ret->fontMetrics().boundingRect(txt));
+    ret->setMaximumWidth(rect.width() + 15);
+    ret->setMaximumHeight(rect.height() + 10);
+    return ret;
+}
+
+QByteArray handleSerialDeviceData(QextSerialPort *dev, lua_State *l, int luacb)
 {
     QByteArray bytes;
     bytes.resize(dev->bytesAvailable());
@@ -68,7 +144,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     handClapSoundPos(0), currentMapIsTemplate(false), robotIsBlocked(false),
     robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
     IRCOMMSendLuaCallback(0), luaHandleExtInt1Callback(0),
-    luaHandleSoundCallback(0)
+    luaHandleSoundCallback(0), luaHandleKeyPressCallback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -314,6 +390,7 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
     NLua::registerFunction(l, luaSetBeeperEnabled, "setBeeperEnabled");
     NLua::registerFunction(l, luaSetBeeperFrequency, "setBeeperFrequency");
     NLua::registerFunction(l, luaSetSoundCallback, "setSoundCallback");
+    NLua::registerFunction(l, luaSetKeyPressCallback, "setKeyPressCallback");
 }
 
 void CRP6Simulator::createMenus()
@@ -400,10 +477,14 @@ void CRP6Simulator::createToolbars()
     QSignalMapper *signalm = new QSignalMapper(this);
     connect(signalm, SIGNAL(mapped(int)), SLOT(setHandClapMode(int)));
     toolb->addWidget(handClapButton = new QToolButton);
+    handClapButton->setEnabled(false);
     handClapButton->setIcon(QIcon("../resource/clapping-hands.png"));
     handClapButton->setText("normal");
+    handClapButton->setToolTip("Clap hands with selected volume (triggers MIC)");
     handClapButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     connect(handClapButton, SIGNAL(clicked(bool)), SLOT(doHandClap()));
+    connect(this, SIGNAL(receivedSoundCallback(bool)), handClapButton,
+            SLOT(setEnabled(bool)));
     QMenu *menu = new QMenu("Clap");
     handClapButton->setMenu(menu);
     QAction *a = menu->addAction("Soft", signalm, SLOT(map()));
@@ -412,6 +493,26 @@ void CRP6Simulator::createToolbars()
     signalm->setMapping(a, CLAP_NORMAL);
     a = menu->addAction("Loud", signalm, SLOT(map()));
     signalm->setMapping(a, CLAP_LOUD);
+
+    signalm = new QSignalMapper(this);
+    connect(signalm, SIGNAL(mapped(int)), SLOT(handleKeyPadPress(int)));
+    toolb->addWidget(keyPadWidget = new QWidget);
+    connect(this, SIGNAL(receivedSoundCallback(bool)), keyPadWidget,
+            SLOT(setEnabled(bool)));
+    keyPadWidget->setEnabled(false);
+    QGridLayout *grid = new QGridLayout(keyPadWidget);
+    for (int i=1; i<=5; ++i)
+    {
+        QToolButton *b = createKeyButton(i);
+        connect(b, SIGNAL(pressed()), signalm, SLOT(map()));
+        signalm->setMapping(b, i);
+        connect(b, SIGNAL(released()), SLOT(resetKeyPress()));
+
+        // Wrap after button 3
+        const int row = (i > 3) ? 1 : 0;
+        const int col = (i > 3) ? (i-4) : (i-1);
+        grid->addWidget(b, row, col);
+    }
 
     addToolBar(editMapToolBar = new QToolBar("Edit map"));
     editMapToolBar->setEnabled(false);
@@ -794,35 +895,23 @@ QDockWidget *CRP6Simulator::createADCDock()
     vbox->addWidget(l);
     vbox->addSpacing(10);
 
-    vbox->addWidget(ADCTableWidget = new QTableWidget(7, 2));
-    ADCTableWidget->setHorizontalHeaderLabels(QStringList() << "override" <<
-                                              "value");
-    ADCTableWidget->setVerticalHeaderLabels(QStringList() << "ADC0" << "ADC1" <<
-                                    "LS_L" << "LS_R" << "MCURRENT_L" <<
-                                    "MCURRENT_R" << "BATTERY");
+    QGroupBox *groupbox = new QGroupBox("RP6");
+    vbox->addWidget(groupbox);
+    QVBoxLayout *subvbox = new QVBoxLayout(groupbox);
+    robotADCTableWidget =
+            createADCTableWidget(QStringList() << "ADC0" << "ADC1" <<
+                                 "LS_L" << "LS_R" << "MCURRENT_L" <<
+                                 "MCURRENT_R" << "BATTERY");
+    subvbox->addWidget(robotADCTableWidget);
 
-    for (int i=0; i<ADCTableWidget->rowCount(); ++i)
-    {
-        QWidget *cw = new QWidget;
-        QHBoxLayout *chbox = new QHBoxLayout(cw);
-        chbox->setAlignment(Qt::AlignCenter);
-        chbox->setMargin(0);
+    vbox->addWidget(groupbox = new QGroupBox("m32"));
+    subvbox = new QVBoxLayout(groupbox);
+    m32ADCTableWidget =
+            createADCTableWidget(QStringList() << "MIC" << "KEYPAD" <<
+                                 "ADC2" << "ADC3" << "ADC4" << "ADC5" <<
+                                 "ADC6" << "ADC7");
+    subvbox->addWidget(m32ADCTableWidget);
 
-        QCheckBox *check = new QCheckBox;
-        chbox->addWidget(check);
-        ADCOverrideCheckBoxes << check;
-        ADCTableWidget->setCellWidget(i, 0, cw);
-
-        QSpinBox *spin = new QSpinBox;
-        spin->setRange(0, 1023); // UNDONE? ADC may have lower max
-        spin->setEnabled(false);
-        connect(check, SIGNAL(toggled(bool)), spin, SLOT(setEnabled(bool)));
-        ADCOverrideSpinBoxes << spin;
-        ADCTableWidget->setCellWidget(i, 1, spin);
-    }
-
-    ADCTableWidget->resizeRowsToContents();
-    ADCTableWidget->resizeColumnToContents(0);
 
     QHBoxLayout *hbox = new QHBoxLayout;
     vbox->addLayout(hbox);
@@ -847,6 +936,9 @@ QDockWidget *CRP6Simulator::createRegisterDock()
     QWidget *w = new QWidget;
     QVBoxLayout *vbox = new QVBoxLayout(w);
     ret->setWidget(w);
+
+    vbox->addWidget(IORegisterTableSelector = new QComboBox);
+    IORegisterTableSelector->addItems(QStringList() << "RP6" << "m32");
 
     vbox->addWidget(IORegisterTableWidget = new QTableWidget(IO_END, 3));
     IORegisterTableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -1813,7 +1905,18 @@ int CRP6Simulator::luaSetSoundCallback(lua_State *l)
         luaL_unref(l, LUA_REGISTRYINDEX, instance->luaHandleSoundCallback);
     lua_pushvalue(l, 1);
     instance->luaHandleSoundCallback = luaL_ref(l, LUA_REGISTRYINDEX);
+    emit instance->receivedSoundCallback(true);
+    return 0;
+}
 
+int CRP6Simulator::luaSetKeyPressCallback(lua_State *l)
+{
+    luaL_checktype(l, 1, LUA_TFUNCTION);
+    if (instance->luaHandleKeyPressCallback)
+        luaL_unref(l, LUA_REGISTRYINDEX, instance->luaHandleKeyPressCallback);
+    lua_pushvalue(l, 1);
+    instance->luaHandleKeyPressCallback = luaL_ref(l, LUA_REGISTRYINDEX);
+    emit instance->receivedKeyPressCallback(true);
     return 0;
 }
 
@@ -1824,7 +1927,7 @@ void CRP6Simulator::handleRobotSerialDeviceData()
 
     // UNDONE: Ignore data if not running(? callback == 0 in that case)
 
-    QByteArray txt = handSerialDeviceData(robotSerialDevice,
+    QByteArray txt = handleSerialDeviceData(robotSerialDevice,
                                           robotSimulator->getLuaState(),
                                           robotSerialSendLuaCallback);
 
@@ -1841,7 +1944,7 @@ void CRP6Simulator::handleM32SerialDeviceData()
 
     // UNDONE: Ignore data if not running(? callback == 0 in that case)
 
-    QByteArray txt = handSerialDeviceData(m32SerialDevice,
+    QByteArray txt = handleSerialDeviceData(m32SerialDevice,
                                           m32Simulator->getLuaState(),
                                           m32SerialSendLuaCallback);
 
@@ -2043,11 +2146,16 @@ void CRP6Simulator::loadMap()
 void CRP6Simulator::timedUIUpdate()
 {
 #ifdef USEATOMIC
-    const QAtomicInt *ioregisters = robotSimulator->getIORegisterArray();
+    const QAtomicInt *ioregisters;
 #else
     QReadLocker iolocker(&simulator->getIORegisterLock());
-    const TIORegisterData *ioregisters = simulator->getIORegisterArray();
+    const TIORegisterData *ioregisters;
 #endif
+
+    if (IORegisterTableSelector->currentText() == "m32")
+        ioregisters = m32Simulator->getIORegisterArray();
+    else
+        ioregisters = robotSimulator->getIORegisterArray();
 
     for (int i=0; i<IO_END; ++i)
     {
@@ -2231,7 +2339,7 @@ void CRP6Simulator::stopPlugin()
     }
 
     if (m32SerialSendLuaCallback || luaHandleExtInt1Callback ||
-        luaHandleSoundCallback)
+        luaHandleSoundCallback || luaHandleKeyPressCallback)
     {
         NLua::CLuaLocker lualocker(m32Simulator->getLuaState());
 
@@ -2255,6 +2363,13 @@ void CRP6Simulator::stopPlugin()
                        luaHandleSoundCallback);
             luaHandleSoundCallback = 0;
         }
+
+        if (luaHandleKeyPressCallback)
+        {
+            luaL_unref(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                       luaHandleKeyPressCallback);
+            luaHandleKeyPressCallback = 0;
+        }
     }
 
     robotSimulator->stopPlugin();
@@ -2273,6 +2388,8 @@ void CRP6Simulator::stopPlugin()
 
     robotSerialSendButton->setEnabled(false);
     IRCOMMSendButton->setEnabled(false);
+    handClapButton->setEnabled(false);
+    keyPadWidget->setEnabled(false);
 
     robotIsBlocked = false;
 }
@@ -2319,6 +2436,32 @@ void CRP6Simulator::setHandClapMode(int m)
     case CLAP_SOFT: handClapButton->setText("soft"); break;
     case CLAP_NORMAL: handClapButton->setText("normal"); break;
     case CLAP_LOUD: handClapButton->setText("loud"); break;
+    }
+}
+
+void CRP6Simulator::handleKeyPadPress(int key)
+{
+    qDebug() << "Key press:" << key;
+    if (luaHandleKeyPressCallback)
+    {
+        NLua::CLuaLocker lualock(m32Simulator->getLuaState());
+        lua_rawgeti(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                    luaHandleKeyPressCallback);
+        lua_pushnumber(m32Simulator->getLuaState(), key);
+        lua_call(m32Simulator->getLuaState(), 1, 0);
+    }
+}
+
+void CRP6Simulator::resetKeyPress()
+{
+    qDebug() << "Reset key press";
+    if (luaHandleKeyPressCallback)
+    {
+        NLua::CLuaLocker lualock(m32Simulator->getLuaState());
+        lua_rawgeti(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                    luaHandleKeyPressCallback);
+        lua_pushnil(m32Simulator->getLuaState());
+        lua_call(m32Simulator->getLuaState(), 1, 0);
     }
 }
 
@@ -2381,30 +2524,26 @@ void CRP6Simulator::mapSelectorItemActivated(QTreeWidgetItem *item)
 void CRP6Simulator::resetADCTable()
 {
     // NOTE: setChecked() triggers ADCOverrideSpinBoxes[]->setEnabled()
-    foreach (QCheckBox *box, ADCOverrideCheckBoxes)
-        box->setChecked(false);
+
+    const int rsize = robotADCTableWidget->rowCount();
+    const int msize = m32ADCTableWidget->rowCount();
+    const int maxsize = qMax(rsize, msize);
+
+    for (int i=0; i<maxsize; ++i)
+    {
+        if (i < rsize)
+            getADCTableCheckBox(robotADCTableWidget, i, 0)->setChecked(false);
+        if (i < msize)
+            getADCTableCheckBox(m32ADCTableWidget, i, 0)->setChecked(false);
+    }
+
     applyADCTable();
 }
 
 void CRP6Simulator::applyADCTable()
 {
-    // UNDONE: m32
-    NLua::CLuaLocker lualocker(robotSimulator->getLuaState());
-    lua_getglobal(robotSimulator->getLuaState(), "setUIADCValue");
-    const int findex = lua_gettop(robotSimulator->getLuaState());
-
-    for (int i=0; i<ADCTableWidget->rowCount(); ++i)
-    {
-        lua_pushvalue(robotSimulator->getLuaState(), findex);
-        lua_pushstring(robotSimulator->getLuaState(),
-                       qPrintable(ADCTableWidget->verticalHeaderItem(i)->text()));
-        if (ADCOverrideCheckBoxes[i]->isChecked())
-            lua_pushinteger(robotSimulator->getLuaState(), ADCOverrideSpinBoxes[i]->value());
-        else
-            lua_pushnil(robotSimulator->getLuaState()); // nil: don't override
-        lua_call(robotSimulator->getLuaState(), 2, 0);
-    }
-    lua_pop(robotSimulator->getLuaState(), 1); // Pop function
+    ::applyADCTable(robotSimulator->getLuaState(), robotADCTableWidget);
+    ::applyADCTable(m32Simulator->getLuaState(), m32ADCTableWidget);
 }
 
 void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
