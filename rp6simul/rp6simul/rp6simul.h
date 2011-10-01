@@ -21,6 +21,7 @@ Q_DECLARE_METATYPE(EMotorDirection)
 
 class QActionGroup;
 class QCheckBox;
+class QComboBox;
 class QGraphicsView;
 class QPushButton;
 class QLabel;
@@ -66,6 +67,7 @@ class CRP6Simulator : public QMainWindow
     QList<QAction *> mapMenuActionList;
     QAction *runPluginAction, *stopPluginAction;
     QToolButton *handClapButton;
+    QWidget *keyPadWidget;
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
     QStackedWidget *mainStackedWidget;
@@ -90,9 +92,8 @@ class CRP6Simulator : public QMainWindow
     QTreeWidgetItem *mapTemplatesTreeItem;
     QTreeWidgetItem *mapHistoryTreeItem;
     QDockWidget *ADCDockWidget;
-    QTableWidget *ADCTableWidget;
-    QList<QCheckBox *> ADCOverrideCheckBoxes;
-    QList<QSpinBox *> ADCOverrideSpinBoxes;
+    QTableWidget *robotADCTableWidget, *m32ADCTableWidget;
+    QComboBox *IORegisterTableSelector;
     QTableWidget *IORegisterTableWidget;
 
     QString logTextBuffer;
@@ -121,6 +122,7 @@ class CRP6Simulator : public QMainWindow
     int IRCOMMSendLuaCallback;
     int luaHandleExtInt1Callback;
     int luaHandleSoundCallback;
+    int luaHandleKeyPressCallback;
     QTimer *pluginUpdateUITimer;
     QTimer *pluginUpdateLEDsTimer;
 
@@ -204,6 +206,7 @@ class CRP6Simulator : public QMainWindow
     static int luaSetBeeperEnabled(lua_State *l);
     static int luaSetBeeperFrequency(lua_State *l);
     static int luaSetSoundCallback(lua_State *l);
+    static int luaSetKeyPressCallback(lua_State *l);
 
 private slots:
     void handleRobotSerialDeviceData(void);
@@ -222,6 +225,8 @@ private slots:
     void stopPlugin(void);
     void doHandClap(void);
     void setHandClapMode(int m);
+    void handleKeyPadPress(int key);
+    void resetKeyPress(void);
     void tabViewChanged(int index);
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
@@ -254,6 +259,8 @@ signals:
     void receivedRobotSerialSendCallback(bool);
     void receivedM32SerialSendCallback(bool);
     void receivedIRCOMMSendCallback(bool);
+    void receivedSoundCallback(bool);
+    void receivedKeyPressCallback(bool);
 };
 
 #endif // RP6SIMUL_H

@@ -89,7 +89,8 @@ OTHER_FILES += \
     lua/m32/drivers/extint1.lua \
     lua/m32/drivers/exteeprom.lua \
     lua/m32/drivers/piezo.lua \
-    lua/m32/drivers/mic.lua
+    lua/m32/drivers/mic.lua \
+    lua/m32/drivers/keypad.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \
@@ -153,6 +154,9 @@ else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
     LIBS += -llua -lSDL
 }
+
+
+
 
 
 
