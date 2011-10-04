@@ -30,6 +30,7 @@ class QPlainTextEdit;
 class QSpinBox;
 class QStackedWidget;
 class QTableWidget;
+class QTableWidgetItem;
 class QTabWidget;
 class QToolButton;
 class QTreeWidget;
@@ -50,6 +51,9 @@ class CRP6Simulator : public QMainWindow
     enum ELogType { LOG_LOG, LOG_WARNING, LOG_ERROR };
     enum { AUDIO_SAMPLERATE = 22050 };
     enum EHandClapMode { CLAP_SOFT, CLAP_NORMAL, CLAP_LOUD };
+    enum { EXTEEPROM_PAGESIZE = 64, EXTEEPROM_CAPACITY = 32 * 1024,
+           EXTEEPROM_TABLEDIMENSION = 8 };
+    enum EExtEEPROMMode { EXTEEPROMMODE_NUMERICAL=0, EXTEEPROMMODE_CHAR=1 };
 
     QextSerialPort *robotSerialDevice, *m32SerialDevice;
     float audioCurrentCycle, audioFrequency;
@@ -58,10 +62,11 @@ class CRP6Simulator : public QMainWindow
     EHandClapMode handClapMode;
     bool playingHandClap;
     int handClapSoundPos;
+    EExtEEPROMMode extEEPROMMode;
     CSimulator *robotSimulator, *m32Simulator;
     QString currentProjectFile;
     QString currentMapFile;
-    bool currentMapIsTemplate;    
+    bool currentMapIsTemplate;
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
@@ -95,6 +100,12 @@ class CRP6Simulator : public QMainWindow
     QTableWidget *robotADCTableWidget, *m32ADCTableWidget;
     QComboBox *IORegisterTableSelector;
     QTableWidget *IORegisterTableWidget;
+    QComboBox *extEEPROMModeComboBox;
+    QSpinBox *extEEPROMPageSpinBox;
+    QTableWidget *extEEPROMTableWidget;
+    QStackedWidget *extEEPROMInputStackedWidget;
+    QSpinBox *extEEPROMInputSpinBox;
+    QLineEdit *extEEPROMInputLineEdit;
 
     QString logTextBuffer;
     QMutex logBufferMutex;
@@ -151,6 +162,7 @@ class CRP6Simulator : public QMainWindow
     QDockWidget *createStatusDock(void);
     QDockWidget *createADCDock(void);
     QDockWidget *createRegisterDock(void);
+    QDockWidget *createExtEEPROMDock(void);
 
     void updateMainStackedWidget(void);
     void updateMapStackedWidget(void);
@@ -234,6 +246,11 @@ private slots:
     void mapSelectorItemActivated(QTreeWidgetItem *item);
     void resetADCTable(void);
     void applyADCTable(void);
+    void updateExtEEPROM(int page);
+    void updateExtEEPROMMode(int mode);
+    void updateExtEEPROMSelection(QTableWidgetItem *item);
+    void updateExtEEPROMByte(int address, quint8 data);
+    void applyExtEEPROMChange(void);
     void setRobotIsBlocked(bool b) { robotIsBlocked = b; }
     void setLuaBumper(CBumper *b, bool e);
     void sendRobotSerialText(void);
@@ -261,6 +278,7 @@ signals:
     void receivedIRCOMMSendCallback(bool);
     void receivedSoundCallback(bool);
     void receivedKeyPressCallback(bool);
+    void extEEPROMByteChanged(int address, quint8 data);
 };
 
 #endif // RP6SIMUL_H

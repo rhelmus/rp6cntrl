@@ -141,7 +141,8 @@ CRP6Simulator *CRP6Simulator::instance = 0;
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QMainWindow(parent), audioCurrentCycle(0.0), audioFrequency(0.0),
     playingBeep(false), handClapMode(CLAP_NORMAL), playingHandClap(false),
-    handClapSoundPos(0), currentMapIsTemplate(false), robotIsBlocked(false),
+    handClapSoundPos(0), extEEPROMMode(EXTEEPROMMODE_NUMERICAL),
+    currentMapIsTemplate(false), robotIsBlocked(false),
     robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
     IRCOMMSendLuaCallback(0), luaHandleExtInt1Callback(0),
     luaHandleSoundCallback(0), luaHandleKeyPressCallback(0)
@@ -168,15 +169,18 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
 
     updateMainStackedWidget();
 
-    QDockWidget *statdock, *regdock;
+    QDockWidget *statdock, *regdock, *eepromdock;
     addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, ADCDockWidget = createADCDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, regdock = createRegisterDock(),
                   Qt::Vertical);
+    addDockWidget(Qt::LeftDockWidgetArea, eepromdock = createExtEEPROMDock(),
+                  Qt::Vertical);
     tabifyDockWidget(statdock, ADCDockWidget);
     tabifyDockWidget(ADCDockWidget, regdock);
+    tabifyDockWidget(regdock, eepromdock);
     activateDockTab(this, "Status");
 
     ADCDockWidget->setEnabled(false);
@@ -960,6 +964,92 @@ QDockWidget *CRP6Simulator::createRegisterDock()
     return ret;
 }
 
+QDockWidget *CRP6Simulator::createExtEEPROMDock()
+{
+    QDockWidget *ret = new QDockWidget("Ext. EEPROM", this);
+    ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    QWidget *w = new QWidget;
+    QVBoxLayout *vbox = new QVBoxLayout(w);
+    ret->setWidget(w);
+
+    QWidget *subw = new QWidget;
+    subw->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    vbox->addWidget(subw, 0, Qt::AlignTop);
+    QGridLayout *grid = new QGridLayout(subw);
+
+
+    QLabel *l = new QLabel("The table belows shows the contents "
+                           "of the currently selected external EEPROM page "
+                           "(left to right, top to bottom). Selecting a "
+                           "cell allows you to modify a single byte value.");
+    l->setWordWrap(true);
+    grid->addWidget(l, 0, 0, 1, 3);
+
+    grid->addItem(new QSpacerItem(0, 10), 1, 0);
+
+    grid->addWidget(extEEPROMModeComboBox = new QComboBox, 2, 0);
+    extEEPROMModeComboBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    extEEPROMModeComboBox->addItems(QStringList() << "Numerical" << "Character");
+    extEEPROMModeComboBox->setToolTip("Display/edit mode");
+    connect(extEEPROMModeComboBox, SIGNAL(currentIndexChanged(int)),
+            SLOT(updateExtEEPROMMode(int)));
+
+    grid->addWidget(extEEPROMPageSpinBox = new QSpinBox, 2, 2);
+    extEEPROMPageSpinBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    extEEPROMPageSpinBox->setToolTip("Ext. EEPROM page");
+    extEEPROMPageSpinBox->setRange(0, (EXTEEPROM_CAPACITY/EXTEEPROM_PAGESIZE)-1);
+    connect(extEEPROMPageSpinBox, SIGNAL(valueChanged(int)),
+            SLOT(updateExtEEPROM(int)));
+
+    grid->addWidget(extEEPROMTableWidget = new QTableWidget(8, 8), 3, 0, 1, 4);
+    extEEPROMTableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    extEEPROMTableWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+    extEEPROMTableWidget->verticalHeader()->hide();
+    extEEPROMTableWidget->horizontalHeader()->hide();
+    extEEPROMTableWidget->setSizePolicy(QSizePolicy::Preferred,
+                                        QSizePolicy::Maximum);
+    extEEPROMTableWidget->horizontalHeader()->setResizeMode(QHeaderView::Stretch);
+    extEEPROMTableWidget->verticalHeader()->setResizeMode(QHeaderView::Stretch);
+    // Avoid unselected state, do this before connecting the signal!
+    extEEPROMTableWidget->setCurrentCell(0, 0);
+    connect(extEEPROMTableWidget,
+            SIGNAL(currentItemChanged(QTableWidgetItem*,QTableWidgetItem*)),
+            SLOT(updateExtEEPROMSelection(QTableWidgetItem*)));
+    for (int i=0; i<EXTEEPROM_TABLEDIMENSION; ++i)
+    {
+        for (int j=0; j<EXTEEPROM_TABLEDIMENSION; ++j)
+        {
+            QTableWidgetItem *item = new QTableWidgetItem;
+            item->setTextAlignment(Qt::AlignCenter);
+            item->setText("255"); // Uninitialized value
+            extEEPROMTableWidget->setItem(i, j, item);
+        }
+    }
+
+    grid->addWidget(extEEPROMInputStackedWidget = new QStackedWidget, 4, 0);
+    extEEPROMInputStackedWidget->setSizePolicy(QSizePolicy::Fixed,
+                                               QSizePolicy::Fixed);
+
+    extEEPROMInputStackedWidget->addWidget(extEEPROMInputSpinBox = new QSpinBox);
+    extEEPROMInputSpinBox->setRange(0, 255);
+
+    extEEPROMInputStackedWidget->addWidget(extEEPROMInputLineEdit = new QLineEdit);
+    extEEPROMInputLineEdit->setInputMask("N"); // 1 Alpha-Numeric character
+
+    extEEPROMInputStackedWidget->setCurrentIndex(0);
+
+    QPushButton *button = new QPushButton("Apply");
+    connect(button, SIGNAL(clicked()), SLOT(applyExtEEPROMChange()));
+    grid->addWidget(button, 4, 1);
+
+    // Connect to self: force code to main thread
+    connect(this, SIGNAL(extEEPROMByteChanged(int,quint8)),
+            SLOT(updateExtEEPROMByte(int,quint8)));
+
+    return ret;
+}
+
 void CRP6Simulator::updateMainStackedWidget()
 {
     if (currentProjectFile.isEmpty())
@@ -996,7 +1086,7 @@ void CRP6Simulator::openProjectFile(const QString &file)
 
     prsettings.beginGroup("m32");
     if (!m32Simulator->loadProjectFile(prsettings))
-        return; // UNDONE: Close robot robot simulator?
+        return; // UNDONE: Close robot simulator?
     prsettings.endGroup();
 
     stopPluginAction->setEnabled(false);
@@ -1008,6 +1098,7 @@ void CRP6Simulator::openProjectFile(const QString &file)
     currentProjectFile = file;
 
     updateMainStackedWidget();
+    updateExtEEPROM(extEEPROMPageSpinBox->value());
 }
 
 void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
@@ -1208,10 +1299,8 @@ QVariantList CRP6Simulator::getExtEEPROM() const
         return prsettings.value("exteeprom").toList();
 
     // Initialize EEPROM with 255 as value for each byte
-    // The external EEPROM is 32 kB in size
     QVariantList ret;
-    const int size = 32 * 1024;
-    for (int i=0; i<size; ++i)
+    for (int i=0; i<EXTEEPROM_CAPACITY; ++i)
         ret << 255;
 
     prsettings.setValue("exteeprom", ret); // Cache
@@ -1840,6 +1929,7 @@ int CRP6Simulator::luaSetExtEEPROM(lua_State *l)
         return 0; // Something went wrong
 
     eeprom[adr] = data;
+    instance->emit extEEPROMByteChanged(adr, data);
 
     CProjectSettings prsettings(instance->currentProjectFile);
     if (verifySettingsFile(prsettings))
@@ -2544,6 +2634,94 @@ void CRP6Simulator::applyADCTable()
 {
     ::applyADCTable(robotSimulator->getLuaState(), robotADCTableWidget);
     ::applyADCTable(m32Simulator->getLuaState(), m32ADCTableWidget);
+}
+
+void CRP6Simulator::updateExtEEPROM(int page)
+{
+    const QVariantList eeprom(getExtEEPROM());
+    const int startindex = EXTEEPROM_PAGESIZE * page;
+
+    int index = startindex;
+    for (int i=0; i<EXTEEPROM_TABLEDIMENSION; ++i)
+    {
+        for (int j=0; j<EXTEEPROM_TABLEDIMENSION; ++j)
+        {
+            if (extEEPROMMode == EXTEEPROMMODE_NUMERICAL)
+            {
+                const int val = eeprom[index].toUInt();
+                extEEPROMTableWidget->item(i, j)->setText(QString::number(val));
+            }
+            else
+            {
+                const char val[] =  { eeprom[index].toUInt(), 0 };
+                extEEPROMTableWidget->item(i, j)->setText(val);
+            }
+            ++index;
+        }
+    }
+
+    if (extEEPROMTableWidget->currentItem())
+        updateExtEEPROMSelection(extEEPROMTableWidget->currentItem());
+}
+
+void CRP6Simulator::updateExtEEPROMMode(int mode)
+{
+    extEEPROMMode = (mode == 1) ? EXTEEPROMMODE_CHAR : EXTEEPROMMODE_NUMERICAL;
+    extEEPROMInputStackedWidget->setCurrentIndex(extEEPROMMode);
+    updateExtEEPROM(extEEPROMPageSpinBox->value());
+}
+
+void CRP6Simulator::updateExtEEPROMSelection(QTableWidgetItem *item)
+{
+    if (extEEPROMMode == EXTEEPROMMODE_NUMERICAL)
+        extEEPROMInputSpinBox->setValue(item->text().toUInt());
+    else
+        extEEPROMInputLineEdit->setText(item->text());
+}
+
+void CRP6Simulator::updateExtEEPROMByte(int address, quint8 data)
+{
+    const int page = address / EXTEEPROM_PAGESIZE;
+
+    if (page == extEEPROMPageSpinBox->value())
+    {
+        const int reladr = address % EXTEEPROM_PAGESIZE;
+        const int row = reladr / EXTEEPROM_TABLEDIMENSION;
+        const int col = reladr % EXTEEPROM_TABLEDIMENSION;
+        qDebug() << "updateEEPROMByte:" << page << reladr << row << col;
+        QTableWidgetItem *item = extEEPROMTableWidget->item(row, col);
+        if (extEEPROMMode == EXTEEPROMMODE_NUMERICAL)
+            item->setText(QString::number(data));
+        else
+            item->setText(QChar(data));
+    }
+}
+
+void CRP6Simulator::applyExtEEPROMChange()
+{
+    Q_ASSERT(extEEPROMTableWidget->currentItem());
+
+    int adr = extEEPROMPageSpinBox->value() * EXTEEPROM_PAGESIZE;
+    adr += (extEEPROMTableWidget->currentItem()->row() * EXTEEPROM_TABLEDIMENSION);
+    adr += extEEPROMTableWidget->currentItem()->column();
+
+    uint8_t data;
+    if (extEEPROMMode == EXTEEPROMMODE_NUMERICAL)
+        data = extEEPROMInputSpinBox->value();
+    else
+        data = extEEPROMInputLineEdit->text().toAscii()[0];
+
+    QVariantList eeprom(getExtEEPROM());
+
+    if (eeprom.isEmpty())
+        return; // Something went wrong
+
+    eeprom[adr] = data;
+    extEEPROMByteChanged(adr, data);
+
+    CProjectSettings prsettings(instance->currentProjectFile);
+    if (verifySettingsFile(prsettings))
+        prsettings.setValue("m32/exteeprom", eeprom);
 }
 
 void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
