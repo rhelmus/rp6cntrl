@@ -4,13 +4,13 @@
 #include "rp6simul.h"
 
 #include <QMap>
-#include <QWidget>
+#include <QMdiArea>
 
 class CBumper;
 class CIRSensor;
 class CLED;
 
-class CRobotWidget : public QWidget
+class CRobotWidget : public QMdiArea
 {
     Q_OBJECT   
 
@@ -25,7 +25,7 @@ class CRobotWidget : public QWidget
     QMap<EMotor, EMotorDirection> motorDirection;
 
 protected:
-    void paintEvent(QPaintEvent *);
+    void paintEvent(QPaintEvent *event);
 
 public:
     explicit CRobotWidget(QWidget *parent = 0);

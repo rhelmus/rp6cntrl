@@ -1,4 +1,5 @@
 #include "bumper.h"
+#include "dataplotwidget.h"
 #include "irsensor.h"
 #include "led.h"
 #include "robotwidget.h"
@@ -69,18 +70,67 @@ void drawMotorIndicator(QPainter &painter, const QRect &rect, int gradh,
 }
 
 CRobotWidget::CRobotWidget(QWidget *parent) :
-    QWidget(parent), motorArrowWidth(25), motorArrowXSpacing(10)
+    QMdiArea(parent), motorArrowWidth(25), motorArrowXSpacing(10)
 {
     const QPixmap p("../resource/rp6-top.png");
     origRobotSize = p.size();
     robotPixmap = p.scaledToWidth(250, Qt::SmoothTransformation);
     widgetMinSize = robotPixmap.size();
     widgetMinSize.rwidth() += (2 * (motorArrowWidth + motorArrowXSpacing));
+
+    setBackground(QBrush(Qt::darkCyan)); // Use normal background (instead of darkened default)
+
+#if 0
+    QwtPlot *plot = new QwtPlot;
+    plot->setTitle("Motor");
+    plot->setAxisTitle(QwtPlot::xBottom, "time (ms)");
+    plot->setAxisTitle(QwtPlot::yLeft, "AU");
+//    plot->setAttribute(Qt::WA_TranslucentBackground);
+//    plot->setAutoFillBackground(true);
+//    plot->canvas()->setPalette(QColor(127, 127, 127, 127));
+//    plot->canvas()->setAutoFillBackground(true);
+//    plot->setCanvasBackground(QColor(255, 0, 0, 0));
+//    plot->canvas()->setAutoFillBackground(false);
+
+    plot->canvas()->setPaintAttribute(QwtPlotCanvas::BackingStore, false);
+    plot->canvas()->setPaintAttribute(QwtPlotCanvas::Opaque, false);
+    plot->canvas()->setAttribute( Qt::WA_OpaquePaintEvent, false );
+    plot->canvas()->setAutoFillBackground( false );
+
+    QwtPlotCurve *curve = new QwtPlotCurve;
+    QVector<double> xdata, ydata;
+    xdata << 0.0 << 1.0 << 2.0;
+    ydata << 0.0 << 10.0 << 15.0;
+    curve->attach(plot);
+    curve->setSamples(xdata, ydata);
+
+    QMdiSubWindow *subw = addSubWindow(plot);
+    subw->setAttribute(Qt::WA_TranslucentBackground);
+    subw->setWindowTitle("Motor");
+    subw->setWindowFlags(subw->windowFlags() & ~Qt::WindowMaximizeButtonHint &
+                         ~Qt::WindowCloseButtonHint);
+    subw->setPalette(QColor(127, 127, 127, 127));
+//    subw->setAutoFillBackground(true);
+#endif
+    CDataPlotWidget *plot = new CDataPlotWidget;
+    plot->setMaxYScale(10.0);
+    plot->addDataPoint(0.0, 10.0);
+    plot->addDataPoint(1.0, 15.0);
+    plot->addDataPoint(2.0, 50.0);
+
+    QMdiSubWindow *subw = addSubWindow(plot);
+    subw->setAttribute(Qt::WA_TranslucentBackground);
+    subw->setWindowTitle("Motor");
+    subw->setWindowFlags(subw->windowFlags() & ~Qt::WindowMaximizeButtonHint &
+                         ~Qt::WindowCloseButtonHint);
+    subw->setPalette(QColor(127, 127, 127, 127));
 }
 
-void CRobotWidget::paintEvent(QPaintEvent *)
+void CRobotWidget::paintEvent(QPaintEvent *event)
 {
-    QPainter painter(this);
+    QMdiArea::paintEvent(event);
+
+    QPainter painter(viewport());
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
 
