@@ -651,6 +651,20 @@ QWidget *CRP6Simulator::createRobotWidget()
 
     vbox->addWidget(robotWidget = new CRobotWidget);
 
+#if 0
+    QMdiArea *mdiArea = new QMdiArea;
+    vbox->addWidget(mdiArea);
+
+    QWidget *w = new QWidget;
+    QMdiSubWindow *subw = mdiArea->addSubWindow(w);
+    subw->setWindowTitle("Motor");
+    subw->setWindowFlags(subw->windowFlags() & ~Qt::WindowMaximizeButtonHint);
+//    subw->setWindowOpacity(0.75);
+    subw->setStyleSheet("background:transparent;");
+    subw->setAttribute(Qt::WA_TranslucentBackground);
+    QVBoxLayout *subvbox = new QVBoxLayout(w);
+    subvbox->addWidget(new QLabel("Hi :-)"));
+#endif
     return ret;
 }
 

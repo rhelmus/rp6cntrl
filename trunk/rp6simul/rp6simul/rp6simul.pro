@@ -12,8 +12,11 @@ TEMPLATE = app
 DEFINES += USEATOMIC
 
 INCLUDEPATH += ../shared/ ../qextserialport/
+INCLUDEPATH += /usr/include/qwt
 
 LIBS += -L../qextserialport/build -lqextserialport
+LIBS += -lSDL
+LIBS += -lqwt
 
 SOURCES += main.cpp\
         rp6simul.cpp \
@@ -34,7 +37,8 @@ SOURCES += main.cpp\
     mapsettingsdialog.cpp \
     clock.cpp \
     progressdialog.cpp \
-    robotwidget.cpp
+    robotwidget.cpp \
+    dataplotwidget.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -60,7 +64,8 @@ HEADERS  += rp6simul.h \
     led.h \
     bumper.h \
     irsensor.h \
-    lightsensor.h
+    lightsensor.h \
+    dataplotwidget.h
 
 OTHER_FILES += \
     TODO.txt \
@@ -152,8 +157,17 @@ win32 {
 }
 else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
-    LIBS += -llua -lSDL
+    LIBS += -llua
 }
+
+
+
+
+
+
+
+
+
 
 
 
