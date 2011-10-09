@@ -118,12 +118,13 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
     plot->addDataPoint(1.0, 15.0);
     plot->addDataPoint(2.0, 50.0);
 
-    QMdiSubWindow *subw = addSubWindow(plot);
+    QMdiSubWindow *subw =
+            addSubWindow(plot, Qt::SubWindow | Qt::CustomizeWindowHint |
+                         Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
     subw->setAttribute(Qt::WA_TranslucentBackground);
-    subw->setWindowTitle("Motor");
-    subw->setWindowFlags(subw->windowFlags() & ~Qt::WindowMaximizeButtonHint &
-                         ~Qt::WindowCloseButtonHint);
     subw->setPalette(QColor(127, 127, 127, 127));
+    subw->setWindowTitle("Motor");
+    subw->resize(subw->minimumSizeHint());
 }
 
 void CRobotWidget::paintEvent(QPaintEvent *event)
