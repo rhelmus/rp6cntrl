@@ -13,7 +13,15 @@ CDataPlotWidget::CDataPlotWidget(QWidget *parent, Qt::WindowFlags flags) :
 
     vbox->addWidget(plotWidget = new QwtPlot);
     plotWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-    plotWidget->setAxisTitle(QwtPlot::xBottom, "time (ms)");
+    QwtText titlex("time (ms)");
+    QFont f(font());
+    f.setPointSize(10);
+    titlex.setFont(f);
+    plotWidget->setAxisTitle(QwtPlot::xBottom, titlex);
+
+    f.setPointSize(9);
+    plotWidget->setAxisFont(QwtPlot::xBottom, f);
+    plotWidget->setAxisFont(QwtPlot::yLeft, f);
 //    plotWidget->setAxisTitle(QwtPlot::yLeft, "AU"); UNDONE
 
     // Make it transparent: see http://www.qtcentre.org/threads/39684-Setting-QwtPlot-s-canvas-as-Transparent-wthout-stylesheet-way
