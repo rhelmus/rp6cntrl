@@ -70,61 +70,92 @@ void drawMotorIndicator(QPainter &painter, const QRect &rect, int gradh,
 }
 
 CRobotWidget::CRobotWidget(QWidget *parent) :
-    QMdiArea(parent), motorArrowWidth(25), motorArrowXSpacing(10)
+    QMdiArea(parent), motorArrowWidth(25), motorArrowXSpacing(10),
+    dataPlotClosedSignalMapper(this)
 {
     const QPixmap p("../resource/rp6-top.png");
     origRobotSize = p.size();
-    robotPixmap = p.scaledToWidth(250, Qt::SmoothTransformation);
+    robotPixmap = p.scaledToWidth(225, Qt::SmoothTransformation);
     widgetMinSize = robotPixmap.size();
     widgetMinSize.rwidth() += (2 * (motorArrowWidth + motorArrowXSpacing));
 
-    setBackground(QBrush(Qt::darkCyan)); // Use normal background (instead of darkened default)
+//    setBackground(QBrush(Qt::darkCyan)); // Use normal background (instead of darkened default)
+    setBackground(QBrush());
 
-#if 0
-    QwtPlot *plot = new QwtPlot;
-    plot->setTitle("Motor");
-    plot->setAxisTitle(QwtPlot::xBottom, "time (ms)");
-    plot->setAxisTitle(QwtPlot::yLeft, "AU");
-//    plot->setAttribute(Qt::WA_TranslucentBackground);
-//    plot->setAutoFillBackground(true);
-//    plot->canvas()->setPalette(QColor(127, 127, 127, 127));
-//    plot->canvas()->setAutoFillBackground(true);
-//    plot->setCanvasBackground(QColor(255, 0, 0, 0));
-//    plot->canvas()->setAutoFillBackground(false);
+    connect(&dataPlotClosedSignalMapper, SIGNAL(mapped(int)),
+            SIGNAL(dataPlotClosed(int)));
 
-    plot->canvas()->setPaintAttribute(QwtPlotCanvas::BackingStore, false);
-    plot->canvas()->setPaintAttribute(QwtPlotCanvas::Opaque, false);
-    plot->canvas()->setAttribute( Qt::WA_OpaquePaintEvent, false );
-    plot->canvas()->setAutoFillBackground( false );
+    for (int i=0; i<DATAPLOT_MAX; ++i)
+        createDataPlotSubWindow(static_cast<EDataPlotType>(i));
 
-    QwtPlotCurve *curve = new QwtPlotCurve;
-    QVector<double> xdata, ydata;
-    xdata << 0.0 << 1.0 << 2.0;
-    ydata << 0.0 << 10.0 << 15.0;
-    curve->attach(plot);
-    curve->setSamples(xdata, ydata);
+    dataPlotUpdateTimer = new QTimer;
+    dataPlotUpdateTimer->setInterval(250); // UNDONE: Configurable?
+    connect(dataPlotUpdateTimer, SIGNAL(timeout()), SLOT(dataPlotTimedUpdate()));
+}
 
-    QMdiSubWindow *subw = addSubWindow(plot);
-    subw->setAttribute(Qt::WA_TranslucentBackground);
-    subw->setWindowTitle("Motor");
-    subw->setWindowFlags(subw->windowFlags() & ~Qt::WindowMaximizeButtonHint &
-                         ~Qt::WindowCloseButtonHint);
-    subw->setPalette(QColor(127, 127, 127, 127));
-//    subw->setAutoFillBackground(true);
-#endif
-    CDataPlotWidget *plot = new CDataPlotWidget;
-    plot->setMaxYScale(10.0);
-    plot->addDataPoint(0.0, 10.0);
-    plot->addDataPoint(1.0, 15.0);
-    plot->addDataPoint(2.0, 50.0);
+void CRobotWidget::createDataPlotSubWindow(EDataPlotType plot)
+{
+    CDataPlotWidget *plotw = new CDataPlotWidget;
 
-    QMdiSubWindow *subw =
-            addSubWindow(plot, Qt::SubWindow | Qt::CustomizeWindowHint |
-                         Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
+    CDataPlotSubWindow *subw =
+            new CDataPlotSubWindow(this, Qt::SubWindow | Qt::CustomizeWindowHint |
+                                   Qt::WindowTitleHint |
+                                   Qt::WindowMinimizeButtonHint |
+                                   Qt::WindowCloseButtonHint);
+    subw->setWidget(plotw);
+    addSubWindow(subw);
     subw->setAttribute(Qt::WA_TranslucentBackground);
     subw->setPalette(QColor(127, 127, 127, 127));
-    subw->setWindowTitle("Motor");
     subw->resize(subw->minimumSizeHint());
+    subw->close();
+
+    switch (plot)
+    {
+    case DATAPLOT_MOTORSPEED:
+        subw->setWindowTitle("Motor Speed");
+        plotw->addCurve("left", Qt::blue);
+        plotw->addCurve("right", Qt::red);
+        break;
+    case DATAPLOT_MOTORPOWER:
+        subw->setWindowTitle("Motor Power");
+        plotw->addCurve("left", Qt::blue);
+        plotw->addCurve("right", Qt::red);
+        break;
+    case DATAPLOT_LIGHT:
+        subw->setWindowTitle("Light Sensors");
+        plotw->addCurve("left", Qt::blue);
+        plotw->addCurve("right", Qt::red);
+        break;
+    case DATAPLOT_PIEZO:
+        subw->setWindowTitle("Piezo");
+        plotw->addCurve("Piezo", Qt::blue);
+        break;
+    case DATAPLOT_MIC:
+        subw->setWindowTitle("Microphone");
+        plotw->addCurve("Mic", Qt::blue);
+        break;
+    case DATAPLOT_ADC:
+        subw->setWindowTitle("ADC");
+        // UNDONE
+        plotw->addCurve("ADC0", Qt::blue);
+        break;
+    default: Q_ASSERT(false);
+    }
+
+    dataPlotClosedSignalMapper.setMapping(subw, plot);
+    connect(subw, SIGNAL(closed()), &dataPlotClosedSignalMapper, SLOT(map()));
+
+    dataPlots.insert(plot, SDataPlotInfo(subw, plotw));
+}
+
+void CRobotWidget::dataPlotTimedUpdate()
+{
+    const double elapsed = static_cast<double>(runTime.elapsed()) / 1000.0;
+
+    // UNDONE
+    dataPlots[DATAPLOT_MOTORSPEED].plotWidget->addDataPoint("left", elapsed, motorSpeed[MOTOR_LEFT]);
+    dataPlots[DATAPLOT_MOTORSPEED].plotWidget->addDataPoint("right", elapsed, motorSpeed[MOTOR_RIGHT]);
+
 }
 
 void CRobotWidget::paintEvent(QPaintEvent *event)
@@ -211,6 +242,32 @@ void CRobotWidget::paintEvent(QPaintEvent *event)
         painter.drawText(trect, Qt::AlignCenter,
                          QString::number(motorPower[MOTOR_RIGHT]));
     }
+}
+
+void CRobotWidget::start()
+{
+    runTime.start();
+    dataPlotUpdateTimer->start();
+    foreach (SDataPlotInfo di, dataPlots)
+        di.plotWidget->clearData();
+}
+
+void CRobotWidget::stop()
+{
+    dataPlotUpdateTimer->stop();
+    LEDs.clear();
+    bumpers.clear();
+    IRSensors.clear();
+    motorPower.clear();
+    motorSpeed.clear();
+    motorDirection.clear();
+    update();
+}
+
+void CRobotWidget::showDataPlot(EDataPlotType plot)
+{
+    dataPlots[plot].subWindow->show();
+    dataPlots[plot].plotWidget->show();
 }
 
 void CRobotWidget::addBumper(CBumper *b)

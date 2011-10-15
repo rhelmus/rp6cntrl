@@ -73,6 +73,8 @@ class CRP6Simulator : public QMainWindow
     QAction *runPluginAction, *stopPluginAction;
     QToolButton *handClapButton;
     QWidget *keyPadWidget;
+    QToolBar *robotToolBar;
+    QMenu *dataPlotMenu;
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
     QStackedWidget *mainStackedWidget;
@@ -239,6 +241,8 @@ private slots:
     void setHandClapMode(int m);
     void handleKeyPadPress(int key);
     void resetKeyPress(void);
+    void handleDataPlotSelection(QAction *a);
+    void enableDataPlotSelection(int plot);
     void tabViewChanged(int index);
     void changeSceneMouseMode(QAction *a);
     void sceneMouseModeChanged(CRobotScene::EMouseMode mode);
