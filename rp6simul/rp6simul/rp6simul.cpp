@@ -113,7 +113,7 @@ QToolButton *createKeyButton(int key)
     ret->setToolTip(QString("M32 key pad button %1").arg(key));
     const QRect rect(ret->fontMetrics().boundingRect(txt));
     ret->setMaximumWidth(rect.width() + 15);
-    ret->setMaximumHeight(rect.height() + 10);
+    ret->setMaximumHeight(rect.height() + 5);
     return ret;
 }
 
@@ -518,6 +518,30 @@ void CRP6Simulator::createToolbars()
         grid->addWidget(b, row, col);
     }
 
+
+    robotToolBar = addToolBar("Robot");
+    QToolButton *tb = new QToolButton;
+    tb->setIcon(QIcon("../resource/dataplot.png"));
+    robotToolBar->addWidget(tb);
+    tb->setMenu(dataPlotMenu = new QMenu);
+    tb->setPopupMode(QToolButton::InstantPopup);
+    a = dataPlotMenu->addAction("Motor Speed");
+    a->setData(CRobotWidget::DATAPLOT_MOTORSPEED);
+    a = dataPlotMenu->addAction("Motor Power");
+    a->setData(CRobotWidget::DATAPLOT_MOTORPOWER);
+    a = dataPlotMenu->addAction("Light");
+    a->setData(CRobotWidget::DATAPLOT_LIGHT);
+    a = dataPlotMenu->addAction("Piezo");
+    a->setData(CRobotWidget::DATAPLOT_PIEZO);
+    a = dataPlotMenu->addAction("Microphone");
+    a->setData(CRobotWidget::DATAPLOT_MIC);
+    a = dataPlotMenu->addAction("ADC");
+    a->setData(CRobotWidget::DATAPLOT_ADC);
+    connect(dataPlotMenu, SIGNAL(triggered(QAction*)),
+            SLOT(handleDataPlotSelection(QAction*)));
+    robotToolBar->addAction("Refr", robotWidget->viewport(), SLOT(update()));
+
+
     addToolBar(editMapToolBar = new QToolBar("Edit map"));
     editMapToolBar->setEnabled(false);
 
@@ -650,21 +674,9 @@ QWidget *CRP6Simulator::createRobotWidget()
     QVBoxLayout *vbox = new QVBoxLayout(ret);
 
     vbox->addWidget(robotWidget = new CRobotWidget);
+    connect(robotWidget, SIGNAL(dataPlotClosed(int)),
+            SLOT(enableDataPlotSelection(int)));
 
-#if 0
-    QMdiArea *mdiArea = new QMdiArea;
-    vbox->addWidget(mdiArea);
-
-    QWidget *w = new QWidget;
-    QMdiSubWindow *subw = mdiArea->addSubWindow(w);
-    subw->setWindowTitle("Motor");
-    subw->setWindowFlags(subw->windowFlags() & ~Qt::WindowMaximizeButtonHint);
-//    subw->setWindowOpacity(0.75);
-    subw->setStyleSheet("background:transparent;");
-    subw->setAttribute(Qt::WA_TranslucentBackground);
-    QVBoxLayout *subvbox = new QVBoxLayout(w);
-    subvbox->addWidget(new QLabel("Hi :-)"));
-#endif
     return ret;
 }
 
@@ -2406,6 +2418,7 @@ void CRP6Simulator::runPlugin()
     robotStatusTreeWidget->clear();
     pluginUpdateUITimer->start();
     pluginUpdateLEDsTimer->start();
+    robotWidget->start();
 
     runPluginAction->setEnabled(false);
     stopPluginAction->setEnabled(true);
@@ -2481,6 +2494,7 @@ void CRP6Simulator::stopPlugin()
 
     pluginUpdateUITimer->stop();
     pluginUpdateLEDsTimer->stop();
+    robotWidget->stop();
 
     // Dump any remaining buffered data
     timedUIUpdate();
@@ -2566,6 +2580,27 @@ void CRP6Simulator::resetKeyPress()
                     luaHandleKeyPressCallback);
         lua_pushnil(m32Simulator->getLuaState());
         lua_call(m32Simulator->getLuaState(), 1, 0);
+    }
+}
+
+void CRP6Simulator::handleDataPlotSelection(QAction *a)
+{
+    CRobotWidget::EDataPlotType plot =
+            static_cast<CRobotWidget::EDataPlotType>(a->data().toInt());
+    robotWidget->showDataPlot(plot);
+    a->setVisible(false);
+}
+
+void CRP6Simulator::enableDataPlotSelection(int plot)
+{
+    QList<QAction *> actions = dataPlotMenu->actions();
+    foreach (QAction *a, actions)
+    {
+        if (a->data() == plot)
+        {
+            a->setVisible(true);
+            break;
+        }
     }
 }
 
