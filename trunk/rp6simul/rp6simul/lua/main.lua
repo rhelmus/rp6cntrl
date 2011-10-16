@@ -223,6 +223,17 @@ function setUIADCValue(a, v)
     UIADCValues[a] = v
 end
 
+function getADCValues()
+    local ret = { }
+    local ports = simulatorEnv.getADCPortNames()
+
+    for _, p in ipairs(ports) do
+        ret[p] = getADCValue(p)
+    end
+
+    return ret
+end
+
 
 -- Called by every simulator (robot, m32)
 function simulator(name)

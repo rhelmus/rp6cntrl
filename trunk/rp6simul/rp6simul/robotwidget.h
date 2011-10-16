@@ -36,7 +36,7 @@ class CRobotWidget : public QMdiArea
 public:
     enum EDataPlotType { DATAPLOT_MOTORSPEED=0, DATAPLOT_MOTORPOWER,
                          DATAPLOT_LIGHT, DATAPLOT_PIEZO, DATAPLOT_MIC,
-                         DATAPLOT_ADC, DATAPLOT_MAX };
+                         DATAPLOT_ROBOTADC, DATAPLOT_M32ADC, DATAPLOT_MAX };
 
 private:
     Q_OBJECT
@@ -59,11 +59,13 @@ private:
     QTime runTime;
     QMap<EDataPlotType, SDataPlotInfo> dataPlots;
     QSignalMapper dataPlotClosedSignalMapper;
+    QMap<QString, int> robotADCValues, m32ADCValues;
     QList<CLED *> LEDs;
     QList<CBumper *> bumpers;
     QList<CIRSensor *> IRSensors;
     QMap<EMotor, int> motorPower, motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
+    int beeperPitch;
 
     void createDataPlotSubWindow(EDataPlotType plot);
 
@@ -81,6 +83,10 @@ public:
     void start(void);
     void stop(void);
     void showDataPlot(EDataPlotType plot);
+    void setRobotADCValue(const QString &port, int val)
+    { robotADCValues[port] = val; }
+    void setM32ADCValue(const QString &port, int val)
+    { m32ADCValues[port] = val; }
     void addBumper(CBumper *b);
     void removeBumper(CBumper *b);
     void addLED(CLED *l);
@@ -91,6 +97,9 @@ public:
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; update(); }
     void setMotorDirection(EMotor m, EMotorDirection d)
     { motorDirection[m] = d; update(); }
+
+public slots:
+    void setBeeperPitch(int pitch) { beeperPitch = pitch; }
 
 signals:
     void dataPlotClosed(int);

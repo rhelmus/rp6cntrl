@@ -85,17 +85,20 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
     connect(&dataPlotClosedSignalMapper, SIGNAL(mapped(int)),
             SIGNAL(dataPlotClosed(int)));
 
-    for (int i=0; i<DATAPLOT_MAX; ++i)
-        createDataPlotSubWindow(static_cast<EDataPlotType>(i));
-
+    // Create timer before plot subwindows!
     dataPlotUpdateTimer = new QTimer;
     dataPlotUpdateTimer->setInterval(250); // UNDONE: Configurable?
     connect(dataPlotUpdateTimer, SIGNAL(timeout()), SLOT(dataPlotTimedUpdate()));
+
+    for (int i=0; i<DATAPLOT_MAX; ++i)
+        createDataPlotSubWindow(static_cast<EDataPlotType>(i));
 }
 
 void CRobotWidget::createDataPlotSubWindow(EDataPlotType plot)
 {
     CDataPlotWidget *plotw = new CDataPlotWidget;
+    // Restrict history to 10 secs
+    plotw->setMaxDataPoints(1000.0 / (double)dataPlotUpdateTimer->interval() * 10.0);
 
     CDataPlotSubWindow *subw =
             new CDataPlotSubWindow(this, Qt::SubWindow | Qt::CustomizeWindowHint |
@@ -128,16 +131,30 @@ void CRobotWidget::createDataPlotSubWindow(EDataPlotType plot)
         break;
     case DATAPLOT_PIEZO:
         subw->setWindowTitle("Piezo");
-        plotw->addCurve("Piezo", Qt::blue);
+        plotw->addCurve("piezo", Qt::blue);
         break;
     case DATAPLOT_MIC:
         subw->setWindowTitle("Microphone");
-        plotw->addCurve("Mic", Qt::blue);
+        plotw->addCurve("mic", Qt::blue);
         break;
-    case DATAPLOT_ADC:
-        subw->setWindowTitle("ADC");
-        // UNDONE
-        plotw->addCurve("ADC0", Qt::blue);
+    case DATAPLOT_ROBOTADC:
+        subw->setWindowTitle("ADC robot");
+        plotw->addCurve("ADC0", Qt::red);
+        plotw->addCurve("ADC1", Qt::yellow);
+        plotw->addCurve("E_INT1", Qt::green);
+        plotw->addCurve("MCURRENT_L", Qt::black);
+        plotw->addCurve("MCURRENT_R", Qt::magenta);
+        plotw->addCurve("UBAT", Qt::cyan);
+        break;
+    case DATAPLOT_M32ADC:
+        subw->setWindowTitle("ADC M32");
+        plotw->addCurve("KEYPAD", Qt::red);
+        plotw->addCurve("ADC2", Qt::yellow);
+        plotw->addCurve("ADC3", Qt::green);
+        plotw->addCurve("ADC4", Qt::black);
+        plotw->addCurve("ADC5", Qt::magenta);
+        plotw->addCurve("ADC6", Qt::cyan);
+        plotw->addCurve("ADC7", Qt::darkRed);
         break;
     default: Q_ASSERT(false);
     }
@@ -153,9 +170,69 @@ void CRobotWidget::dataPlotTimedUpdate()
     const double elapsed = static_cast<double>(runTime.elapsed()) / 1000.0;
 
     // UNDONE
-    dataPlots[DATAPLOT_MOTORSPEED].plotWidget->addDataPoint("left", elapsed, motorSpeed[MOTOR_LEFT]);
-    dataPlots[DATAPLOT_MOTORSPEED].plotWidget->addDataPoint("right", elapsed, motorSpeed[MOTOR_RIGHT]);
 
+    // Motor speed
+    int lspeed = motorSpeed[MOTOR_LEFT], rspeed = motorSpeed[MOTOR_RIGHT];
+    if (motorDirection[MOTOR_LEFT] == MOTORDIR_BWD)
+        lspeed *= -1;
+    if (motorDirection[MOTOR_RIGHT] == MOTORDIR_BWD)
+        rspeed *= -1;
+
+    dataPlots[DATAPLOT_MOTORSPEED].plotWidget->addDataPoint("left", elapsed,
+                                                            lspeed);
+    dataPlots[DATAPLOT_MOTORSPEED].plotWidget->addDataPoint("right", elapsed,
+                                                            rspeed);
+
+    // Motor power
+    dataPlots[DATAPLOT_MOTORPOWER].plotWidget->addDataPoint("left", elapsed,
+                                                            motorPower[MOTOR_LEFT]);
+    dataPlots[DATAPLOT_MOTORPOWER].plotWidget->addDataPoint("right", elapsed,
+                                                            motorPower[MOTOR_RIGHT]);
+
+    // Beeper / Piezo
+    dataPlots[DATAPLOT_PIEZO].plotWidget->addDataPoint("piezo", elapsed,
+                                                       beeperPitch);
+
+
+    // Light
+    dataPlots[DATAPLOT_LIGHT].plotWidget->addDataPoint("left", elapsed,
+                                                       robotADCValues["LS_L"]);
+    dataPlots[DATAPLOT_LIGHT].plotWidget->addDataPoint("right", elapsed,
+                                                       robotADCValues["LS_R"]);
+
+    // Microphone
+    dataPlots[DATAPLOT_MIC].plotWidget->addDataPoint("mic", elapsed,
+                                                     m32ADCValues["MIC"]);
+
+    // (Other) ADC - robot
+    dataPlots[DATAPLOT_ROBOTADC].plotWidget->addDataPoint("ADC0", elapsed,
+                                                          robotADCValues["ADC0"]);
+    dataPlots[DATAPLOT_ROBOTADC].plotWidget->addDataPoint("ADC1", elapsed,
+                                                          robotADCValues["ADC1"]);
+    dataPlots[DATAPLOT_ROBOTADC].plotWidget->addDataPoint("E_INT1", elapsed,
+                                                          robotADCValues["E_INT1"]);
+    dataPlots[DATAPLOT_ROBOTADC].plotWidget->addDataPoint("MCURRENT_L", elapsed,
+                                                          robotADCValues["MCURRENT_L"]);
+    dataPlots[DATAPLOT_ROBOTADC].plotWidget->addDataPoint("MCURRENT_R", elapsed,
+                                                          robotADCValues["MCURRENT_R"]);
+    dataPlots[DATAPLOT_ROBOTADC].plotWidget->addDataPoint("UBAT", elapsed,
+                                                          robotADCValues["UBAT"]);
+
+    // (Other) ADC - m32
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("KEYPAD", elapsed,
+                                                          m32ADCValues["KEYPAD"]);
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("ADC2", elapsed,
+                                                          m32ADCValues["ADC2"]);
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("ADC3", elapsed,
+                                                          m32ADCValues["ADC3"]);
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("ADC4", elapsed,
+                                                          m32ADCValues["ADC4"]);
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("ADC5", elapsed,
+                                                          m32ADCValues["ADC5"]);
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("ADC6", elapsed,
+                                                          m32ADCValues["ADC6"]);
+    dataPlots[DATAPLOT_M32ADC].plotWidget->addDataPoint("ADC7", elapsed,
+                                                          m32ADCValues["ADC7"]);
 }
 
 void CRobotWidget::paintEvent(QPaintEvent *event)
@@ -165,6 +242,9 @@ void CRobotWidget::paintEvent(QPaintEvent *event)
     QPainter painter(viewport());
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
+
+    // Background
+    painter.fillRect(rect(), Qt::darkCyan);
 
     // center
     const int imgx = (width() - robotPixmap.width()) / 2;
@@ -299,3 +379,4 @@ void CRobotWidget::removeIRSensor(CIRSensor *ir)
 {
     IRSensors.removeOne(ir);
 }
+

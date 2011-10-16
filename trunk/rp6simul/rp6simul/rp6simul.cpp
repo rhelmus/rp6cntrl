@@ -140,12 +140,13 @@ CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QMainWindow(parent), audioCurrentCycle(0.0), audioFrequency(0.0),
-    playingBeep(false), handClapMode(CLAP_NORMAL), playingHandClap(false),
-    handClapSoundPos(0), extEEPROMMode(EXTEEPROMMODE_NUMERICAL),
-    currentMapIsTemplate(false), robotIsBlocked(false),
-    robotSerialSendLuaCallback(0), m32SerialSendLuaCallback(0),
-    IRCOMMSendLuaCallback(0), luaHandleExtInt1Callback(0),
-    luaHandleSoundCallback(0), luaHandleKeyPressCallback(0)
+    beeperPitch(0), playingBeep(false), handClapMode(CLAP_NORMAL),
+    playingHandClap(false), handClapSoundPos(0),
+    extEEPROMMode(EXTEEPROMMODE_NUMERICAL), currentMapIsTemplate(false),
+    robotIsBlocked(false), robotSerialSendLuaCallback(0),
+    m32SerialSendLuaCallback(0), IRCOMMSendLuaCallback(0),
+    luaHandleExtInt1Callback(0), luaHandleSoundCallback(0),
+    luaHandleKeyPressCallback(0)
 {
     Q_ASSERT(!instance);
     instance = this;
@@ -501,7 +502,7 @@ void CRP6Simulator::createToolbars()
     signalm = new QSignalMapper(this);
     connect(signalm, SIGNAL(mapped(int)), SLOT(handleKeyPadPress(int)));
     toolb->addWidget(keyPadWidget = new QWidget);
-    connect(this, SIGNAL(receivedSoundCallback(bool)), keyPadWidget,
+    connect(this, SIGNAL(receivedKeyPressCallback(bool)), keyPadWidget,
             SLOT(setEnabled(bool)));
     keyPadWidget->setEnabled(false);
     QGridLayout *grid = new QGridLayout(keyPadWidget);
@@ -535,8 +536,10 @@ void CRP6Simulator::createToolbars()
     a->setData(CRobotWidget::DATAPLOT_PIEZO);
     a = dataPlotMenu->addAction("Microphone");
     a->setData(CRobotWidget::DATAPLOT_MIC);
-    a = dataPlotMenu->addAction("ADC");
-    a->setData(CRobotWidget::DATAPLOT_ADC);
+    a = dataPlotMenu->addAction("ADC - robot");
+    a->setData(CRobotWidget::DATAPLOT_ROBOTADC);
+    a = dataPlotMenu->addAction("ADC - m32");
+    a->setData(CRobotWidget::DATAPLOT_M32ADC);
     connect(dataPlotMenu, SIGNAL(triggered(QAction*)),
             SLOT(handleDataPlotSelection(QAction*)));
     robotToolBar->addAction("Refr", robotWidget->viewport(), SLOT(update()));
@@ -676,7 +679,8 @@ QWidget *CRP6Simulator::createRobotWidget()
     vbox->addWidget(robotWidget = new CRobotWidget);
     connect(robotWidget, SIGNAL(dataPlotClosed(int)),
             SLOT(enableDataPlotSelection(int)));
-
+    connect(this, SIGNAL(beeperPitchChanged(int)), robotWidget,
+            SLOT(setBeeperPitch(int)));
     return ret;
 }
 
@@ -1334,6 +1338,20 @@ QVariantList CRP6Simulator::getExtEEPROM() const
     return ret;
 }
 
+QVariantHash CRP6Simulator::getADCValues(lua_State *l)
+{
+    NLua::CLuaLocker lualocker(l);
+
+    lua_getglobal(l, "getADCValues");
+    lua_call(l, 0, 1);
+    luaL_checktype(l, -1, LUA_TTABLE);
+
+    QVariantHash ret(NLua::convertLuaTable(l, -1));
+    lua_pop(l, 1);
+
+    return ret;
+}
+
 void CRP6Simulator::SDLAudioCallback(void *, Uint8 *stream, int length)
 {
     if (instance->playingHandClap)
@@ -1439,9 +1457,9 @@ int CRP6Simulator::luaSetDriverLists(lua_State *l)
     luaL_checktype(l, 1, LUA_TTABLE); // Driver descriptions
     luaL_checktype(l, 2, LUA_TTABLE); // Default driver list
 
-    QHash<QString, QVariant> list = NLua::convertLuaTable(l, 1);
+    QVariantHash list = NLua::convertLuaTable(l, 1);
     QHash<QString, QString> descmap;
-    for(QHash<QString, QVariant>::iterator it=list.begin(); it!=list.end(); ++it)
+    for(QVariantHash::iterator it=list.begin(); it!=list.end(); ++it)
         descmap[it.key()] = it.value().toString();
 
     instance->projectWizard->setDriverLists(descmap,
@@ -1990,8 +2008,13 @@ int CRP6Simulator::luaSetBeeperEnabled(lua_State *l)
     {
         instance->playingBeep = e;
 
-        if (e) // Initialize?
+        if (e)
+        {
             instance->audioCurrentCycle = 0.0;
+            instance->emit beeperPitchChanged(instance->beeperPitch);
+        }
+        else
+            instance->emit beeperPitchChanged(0);
 
         // UNDONE: Check if audio is enabled/not in error state
         SDL_PauseAudio(!e);
@@ -2004,12 +2027,16 @@ int CRP6Simulator::luaSetBeeperFrequency(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
 
-    const float freq = luaL_checknumber(l, 1);
+    instance->beeperPitch = luaL_checkint(l, 1);
+    const float freq = luaL_checknumber(l, 2);
 
     // UNDONE: Check if audio is enabled/not in error state
     SDL_LockAudio();
     instance->audioFrequency = freq;
     SDL_UnlockAudio();
+
+    if (instance->playingBeep)
+        instance->emit beeperPitchChanged(instance->beeperPitch);
 
     return 0;
 }
@@ -2261,6 +2288,23 @@ void CRP6Simulator::loadMap()
 
 void CRP6Simulator::timedUIUpdate()
 {
+    QVariantHash adcvalues(getADCValues(robotSimulator->getLuaState()));
+    for (QVariantHash::iterator it=adcvalues.begin(); it!=adcvalues.end(); ++it)
+    {
+        appendRobotStatusUpdate(QStringList() << "robot" << "ADC" <<
+                                it.key() << it.value().toString());
+        robotWidget->setRobotADCValue(it.key(), it.value().toInt());
+    }
+
+    adcvalues = getADCValues(m32Simulator->getLuaState());
+    for (QVariantHash::iterator it=adcvalues.begin(); it!=adcvalues.end(); ++it)
+    {
+        appendRobotStatusUpdate(QStringList() << "m32" << "ADC" <<
+                                it.key() << it.value().toString());
+        robotWidget->setM32ADCValue(it.key(), it.value().toInt());
+    }
+
+
 #ifdef USEATOMIC
     const QAtomicInt *ioregisters;
 #else
@@ -2369,6 +2413,7 @@ void CRP6Simulator::timedUIUpdate()
         parent->setText(1, stritems.last());
     }
     robotStatusUpdateBuffer.clear();
+    statlocker.unlock(); // So we can call appendRobotStatusUpdate() below
 
 #ifndef USEATOMIC
     QMutexLocker mpowerlocker(&motorPowerMutex);
