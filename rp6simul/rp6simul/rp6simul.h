@@ -57,6 +57,7 @@ class CRP6Simulator : public QMainWindow
 
     QextSerialPort *robotSerialDevice, *m32SerialDevice;
     float audioCurrentCycle, audioFrequency;
+    int beeperPitch; // As set by plugin code
     bool playingBeep;
     SDL_AudioCVT handClapCVT;
     EHandClapMode handClapMode;
@@ -178,6 +179,7 @@ class CRP6Simulator : public QMainWindow
     QString getLogOutput(ELogType type, QString text) const;
     void appendRobotStatusUpdate(const QStringList &strtree);
     QVariantList getExtEEPROM(void) const;
+    QVariantHash getADCValues(lua_State *l);
 
     // SDL audio callback
     static void SDLAudioCallback(void *, Uint8 *stream, int length);
@@ -277,12 +279,13 @@ signals:
     void motorDriveSpeedChanged(EMotor, int);
     void motorDirectionChanged(EMotor, EMotorDirection);
     void newIRCOMMText(const QString &);
+    void beeperPitchChanged(int);
     void receivedRobotSerialSendCallback(bool);
     void receivedM32SerialSendCallback(bool);
     void receivedIRCOMMSendCallback(bool);
     void receivedSoundCallback(bool);
     void receivedKeyPressCallback(bool);
-    void extEEPROMByteChanged(int address, quint8 data);
+    void extEEPROMByteChanged(int, quint8);
 };
 
 #endif // RP6SIMUL_H

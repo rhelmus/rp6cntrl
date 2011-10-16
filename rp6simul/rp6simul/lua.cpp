@@ -189,9 +189,9 @@ bool checkBoolean(lua_State *l, int index)
     return lua_toboolean(l, index);
 }
 
-QHash<QString, QVariant> convertLuaTable(lua_State *l, int index)
+QVariantHash convertLuaTable(lua_State *l, int index)
 {
-    QHash<QString, QVariant> ret;
+    QVariantHash ret;
     const int tabind = luaAbsIndex(l, index);
 
     lua_pushnil(l);
