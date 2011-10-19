@@ -25,6 +25,7 @@ local robotPicWidth = 637 -- Full width of rp6-top.png image
 
 local green = { 0, 255, 0 }
 local red = { 255, 0, 0 }
+local yellow = { 255, 255, 0 }
 local darkblue = { 0, 0, 192 }
 local transblue = { 0, 0, 255, 80 }
 
@@ -35,7 +36,7 @@ local ACSDistances =
     medium = 23 / cmPerPixel,
     high = 32 / cmPerPixel
 }
-
+--187, 513
 properties =
 {
     clockSpeed = 8000000,
@@ -50,12 +51,14 @@ properties =
     m32Front = { pos = { 22, 60 }, rotation = 180 },
     m32Back = { pos = { 12, 540 }, rotation = 0 },
 
-    led1 = { pos = { 458, 209 }, radius = 10, color = green },
-    led2 = { pos = { 458, 184 }, radius = 10, color = red },
-    led3 = { pos = { 458, 158 }, radius = 10, color = red },
-    led4 = { pos = { 191, 209 }, radius = 10, color = green },
-    led5 = { pos = { 191, 181 }, radius = 10, color = red },
-    led6 = { pos = { 191, 156 }, radius = 10, color = red },
+    LED1 = { pos = { 458, 209 }, radius = 10, color = green },
+    LED2 = { pos = { 458, 184 }, radius = 10, color = red },
+    LED3 = { pos = { 458, 158 }, radius = 10, color = red },
+    LED4 = { pos = { 191, 209 }, radius = 10, color = green },
+    LED5 = { pos = { 191, 181 }, radius = 10, color = red },
+    LED6 = { pos = { 191, 156 }, radius = 10, color = red },
+
+    powerLED = { pos = { 187, 513 }, radius = 10, color = yellow },
 
     ACSLeft =
     {

@@ -7,6 +7,8 @@ local ret = driver(...)
 --      4: PORTB, pin 7
 --      5: PORTB, pin 1
 --      6: PORTB, pin 0
+--
+--      Power LED: PORTB, pin 4
 
 description = "Driver for the RP6 LEDs."
 
@@ -25,7 +27,10 @@ local LEDInfo = {
     LEDs = { },
     -- Although we could retrieve the status from a function, this is
     -- more efficient for the possible many frequent calls
-    LEDStatus = { false, false, false, false, false, false }
+    LEDStatus = { false, false, false, false, false, false },
+
+    powerLED = nil,
+    powerLEDStatus = false,
 }
 
 local function updateLEDs(port)
@@ -47,17 +52,30 @@ local function updateLEDs(port)
         update(4, LEDInfo.curPORTB, avr.PB7, LEDInfo.curDDRB, avr.DDB7)
         update(5, LEDInfo.curPORTB, avr.PB1, LEDInfo.curDDRB, avr.DDB1)
         update(6, LEDInfo.curPORTB, avr.PB0, LEDInfo.curDDRB, avr.DDB0)
+
+        -- Power LED
+        local pe = bit.isSet(LEDInfo.curPORTB, avr.PB4)
+        if LEDInfo.powerLEDStatus ~= pe then
+            log(string.format("Power LED %s\n", (pe and "enabled") or "disabled"))
+            LEDInfo.powerLEDStatus = pe
+            LEDInfo.powerLED:setEnabled(pe)
+            updateRobotStatus("leds", "power", (pe and "ON") or "OFF")
+        end
     end
 end
 
 
 function initPlugin()
     for i=1,6 do
-        local propname = "led" .. tostring(i)
+        local propname = "LED" .. tostring(i)
         LEDInfo.LEDs[i] = createLED(properties[propname].pos,
                                     properties[propname].color,
                                     properties[propname].radius)
     end
+
+    LEDInfo.powerLED = createLED(properties.powerLED.pos,
+                                 properties.powerLED.color,
+                                 properties.powerLED.radius)
 end
 
 function handleIOData(type, data)
