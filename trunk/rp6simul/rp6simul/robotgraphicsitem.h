@@ -64,7 +64,7 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
-    void setCmPerPixel(float c) { cmPerPixel = c * getPixmapScale(); }
+    void setCmPerPixel(float c) { cmPerPixel = c / getPixmapScale(); }
     void setRobotLength(float l) { robotLength = l; }
     void setM32Slot(EM32Slot s, const QPointF &p, float r);
     void setM32Scale(float s) { m32Scale = s; m32PixmapDirty = true; }

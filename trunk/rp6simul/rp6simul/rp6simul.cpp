@@ -441,7 +441,7 @@ void CRP6Simulator::createMenus()
 
 
     menu = menuBar()->addMenu("&Help");
-    menu->addAction("About");
+    menu->addAction("About", this, SLOT(showAbout()));
     menu->addAction("About Qt", qApp, SLOT(aboutQt()));
 
     foreach (a, mapMenuActionList)
@@ -467,15 +467,20 @@ void CRP6Simulator::setToolBarToolTips()
 void CRP6Simulator::createToolbars()
 {
     QToolBar *toolb = addToolBar("Run");
-    runPluginAction = toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_MediaPlay)), "Run",
+    runPluginAction = toolb->addAction(QIcon("../resource/run.png"), "Run",
                                        this, SLOT(runPlugin()));
     runPluginAction->setShortcut(tr("ctrl+R"));
     runPluginAction->setEnabled(false);
 
-    stopPluginAction = toolb->addAction(QIcon(style()->standardIcon(QStyle::SP_MediaStop)), "Stop",
+    stopPluginAction = toolb->addAction(QIcon("../resource/stop.png"), "Stop",
                                         this, SLOT(stopPlugin()));
     stopPluginAction->setShortcut(tr("esc"));
     stopPluginAction->setEnabled(false);
+
+    resetPluginAction = toolb->addAction(QIcon("../resource/reset.png"), "Reset");
+    connect(resetPluginAction, SIGNAL(triggered()), SLOT(stopPlugin()));
+    connect(resetPluginAction, SIGNAL(triggered()), SLOT(runPlugin()));
+    resetPluginAction->setEnabled(false);
 
     toolb->addSeparator();
 
@@ -542,7 +547,6 @@ void CRP6Simulator::createToolbars()
     a->setData(CRobotWidget::DATAPLOT_M32ADC);
     connect(dataPlotMenu, SIGNAL(triggered(QAction*)),
             SLOT(handleDataPlotSelection(QAction*)));
-    robotToolBar->addAction("Refr", robotWidget->viewport(), SLOT(update()));
 
 
     addToolBar(editMapToolBar = new QToolBar("Edit map"));
@@ -1121,6 +1125,7 @@ void CRP6Simulator::openProjectFile(const QString &file)
 
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
+    resetPluginAction->setEnabled(false);
 
     foreach (QAction *a, mapMenuActionList)
         a->setEnabled(true);
@@ -2286,6 +2291,12 @@ void CRP6Simulator::loadMap()
         loadMapFile(file, false);
 }
 
+void CRP6Simulator::showAbout()
+{
+    // UNDONE
+    QMessageBox::about(this, "rp6sim", "Hello");
+}
+
 void CRP6Simulator::timedUIUpdate()
 {
     QVariantHash adcvalues(getADCValues(robotSimulator->getLuaState()));
@@ -2467,6 +2478,7 @@ void CRP6Simulator::runPlugin()
 
     runPluginAction->setEnabled(false);
     stopPluginAction->setEnabled(true);
+    resetPluginAction->setEnabled(true);
     ADCDockWidget->setEnabled(true);
 }
 
@@ -2547,6 +2559,7 @@ void CRP6Simulator::stopPlugin()
 
     runPluginAction->setEnabled(true);
     stopPluginAction->setEnabled(false);
+    resetPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
 
     robotSerialSendButton->setEnabled(false);

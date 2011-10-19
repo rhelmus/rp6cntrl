@@ -79,8 +79,7 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
     widgetMinSize = robotPixmap.size();
     widgetMinSize.rwidth() += (2 * (motorArrowWidth + motorArrowXSpacing));
 
-//    setBackground(QBrush(Qt::darkCyan)); // Use normal background (instead of darkened default)
-    setBackground(QBrush());
+    setBackground(QBrush()); // Clear background: interferes with drawing
 
     connect(&dataPlotClosedSignalMapper, SIGNAL(mapped(int)),
             SIGNAL(dataPlotClosed(int)));

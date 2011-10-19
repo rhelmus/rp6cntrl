@@ -49,7 +49,6 @@
     - no anonymous unions (gives compile errors + no duplicate variables)
     - Check changes made on kubuntu
     - ...
-- reset plugin action (stop+start)
 - BUG: lua timer destroyed after CSimulator is
 - robot widget: show motor speeds?
 - powerON/powerOFF currently don't affect encoders and such
@@ -66,8 +65,7 @@
         - Disable m32 related widgets?
         - Disable robot option (m32 only)
     - Extend loadCustomDriverInfo()
-- power LED
 - autodetect F_CPU?
-- Robot moves too fast
+- Robot speed: correct?
 - ADC values are not rounded
 - What is EINT1 ADC value?

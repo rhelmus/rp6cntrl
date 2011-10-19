@@ -71,7 +71,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
-    QAction *runPluginAction, *stopPluginAction;
+    QAction *runPluginAction, *stopPluginAction, *resetPluginAction;
     QToolButton *handClapButton;
     QWidget *keyPadWidget;
     QToolBar *robotToolBar;
@@ -237,6 +237,7 @@ private slots:
     void saveMap(void);
     void saveMapAs(void);
     void loadMap(void);
+    void showAbout(void);
     void runPlugin(void);
     void stopPlugin(void);
     void doHandClap(void);
