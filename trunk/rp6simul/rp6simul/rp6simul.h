@@ -15,6 +15,7 @@
 enum EMotor { MOTOR_LEFT=0, MOTOR_RIGHT, MOTOR_END };
 enum EMotorDirection { MOTORDIR_FWD=0, MOTORDIR_BWD, MOTORDIR_END };
 enum EM32Slot { SLOT_FRONT=0, SLOT_BACK, SLOT_END };
+enum ESimulator { SIMULATOR_ROBOT, SIMULATOR_M32, SIMULATOR_ROBOTM32 };
 
 Q_DECLARE_METATYPE(EMotor)
 Q_DECLARE_METATYPE(EMotorDirection)
@@ -44,6 +45,16 @@ class CProjectWizard;
 class CRobotWidget;
 class CSimulator;
 
+struct SDriverInfo
+{
+    QString name, description;
+    bool isDefault;
+    SDriverInfo(const QString &n, const QString &d, bool def)
+        : name(n), description(d), isDefault(def) { }
+};
+
+typedef QList<SDriverInfo> TDriverInfoList;
+
 class CRP6Simulator : public QMainWindow
 {
     Q_OBJECT
@@ -68,6 +79,7 @@ class CRP6Simulator : public QMainWindow
     QString currentProjectFile;
     QString currentMapFile;
     bool currentMapIsTemplate;
+    TDriverInfoList robotDriverInfoList, m32DriverInfoList;
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
@@ -150,6 +162,7 @@ class CRP6Simulator : public QMainWindow
     void registerLuaGeneric(lua_State *l);
     void registerLuaRobot(lua_State *l);
     void registerLuaM32(lua_State *l);
+    TDriverInfoList getLuaDriverInfoList(lua_State *l);
 
     void createMenus(void);
     void setToolBarToolTips(void);
@@ -239,6 +252,7 @@ private slots:
     bool saveMap(void);
     bool saveMapAs(void);
     void loadMap(void);
+    void editProjectSettings(void);
     void showAbout(void);
     void runPlugin(void);
     void stopPlugin(void);
@@ -273,6 +287,10 @@ public:
     ~CRP6Simulator(void);
 
     static CRP6Simulator *getInstance(void) { return instance; }
+    TDriverInfoList getRobotDriverInfoList(void) const
+    { return robotDriverInfoList; }
+    TDriverInfoList getM32DriverInfoList(void) const
+    { return m32DriverInfoList; }
     bool loadCustomDriverInfo(const QString &file, QString &name,
                               QString &desc);
 

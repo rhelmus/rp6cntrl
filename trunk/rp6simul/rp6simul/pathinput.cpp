@@ -2,8 +2,8 @@
 #include "pathinput.h"
 
 CPathInput::CPathInput(const QString &desc, EPathInputMode mode,
-                       const QString &path, QWidget *parent)
-    : QWidget(parent), pathDescription(desc), pathInputMode(mode)
+                       const QString &path, const QString &f, QWidget *parent)
+    : QWidget(parent), pathDescription(desc), filter(f), pathInputMode(mode)
 {
     QHBoxLayout *hbox = new QHBoxLayout(this);
 
@@ -36,10 +36,10 @@ void CPathInput::openBrowser()
                                                  pathEdit->text());
     else if (pathInputMode == PATH_EXISTFILE)
         path = QFileDialog::getOpenFileName(this, pathDescription,
-                                            pathEdit->text());
+                                            pathEdit->text(), filter);
     else if (pathInputMode == PATH_NEWFILE)
         path = QFileDialog::getSaveFileName(this, pathDescription,
-                                            pathEdit->text());
+                                            pathEdit->text(), filter);
 
     if (!path.isEmpty())
         pathEdit->setText(path);

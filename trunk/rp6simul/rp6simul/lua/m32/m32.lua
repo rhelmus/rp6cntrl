@@ -1,14 +1,20 @@
 local ret = simulator(...)
 
--- UNDONE: defaults
 driverList =
 {
     { name = "adc", default = true },
+    { name = "exteeprom", default  = true },
+    { name = "extint1", default  = true },
+    { name = "keypad", default  = true },
     { name = "led", default  = true },
+    { name = "mic", default  = true },
+    { name = "piezo", default  = true },
     { name = "portlog", default  = false },
+    { name = "spi", default  = true },
     { name = "timer0", default  = true },
     { name = "timer1", default  = false },
     { name = "timer2", default  = false },
+    { name = "twi", default  = true },
     { name = "uart", default  = true },
 }
 

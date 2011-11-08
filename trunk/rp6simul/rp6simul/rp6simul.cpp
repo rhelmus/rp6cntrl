@@ -325,6 +325,7 @@ void CRP6Simulator::initSimulators()
     registerLuaGeneric(robotSimulator->getLuaState());
     registerLuaRobot(robotSimulator->getLuaState());
     robotSimulator->startLua("robot");
+    robotDriverInfoList = getLuaDriverInfoList(robotSimulator->getLuaState());
 
     m32Simulator = new CSimulator(this);
     connect(m32Simulator->getAVRClock(), SIGNAL(clockSpeed(unsigned long)),
@@ -332,6 +333,7 @@ void CRP6Simulator::initSimulators()
     registerLuaGeneric(m32Simulator->getLuaState());
     registerLuaM32(m32Simulator->getLuaState());
     m32Simulator->startLua("m32");
+    m32DriverInfoList = getLuaDriverInfoList(m32Simulator->getLuaState());
 
     connect(robotSimulator, SIGNAL(luaTWIMSGSend(QString,QList<QVariant>)),
             m32Simulator, SLOT(handleLuaTWIMSG(QString,QList<QVariant>)),
@@ -402,6 +404,42 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
     NLua::registerFunction(l, luaCreateLED, "createLED", (void *)"m32");
 }
 
+TDriverInfoList CRP6Simulator::getLuaDriverInfoList(lua_State *l)
+{
+    TDriverInfoList ret;
+
+    lua_getglobal(l, "getDriverInfoList");
+    lua_call(l, 0, 1);
+
+    luaL_checktype(l, -1, LUA_TTABLE);
+    const int tabind = NLua::luaAbsIndex(l, -1);
+    const int size = lua_objlen(l, 1);
+
+    for (int i=1; i<=size; ++i)
+    {
+        lua_rawgeti(l, tabind, i);
+        luaL_checktype(l, -1, LUA_TTABLE);
+
+        lua_getfield(l, -1, "name");
+        const char *name = luaL_checkstring(l, -1);
+        lua_pop(l, 1);
+
+        lua_getfield(l, -1, "description");
+        const char *desc = luaL_checkstring(l, -1);
+        lua_pop(l, 1);
+
+        lua_getfield(l, -1, "default");
+        const bool def = NLua::checkBoolean(l, -1);
+        lua_pop(l, 1);
+
+        lua_pop(l, 1); // driver info table
+
+        ret << SDriverInfo(name, desc, def);
+    }
+
+    return ret;
+}
+
 void CRP6Simulator::createMenus()
 {
     QMenu *menu = menuBar()->addMenu("&File");
@@ -439,7 +477,8 @@ void CRP6Simulator::createMenus()
 
 
     menu = menuBar()->addMenu("&Edit");
-    editProjectSettingsAction = menu->addAction("Project settings");
+    editProjectSettingsAction =  menu->addAction("Project settings", this,
+                                                 SLOT(editProjectSettings()));
     editProjectSettingsAction->setEnabled(false);
 
     menu->addSeparator();
@@ -1615,6 +1654,8 @@ int CRP6Simulator::luaCreateBumper(lua_State *l)
         const float y = luaL_checknumber(l, -1);
         lua_pop(l, 1);
         points << QPointF(x, y);
+
+        lua_pop(l, 1); // pair table
     }
 
     // color
@@ -2351,6 +2392,19 @@ void CRP6Simulator::loadMap()
                                          "RP6 map files (*.map)");
     if (!file.isEmpty())
         loadMapFile(file, false);
+}
+
+void CRP6Simulator::editProjectSettings()
+{
+    CProjectSettings prsettings(instance->currentProjectFile);
+    if (!verifySettingsFile(prsettings))
+        return;
+
+    CProjectSettingsDialog dialog;
+    dialog.loadSettings(prsettings);
+
+    if (dialog.exec() == QDialog::Accepted)
+        dialog.saveSettings(prsettings);
 }
 
 void CRP6Simulator::showAbout()

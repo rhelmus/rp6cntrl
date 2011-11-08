@@ -5,6 +5,7 @@ driverList =
     { name = "acs", default  = true },
     { name = "adc", default  = true },
     { name = "bumper", default  = true },
+    { name = "extint1", default  = true },
     { name = "ircomm", default  = true },
     { name = "led", default  = true },
     { name = "light", default  = true },
@@ -13,6 +14,7 @@ driverList =
     { name = "timer0", default  = true },
     { name = "timer1", default  = false },
     { name = "timer2", default  = true },
+    { name = "twi", default  = true },
     { name = "uart", default  = true },
 }
 

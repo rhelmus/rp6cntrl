@@ -193,20 +193,20 @@ function handleIOData(type, data)
     end
 end
 
-function getDriverList()
-    local ret, dret = { }, { }
+function getDriverInfoList()
+    local ret = { }
 
-    for _, d in ipairs(simulatorEnv.driverList) do
+    for i, d in ipairs(simulatorEnv.driverList) do
         local driver = loadDriver(d.name)
         if driver then
-            ret[d] = driver.description or "No description."
-            if d.default then
-                table.insert(dret, d)
-            end
+            ret[i] = { }
+            ret[i].name = d.name
+            ret[i].description = driver.description or "No description."
+            ret[i].default = d.default
         end
     end
 
-    return ret, dret
+    return ret
 end
 
 function getDriver(d)
