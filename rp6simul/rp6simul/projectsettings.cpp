@@ -244,10 +244,9 @@ QAction *CDriverSelectionWidget::getAddAction(const QString &driver)
 void CDriverSelectionWidget::addCustomDriver(const QString &file)
 {
     QString name, desc;
-    const bool ok =
-            CRP6Simulator::getInstance()->loadCustomDriverInfo(file,
-                                                               name,
-                                                               desc);
+    const bool ok = CRP6Simulator::getInstance()->loadCustomDriverInfo(file,
+                                                                       name,
+                                                                       desc);
     if (!ok)
         QMessageBox::critical(this, "Custom driver error",
                               "Could not load custom driver (see error log");

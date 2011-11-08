@@ -111,7 +111,7 @@ bool CNewProjectDestPage::validatePage()
         QMessageBox::StandardButton button =
                 QMessageBox::warning(this, "Project file exists",
                              "A project with the same name already exists in "
-                             "the directory specified. Overwrite?",
+                             "the specified directory. Overwrite?",
                              QMessageBox::Yes | QMessageBox::No);
         return (button == QMessageBox::Yes);
     }

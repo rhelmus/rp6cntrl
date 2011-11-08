@@ -42,7 +42,6 @@ local function checkSettings()
     local tccr2 = avr.getIORegister(avr.IO_TCCR2)
     local ret = true
 
-    -- UNDONE: COM20 is set for m32-control's beeper
     if not (not bit.isSet(tccr2, avr.COM20, avr.COM21, avr.WGM20) and
             bit.isSet(tccr2, avr.WGM21)) then
         warning("Incompatible settings for timer2\n")
