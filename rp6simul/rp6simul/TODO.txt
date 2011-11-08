@@ -72,4 +72,5 @@
     - Plugin files
     - Drivers
     - M32 / Robot enabling/disabling
+- More menu options (from toolbar)
 

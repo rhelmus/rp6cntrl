@@ -14,7 +14,7 @@ public:
     enum EPathInputMode { PATH_EXISTDIR, PATH_EXISTFILE, PATH_NEWFILE };
 
 private:
-    QString pathDescription;
+    QString pathDescription, filter;
     EPathInputMode pathInputMode;
     QLineEdit *pathEdit;
 
@@ -23,7 +23,8 @@ private slots:
 
 public:
     explicit CPathInput(const QString &desc, EPathInputMode mode,
-                        const QString &path=QString(), QWidget *parent = 0);
+                        const QString &path=QString(), const QString &f=QString(),
+                        QWidget *parent = 0);
 
     QString getPath(void) const;
     void setPath(const QString &dir);

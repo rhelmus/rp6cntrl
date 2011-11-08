@@ -843,6 +843,8 @@ void CRobotScene::saveMap(QSettings &settings)
 
     settings.endGroup();
 
+    settings.sync(); // force commit
+
     // UNDONE: Should be here? (ie map export)
     markMapEdited(false);
 }
