@@ -83,7 +83,6 @@ class CSimulator : public QObject
     bool ISRFailedArray[ISR_END];
     QMutex ISRExecMutex;
     int luaTWIHandler;
-    QMutex luaTWIHandlerMutex;
 
     QString currentPluginFileName;
     QStringList currentDriverList;

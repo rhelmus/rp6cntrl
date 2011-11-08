@@ -24,7 +24,6 @@ function getADCValue(a)
     if a == "KEYPAD" then
         if currentKeyPressed ~= nil then
             -- ADC levels based from lib
-            -- UNDONE: Configurable?
             if currentKeyPressed == 1 then
                 return 40
             elseif currentKeyPressed == 2 then

@@ -21,5 +21,7 @@ inline unsigned long getUSDiff(const timespec &start, const timespec &end)
 bool verifySettingsFile(QSettings &file);
 void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
              qreal scale);
+qreal toClockwiseAngle(qreal a);
+qreal toCounterClockwiseAngle(qreal a);
 
 #endif // UTILS_H

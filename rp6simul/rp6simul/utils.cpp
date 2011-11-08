@@ -4,6 +4,7 @@
 #include "rp6simul.h"
 #include "simulator.h"
 
+#include <QDebug>
 #include <QMessageBox>
 #include <QPainter>
 #include <QSettings>
@@ -38,8 +39,8 @@ void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
 
     const QColor c = led->getColor();
 
-    const int srad = static_cast<qreal>(led->getRadius()) * scale;
-    const int totalrad = 2 * srad; // light effect is bigger than led
+    const qreal srad = static_cast<qreal>(led->getRadius()) * scale;
+    const int totalrad = qRound(1.75 * srad); // light effect is bigger than led
 
     QRadialGradient rg(pos, totalrad);
     rg.setColorAt(0.0, c);
@@ -48,4 +49,17 @@ void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
     painter.setBrush(rg);
     painter.setPen(Qt::NoPen);
     painter.drawEllipse(pos, totalrad, totalrad);
+}
+
+qreal toClockwiseAngle(qreal a)
+{
+    // Convert from counter-clockwise + 90 to clockwise + 0
+    return 90.0 - a;
+}
+
+qreal toCounterClockwiseAngle(qreal a)
+{
+    // Convert from clockwise + 0 to counter-clockwise + 90
+    // (yes this is the same as the other way around)
+    return 90.0 - a;
 }

@@ -71,6 +71,7 @@ class CRP6Simulator : public QMainWindow
 
     CProjectWizard *projectWizard;
     QList<QAction *> mapMenuActionList;
+    QAction *saveMapAsAction, *editProjectSettingsAction;
     QAction *runPluginAction, *stopPluginAction, *resetPluginAction;
     QToolButton *handClapButton;
     QWidget *keyPadWidget;
@@ -171,6 +172,7 @@ class CRP6Simulator : public QMainWindow
     void updateMapStackedWidget(void);
     void openProjectFile(const QString &file);
     void loadMapFile(const QString &file, bool istemplate);
+    bool checkMapChange(void);
     void loadMapTemplatesTree(void);
     bool mapItemIsTemplate(QTreeWidgetItem *item) const;
     void syncMapHistoryTree(const QStringList &l);
@@ -234,8 +236,8 @@ private slots:
     void newProject(void);
     void openProject(void);
     void newMap(void);
-    void saveMap(void);
-    void saveMapAs(void);
+    bool saveMap(void);
+    bool saveMapAs(void);
     void loadMap(void);
     void showAbout(void);
     void runPlugin(void);

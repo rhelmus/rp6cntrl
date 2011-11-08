@@ -71,6 +71,7 @@ void drawMotorIndicator(QPainter &painter, const QRect &rect, int gradh,
 
 CRobotWidget::CRobotWidget(QWidget *parent) :
     QMdiArea(parent), motorArrowWidth(25), motorArrowXSpacing(10),
+    m32Scale(1.0), activeM32Slot(SLOT_END), m32PixmapDirty(false),
     dataPlotClosedSignalMapper(this)
 {
     const QPixmap p("../resource/rp6-top.png");
@@ -78,6 +79,9 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
     robotPixmap = p.scaledToWidth(225, Qt::SmoothTransformation);
     widgetMinSize = robotPixmap.size();
     widgetMinSize.rwidth() += (2 * (motorArrowWidth + motorArrowXSpacing));
+
+    origM32Size = QImage("../resource/m32-top.png").size();
+    m32Rotations[SLOT_FRONT] = m32Rotations[SLOT_BACK] = 0.0;
 
     setBackground(QBrush()); // Clear background: interferes with drawing
 
@@ -91,6 +95,24 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
 
     for (int i=0; i<DATAPLOT_MAX; ++i)
         createDataPlotSubWindow(static_cast<EDataPlotType>(i));
+}
+
+void CRobotWidget::updateM32Pixmap()
+{
+    if (activeM32Slot == SLOT_END)
+        return;
+
+    const float w = robotPixmap.width() * m32Scale;
+    m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+
+    const QPointF c(m32Pixmap.rect().center());
+    QTransform tr;
+    tr.translate(c.x(), c.y());
+    tr.rotate(m32Rotations[activeM32Slot]);
+    tr.translate(-c.x(), -c.y());
+    m32Pixmap = m32Pixmap.transformed(tr, Qt::SmoothTransformation);
+
+    m32PixmapDirty = false;
 }
 
 void CRobotWidget::createDataPlotSubWindow(EDataPlotType plot)
@@ -167,8 +189,6 @@ void CRobotWidget::createDataPlotSubWindow(EDataPlotType plot)
 void CRobotWidget::dataPlotTimedUpdate()
 {
     const double elapsed = static_cast<double>(runTime.elapsed()) / 1000.0;
-
-    // UNDONE
 
     // Motor speed
     int lspeed = motorSpeed[MOTOR_LEFT], rspeed = motorSpeed[MOTOR_RIGHT];
@@ -257,7 +277,7 @@ void CRobotWidget::paintEvent(QPaintEvent *event)
     // UNDONE: move to transform
     const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
 
-    foreach (CLED *l, LEDs)
+    foreach (CLED *l, robotLEDs)
     {
         if (l->isEnabled())
             drawLED(painter, l, tr, scale);
@@ -281,6 +301,28 @@ void CRobotWidget::paintEvent(QPaintEvent *event)
             const float rad = ir->getRadius() * scale;
             painter.setBrush(ir->getColor());
             painter.drawEllipse(pos, rad, rad);
+        }
+    }
+
+    if (m32PixmapDirty)
+        updateM32Pixmap();
+
+    if (!m32Pixmap.isNull()) // null if active slot isn't set yet
+    {
+        const QPointF m32pos(m32Positions[activeM32Slot]);
+        painter.drawPixmap(tr.map(m32pos), m32Pixmap);
+
+        tr.translate(m32pos.x(), m32pos.y());
+        tr.translate(m32Pixmap.width()/2.0, m32Pixmap.height()/2.0);
+        tr.rotate(m32Rotations[activeM32Slot]);
+        tr.translate(-m32Pixmap.width()/2.0, -m32Pixmap.height()/2.0);
+
+        const qreal m32scale =
+                (qreal)m32Pixmap.width() / (qreal)origM32Size.width();
+        foreach (CLED *l, m32LEDs)
+        {
+            if (l->isEnabled())
+                drawLED(painter, l, tr, m32scale);
         }
     }
 
@@ -334,7 +376,7 @@ void CRobotWidget::start()
 void CRobotWidget::stop()
 {
     dataPlotUpdateTimer->stop();
-    LEDs.clear();
+    robotLEDs.clear();
     bumpers.clear();
     IRSensors.clear();
     motorPower.clear();
@@ -359,14 +401,14 @@ void CRobotWidget::removeBumper(CBumper *b)
     bumpers.removeOne(b);
 }
 
-void CRobotWidget::addLED(CLED *l)
+void CRobotWidget::addRobotLED(CLED *l)
 {
-    LEDs << l;
+    robotLEDs << l;
 }
 
-void CRobotWidget::removeLED(CLED *l)
+void CRobotWidget::removeRobotLED(CLED *l)
 {
-    LEDs.removeOne(l);
+    robotLEDs.removeOne(l);
 }
 
 void CRobotWidget::addIRSensor(CIRSensor *ir)
@@ -379,3 +421,20 @@ void CRobotWidget::removeIRSensor(CIRSensor *ir)
     IRSensors.removeOne(ir);
 }
 
+void CRobotWidget::setM32Slot(EM32Slot s, const QPointF &p, float r)
+{
+    const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
+    m32Positions[s] = p * scale;
+    m32Rotations[s] = r;
+    m32PixmapDirty = true;
+}
+
+void CRobotWidget::addM32LED(CLED *l)
+{
+    m32LEDs << l;
+}
+
+void CRobotWidget::removeM32LED(CLED *l)
+{
+    m32LEDs.removeOne(l);
+}
