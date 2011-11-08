@@ -345,6 +345,8 @@ void CRP6Simulator::registerLuaGeneric(lua_State *l)
 {
     NLua::registerFunction(l, luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(l, luaUpdateRobotStatus, "updateRobotStatus");
+
+    NLua::registerClassFunction(l, luaLEDSetEnabled, "setEnabled", "led");
 }
 
 void CRP6Simulator::registerLuaRobot(lua_State *l)
@@ -366,8 +368,7 @@ void CRP6Simulator::registerLuaRobot(lua_State *l)
     NLua::registerFunction(l, luaSetExtInt1Enabled, "setExtInt1Enabled");
 
     // LED class
-    NLua::registerFunction(l, luaCreateLED, "createLED");
-    NLua::registerClassFunction(l, luaLEDSetEnabled, "setEnabled", "led");
+    NLua::registerFunction(l, luaCreateLED, "createLED", (void *)"robot");
 
     // Bumper class
     NLua::registerFunction(l, luaCreateBumper, "createBumper");
@@ -396,15 +397,18 @@ void CRP6Simulator::registerLuaM32(lua_State *l)
     NLua::registerFunction(l, luaSetBeeperFrequency, "setBeeperFrequency");
     NLua::registerFunction(l, luaSetSoundCallback, "setSoundCallback");
     NLua::registerFunction(l, luaSetKeyPressCallback, "setKeyPressCallback");
+
+    // LED class
+    NLua::registerFunction(l, luaCreateLED, "createLED", (void *)"m32");
 }
 
 void CRP6Simulator::createMenus()
 {
     QMenu *menu = menuBar()->addMenu("&File");
-    menu->addAction("New", this, SLOT(newProject()), tr("ctrl+N"));
+    menu->addAction("New Project", this, SLOT(newProject()), tr("ctrl+N"));
     menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
-                    "Open", this, SLOT(openProject()), tr("ctrl+O"));
-    menu->addMenu("Open recent...")->addAction("blah");
+                    "Open Project", this, SLOT(openProject()), tr("ctrl+O"));
+    menu->addMenu("Open recent...")->addAction("blah"); // UNDONE
 
     menu->addSeparator();
 
@@ -422,10 +426,10 @@ void CRP6Simulator::createMenus()
             SLOT(setEnabled(bool)));
     a->setEnabled(false);
 
-    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
-                        "Save map As...", this, SLOT(saveMapAs()));
-    mapMenuActionList << a;
-    a->setEnabled(false);
+    saveMapAsAction = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
+                                      "Save map As...", this, SLOT(saveMapAs()));
+    mapMenuActionList << saveMapAsAction;
+    saveMapAsAction->setEnabled(false);
 
     a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
                         "Load map", this, SLOT(loadMap()));
@@ -435,8 +439,11 @@ void CRP6Simulator::createMenus()
 
 
     menu = menuBar()->addMenu("&Edit");
-    menu->addAction("Project settings");
+    editProjectSettingsAction = menu->addAction("Project settings");
+    editProjectSettingsAction->setEnabled(false);
+
     menu->addSeparator();
+
     menu->addAction("Preferences");
 
 
@@ -526,6 +533,7 @@ void CRP6Simulator::createToolbars()
 
 
     robotToolBar = addToolBar("Robot");
+    robotToolBar->setEnabled(false);
     QToolButton *tb = new QToolButton;
     tb->setIcon(QIcon("../resource/dataplot.png"));
     robotToolBar->addWidget(tb);
@@ -596,10 +604,6 @@ void CRP6Simulator::createToolbars()
                                   "Toggle grid visibility",
                                   robotScene, SLOT(setGridVisible(bool)));
     a->setCheckable(true);
-
-    a = editMapToolBar->addAction(QIcon("../resource/light-refresh.png"),
-                                  "Update lighting", robotScene,
-                                  SLOT(updateLighting()));
 
     QAction *lightedita =
             editMapToolBar->addAction(QIcon("../resource/light-mode.png"),
@@ -1111,7 +1115,8 @@ void CRP6Simulator::openProjectFile(const QString &file)
         return;
 
     // UNDONE
-    robotScene->getRobotItem()->setActiveM32Slot(SLOT_FRONT);
+    robotScene->getRobotItem()->setActiveM32Slot(SLOT_BACK);
+    robotWidget->setActiveM32Slot(SLOT_BACK);
 
     prsettings.beginGroup("robot");
     if (!robotSimulator->loadProjectFile(prsettings))
@@ -1126,9 +1131,12 @@ void CRP6Simulator::openProjectFile(const QString &file)
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
     resetPluginAction->setEnabled(false);
+    robotToolBar->setEnabled(true);
 
     foreach (QAction *a, mapMenuActionList)
         a->setEnabled(true);
+    saveMapAsAction->setEnabled(!currentMapFile.isNull());
+    editProjectSettingsAction->setEnabled(true);
 
     currentProjectFile = file;
 
@@ -1150,7 +1158,29 @@ void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
         if (!istemplate)
             addMapHistoryFile(file);
         currentMapIsTemplate = istemplate;
+        saveMapAsAction->setEnabled(true);
     }
+}
+
+bool CRP6Simulator::checkMapChange()
+{
+    if (robotScene->getMapEdited())
+    {
+        int but = QMessageBox::question(this, "Map changed",
+                                  "The current map was changed. "
+                                  "Do you want to save it?",
+                                  QMessageBox::Yes | QMessageBox::No |
+                                  QMessageBox::Cancel,
+                                  QMessageBox::Yes);
+        if (but == QMessageBox::Yes)
+            return saveMap();
+        else if (but == QMessageBox::No)
+            return true;
+
+        return false; // Cancelled
+    }
+
+    return true;
 }
 
 void CRP6Simulator::loadMapTemplatesTree()
@@ -1245,7 +1275,7 @@ void CRP6Simulator::loadMapHistoryTree()
 
 void CRP6Simulator::addMapHistoryFile(const QString &file)
 {
-    const int max = 20; // UNDONE: Configurable?
+    const int max = 20;
     QSettings settings;
     QStringList historylist =
             settings.value("maphistory").toStringList();
@@ -1514,6 +1544,7 @@ int CRP6Simulator::luaSetRobotM32Slot(lua_State *l)
     const float rot = luaL_checknumber(l, 3);
 
     instance->robotScene->getRobotItem()->setM32Slot(slot, QPointF(x, y), rot);
+    instance->robotWidget->setM32Slot(slot, QPointF(x, y), rot);
     return 0;
 }
 
@@ -1522,6 +1553,7 @@ int CRP6Simulator::luaSetRobotM32Scale(lua_State *l)
     // This function should only be called by init(), where we do
     // not have to worry about threads
     instance->robotScene->getRobotItem()->setM32Scale(luaL_checknumber(l, 1));
+    instance->robotWidget->setM32Scale(luaL_checknumber(l, 1));
     return 0;
 }
 
@@ -1644,6 +1676,8 @@ int CRP6Simulator::luaCreateLED(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
 
+    const char *board = NLua::getFromClosure<const char *>(l);
+
     // position
     luaL_checktype(l, 1, LUA_TTABLE);
 
@@ -1677,9 +1711,19 @@ int CRP6Simulator::luaCreateLED(lua_State *l)
     const float rad = (float)luaL_checknumber(l, 3);
 
     CLED *led = new CLED(QPointF(x, y), QColor(r, g, b, a), rad);
-    instance->robotScene->getRobotItem()->addLED(led);
-    instance->robotWidget->addLED(led);
-    NLua::createClass(l, led, "led", luaLEDDestr);
+
+    if (!strcmp(board, "robot"))
+    {
+        instance->robotScene->getRobotItem()->addRobotLED(led);
+        instance->robotWidget->addRobotLED(led);
+    }
+    else
+    {
+        instance->robotScene->getRobotItem()->addM32LED(led);
+        instance->robotWidget->addM32LED(led);
+    }
+
+    NLua::createClass(l, led, "led", luaLEDDestr, (void *)board);
     return 1;
 }
 
@@ -1696,9 +1740,20 @@ int CRP6Simulator::luaLEDDestr(lua_State *l)
 {
     qDebug() << "Removing LED";
     // NLua::CLuaLocker lualocker(l);
+    const char *board = NLua::getFromClosure<const char *>(l);
     CLED *led = NLua::checkClassData<CLED>(l, 1, "led");
-    instance->robotScene->getRobotItem()->removeLED(led);
-    instance->robotWidget->removeLED(led);
+
+    if (!strcmp(board, "robot"))
+    {
+        instance->robotScene->getRobotItem()->removeRobotLED(led);
+        instance->robotWidget->removeRobotLED(led);
+    }
+    else
+    {
+        instance->robotScene->getRobotItem()->removeM32LED(led);
+        instance->robotWidget->removeM32LED(led);
+    }
+
     delete led;
     return 0;
 }
@@ -2152,6 +2207,9 @@ void CRP6Simulator::openProject()
 
 void CRP6Simulator::newMap()
 {
+    if (!checkMapChange())
+        return;
+
     QDialog dialog(this);
     dialog.setModal(true);
 
@@ -2238,7 +2296,7 @@ void CRP6Simulator::newMap()
     }
 }
 
-void CRP6Simulator::saveMap()
+bool CRP6Simulator::saveMap()
 {
     Q_ASSERT(!currentMapFile.isEmpty());
 
@@ -2246,19 +2304,19 @@ void CRP6Simulator::saveMap()
     {
         // If map is saved under another name it will be cleared
         // automatically from being a template.
-        saveMapAs();
-        return;
+        return saveMapAs();
     }
 
     QSettings s(currentMapFile, QSettings::IniFormat);
 
     if (!verifySettingsFile(s))
-        return;
+        return false;
 
-    robotScene->saveMap(s);    
+    robotScene->saveMap(s);
+    return true;
 }
 
-void CRP6Simulator::saveMapAs()
+bool CRP6Simulator::saveMapAs()
 {
     Q_ASSERT(!currentMapFile.isEmpty());
 
@@ -2267,26 +2325,30 @@ void CRP6Simulator::saveMapAs()
             QFileDialog::getSaveFileName(this, "Save map as", projdir,
                                          "map files (*.map)");
     if (destfile.isEmpty())
-        return;
+        return false;
 
     QSettings s(destfile, QSettings::IniFormat);
 
     if (!verifySettingsFile(s))
-        return;
+        return false;
 
     robotScene->saveMap(s);
 
     // Sets up correct file selector settings etc.
     loadMapFile(destfile, false);
+
+    return true;
 }
 
 void CRP6Simulator::loadMap()
 {
+    if (!checkMapChange())
+        return;
+
     QString file =
             QFileDialog::getOpenFileName(this, "Open map file",
                                          QDir::homePath(),
                                          "RP6 map files (*.map)");
-    // UNDONE: Check if running
     if (!file.isEmpty())
         loadMapFile(file, false);
 }
@@ -2474,6 +2536,7 @@ void CRP6Simulator::runPlugin()
     robotStatusTreeWidget->clear();
     pluginUpdateUITimer->start();
     pluginUpdateLEDsTimer->start();
+    robotScene->start();
     robotWidget->start();
 
     runPluginAction->setEnabled(false);
@@ -2551,6 +2614,7 @@ void CRP6Simulator::stopPlugin()
 
     pluginUpdateUITimer->stop();
     pluginUpdateLEDsTimer->stop();
+    robotScene->stop();
     robotWidget->stop();
 
     // Dump any remaining buffered data
@@ -2664,9 +2728,13 @@ void CRP6Simulator::enableDataPlotSelection(int plot)
 
 void CRP6Simulator::tabViewChanged(int index)
 {
-    const bool e = (index != 0);
-    mapSelectorTreeWidget->setEnabled(e);
-    editMapToolBar->setEnabled(e && !currentMapFile.isEmpty());
+    // 0: Robot tab; 1: Map tab
+    const bool robottab = (index == 0);
+
+    robotToolBar->setEnabled(robottab);
+
+    mapSelectorTreeWidget->setEnabled(!robottab);
+    editMapToolBar->setEnabled(!robottab && !currentMapFile.isEmpty());
 }
 
 void CRP6Simulator::changeSceneMouseMode(QAction *a)
@@ -2688,7 +2756,6 @@ void CRP6Simulator::editMapSettings()
     CMapSettingsDialog dialog;
 
     dialog.setMapSize(robotScene->sceneRect().size());
-    dialog.setAutoRefreshLight(robotScene->getAutoRefreshLighting());
     dialog.setAmbientLight(robotScene->getAmbientLight());
     dialog.setShadowQuality(robotScene->getShadowQuality());
     dialog.setGridSize(robotScene->getGridSize());
@@ -2696,7 +2763,6 @@ void CRP6Simulator::editMapSettings()
 
     if (dialog.exec() == QDialog::Accepted)
     {
-        robotScene->setAutoRefreshLighting(dialog.getAutoRefreshLight());
         robotScene->setMapSize(dialog.getMapSize());
         qDebug() << "Ambient light changed:" << (robotScene->getAmbientLight() != dialog.getAmbientLight()) << robotScene->getAmbientLight() << dialog.getAmbientLight();
         robotScene->setAmbientLight(dialog.getAmbientLight());
@@ -2709,6 +2775,9 @@ void CRP6Simulator::editMapSettings()
 void CRP6Simulator::mapSelectorItemActivated(QTreeWidgetItem *item)
 {
     if (!item)
+        return;
+
+    if (!checkMapChange())
         return;
 
     if (item->parent() == mapHistoryTreeItem)
@@ -2837,7 +2906,7 @@ void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
     lua_rawgeti(robotSimulator->getLuaState(), LUA_REGISTRYINDEX,
                 bumperLuaCallbacks[b]);
     lua_pushboolean(robotSimulator->getLuaState(), e);
-    lua_call(robotSimulator->getLuaState(), 1, 0); // UNDONE: error handling
+    lua_call(robotSimulator->getLuaState(), 1, 0);
 }
 
 void CRP6Simulator::sendRobotSerialText()

@@ -99,15 +99,15 @@ CRobotScene::CRobotScene(QObject *parent) :
     backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
                                                              Qt::IgnoreAspectRatio,
                                                              Qt::SmoothTransformation)),
-    lightingDirty(false), autoRefreshLighting(true),
-    ambientLight(0.35), shadowQuality(SH_QUALITY_MED),
+    lightingDirty(false), ambientLight(0.35), shadowQuality(SH_QUALITY_MED),
     blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
                                                        Qt::IgnoreAspectRatio,
                                                        Qt::SmoothTransformation)),
-    boxPixmap("../resource/cardboard-box.png"), robotAdvanceDelay(1000.0 / 33.0),
-    followRobot(false), viewAngle(0.0), dragging(false), draggedEnough(false),
-    mouseMode(MODE_POINT), lightEditMode(false), mapEdited(false),
-    gridSize(15.0), autoGridEnabled(true), gridVisible(false)
+    boxPixmap("../resource/cardboard-box.png"), running(false),
+    robotAdvanceDelay(1000.0 / 33.0), followRobot(false), viewAngle(0.0),
+    dragging(false), draggedEnough(false), mouseMode(MODE_POINT),
+    lightEditMode(false), mapEdited(false), gridSize(15.0),
+    autoGridEnabled(true), gridVisible(false)
 {
     qRegisterMetaTypeStreamOperators<SLightSettings>("SLightSettings");
     qRegisterMetaTypeStreamOperators<SObjectSettings>("SObjectSettings");
@@ -116,12 +116,20 @@ CRobotScene::CRobotScene(QObject *parent) :
 
     robotGraphicsItem = new CRobotGraphicsItem;
     addItem(robotGraphicsItem);
+    robotGraphicsItem->setVisible(false);
     connect(robotGraphicsItem, SIGNAL(robotMoved(const QPointF &, qreal)),
             this, SLOT(updateRobotFollowing()));
-    connect(robotGraphicsItem, SIGNAL(posChanged(const QPointF &)), this,
-            SLOT(updateRobotStartPosition()));
-    connect(robotGraphicsItem, SIGNAL(rotationChanged(qreal)), this,
-            SLOT(updateRobotStartRotation()));
+
+    QPixmap pm =
+            QPixmap("../resource/robot-start.png").scaledToHeight(robotGraphicsItem->boundingRect().height(),
+                                                                  Qt::SmoothTransformation);
+    robotStartGraphicsItem = new CRotatablePixmapGraphicsItem(pm);
+    robotStartGraphicsItem->setDeletable(false);
+    addItem(robotStartGraphicsItem);
+    connect(robotStartGraphicsItem, SIGNAL(posChanged(const QPointF &)), this,
+            SLOT(markMapEdited()));
+    connect(robotStartGraphicsItem, SIGNAL(rotationChanged(qreal)), this,
+            SLOT(markMapEdited()));
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), SLOT(advance()));
@@ -208,7 +216,7 @@ QRectF CRobotScene::getDragRect(bool squared) const
 
 void CRobotScene::handleDirtyLighting()
 {
-    if (autoRefreshLighting && !lightEditMode)
+    if (!lightEditMode)
         updateLighting();
     else
         lightingDirty = true;
@@ -473,18 +481,6 @@ void CRobotScene::updateRobotFollowing()
     }
 }
 
-void CRobotScene::updateRobotStartPosition()
-{
-    robotStartPosition = robotGraphicsItem->pos();
-    markMapEdited();
-}
-
-void CRobotScene::updateRobotStartRotation()
-{
-    robotStartRotation = robotGraphicsItem->rotation();
-    markMapEdited();
-}
-
 void CRobotScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
     QGraphicsScene::drawBackground(painter, rect);
@@ -636,6 +632,22 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     dragging = draggedEnough = false;
 }
 
+void CRobotScene::start()
+{
+    robotStartGraphicsItem->setVisible(false);
+    robotGraphicsItem->setPos(robotStartGraphicsItem->pos());
+    robotGraphicsItem->setRotation(robotStartGraphicsItem->rotation());
+    robotGraphicsItem->setVisible(true);
+    running = true;
+}
+
+void CRobotScene::stop()
+{
+    robotStartGraphicsItem->setVisible(true);
+    robotGraphicsItem->setVisible(false);
+    running = false;
+}
+
 void CRobotScene::setMouseMode(EMouseMode mode, bool sign)
 {
     mouseMode = mode;
@@ -690,8 +702,6 @@ void CRobotScene::setMapSize(const QSizeF &size, bool force)
 
                 r.moveCenter(newsrect.center());
                 it->setPos(r.topLeft());
-
-                // UNDONE: How to handle robot?
             }
 
         }
@@ -699,17 +709,6 @@ void CRobotScene::setMapSize(const QSizeF &size, bool force)
 
     setSceneRect(newsrect);
     updateMapSize();
-}
-
-void CRobotScene::setAutoRefreshLighting(bool a)
-{
-    if (a != autoRefreshLighting)
-    {
-        autoRefreshLighting = a;
-        markMapEdited(true);
-        if (lightingDirty && a)
-            updateLighting();
-    }
 }
 
 void CRobotScene::setAmbientLight(float l)
@@ -834,13 +833,12 @@ void CRobotScene::saveMap(QSettings &settings)
     settings.setValue("gridSize", gridSize);
     settings.setValue("autoGrid", autoGridEnabled);
     settings.setValue("lights", lightsvarlist);
-    settings.setValue("autoRefreshLighting", autoRefreshLighting);
     settings.setValue("ambientLight", ambientLight);
     settings.setValue("shadowQuality", shadowQuality);
     settings.setValue("walls", wallsvarlist);
     settings.setValue("boxes", boxesvarlist);
-    settings.setValue("robotStartPosition", robotStartPosition);
-    settings.setValue("robotStartRotation", robotStartRotation);
+    settings.setValue("robotStartPosition", robotStartGraphicsItem->pos());
+    settings.setValue("robotStartRotation", robotStartGraphicsItem->rotation());
     settings.setValue("scale", getTransformScaleWidth(getGraphicsView()->transform()));
 
     settings.endGroup();
@@ -877,7 +875,6 @@ void CRobotScene::loadMap(QSettings &settings)
         addLight(s.pos + QPointF(s.radius, s.radius), s.radius);
     }
 
-    autoRefreshLighting = settings.value("autoRefreshLighting", true).toBool();
     ambientLight = settings.value("ambientLight", 0.35).toFloat();
     shadowQuality =
             static_cast<EShadowQuality>(settings.value("shadowQuality", 1).toInt());
@@ -896,11 +893,16 @@ void CRobotScene::loadMap(QSettings &settings)
         addBox(QRectF(s.pos, s.size));
     }
 
-    robotStartPosition = settings.value("robotStartPosition",
-                                        sceneRect().center()).toPointF();
-    robotStartRotation = settings.value("robotStartRotation", 0.0).toReal();
-    robotGraphicsItem->setPos(robotStartPosition);
-    robotGraphicsItem->setRotation(robotStartRotation);
+    QPointF startpos(settings.value("robotStartPosition",
+                                    sceneRect().center()).toPointF());
+    qreal startrot = settings.value("robotStartRotation", 0.0).toReal();
+    robotStartGraphicsItem->setPos(startpos);
+    robotStartGraphicsItem->setRotation(startrot);
+    if (running)
+    {
+        robotGraphicsItem->setPos(startpos);
+        robotGraphicsItem->setRotation(startrot);
+    }
 
     const qreal scale = settings.value("scale", 1.0).toReal();
     const qreal curscale = getTransformScaleWidth(getGraphicsView()->transform());
@@ -909,7 +911,7 @@ void CRobotScene::loadMap(QSettings &settings)
     settings.endGroup();
     updateLighting();
     markMapEdited(false);
-    getGraphicsView()->centerOn(robotGraphicsItem);
+    getGraphicsView()->centerOn(robotStartGraphicsItem);
 }
 
 float CRobotScene::getIntensity(QPointF point) const
@@ -1043,6 +1045,7 @@ void CRobotScene::updateLighting()
                  point.
                 */
                 QList<QPointF> shadowverts;
+                int i = 0, j = 0;
                 foreach (QPointF v, obtr)
                 {
                     QLineF line(QPointF(rad, rad), v);
@@ -1057,17 +1060,28 @@ void CRobotScene::updateLighting()
 
                     foreach (QPointF pv, p)
                     {
+                        if (i == j)
+                        {
+                            ++j;
+                            continue;
+                        }
+
                         if (qFuzzyCompare(pv.y(), v.y()))
                             continue;
+
                         hasup = (hasup || (pv.y() > v.y()));
                         hasdown = (hasdown || (pv.y() < v.y()));
 
                         if (hasup && hasdown)
                             break;
+
+                        ++j;
                     }
 
                     if ((hasup && !hasdown) || (!hasup && hasdown))
                         shadowverts << v;
+
+                    ++i;
                 }
 
                 Q_ASSERT(shadowverts.size() == 2);
@@ -1162,7 +1176,7 @@ void CRobotScene::clearMap()
         if (rit && swalls.contains(rit))
             continue; // Skip static walls
 
-        if (it == robotGraphicsItem)
+        if ((it == robotGraphicsItem) || (it == robotStartGraphicsItem))
             continue;
 
         delete it;
@@ -1191,7 +1205,7 @@ void CRobotScene::setLightEditMode(bool v)
         if (mouseMode == MODE_LIGHT)
             setMouseMode(MODE_POINT, true);
 
-        if (lightingDirty && autoRefreshLighting)
+        if (lightingDirty)
             updateLighting();
     }
 

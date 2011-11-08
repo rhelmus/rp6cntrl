@@ -799,7 +799,7 @@ void CSimulator::timeOutCallback(CAVRTimer *timer, void *data)
         {
             NLua::CLuaLocker lualocker(instance->luaState);
             lua_rawgeti(instance->luaState, LUA_REGISTRYINDEX, it->luaRef);
-            lua_call(instance->luaState, 0, 0); // UNDONE: error handling
+            lua_call(instance->luaState, 0, 0);
         }
         else
             instance->execISR(it->ISRType);
@@ -850,7 +850,6 @@ int CSimulator::luaAvrSetTWIMSGHandler(lua_State *l)
     luaL_checktype(l, 1, LUA_TFUNCTION);
     lua_pushvalue(l, 1);
 
-    QMutexLocker twilock(&instance->luaTWIHandlerMutex);
     if (instance->luaTWIHandler != 0)
         luaL_unref(l, LUA_REGISTRYINDEX, instance->luaTWIHandler);
     instance->luaTWIHandler = luaL_ref(l, LUA_REGISTRYINDEX);
@@ -1143,16 +1142,11 @@ int CSimulator::luaBitShiftRight(lua_State *l)
 
 void CSimulator::handleLuaTWIMSG(const QString &msg, const QList<QVariant> &args)
 {
-    // UNDONE: Do we actually need a mutex for this at all?
-    QMutexLocker twilocker(&luaTWIHandlerMutex);
-    const int handlerref = luaTWIHandler;
-    twilocker.unlock();
-
     if (luaTWIHandler == 0)
         return;
 
     NLua::CLuaLocker lualocker(luaState);
-    lua_rawgeti(luaState, LUA_REGISTRYINDEX, handlerref);
+    lua_rawgeti(luaState, LUA_REGISTRYINDEX, luaTWIHandler);
     lua_pushstring(luaState, qPrintable(msg));
     pushPackedLuaTWIData(luaState, args);
     lua_call(luaState, 1 + args.size(), 0);
@@ -1238,11 +1232,9 @@ void CSimulator::stopPlugin()
     AVRClock->stop();
 
     // Wait untill clock is really stopped.
-    // UNDONE: Thread safe?
     while (AVRClock->isActive())
         ;
 
-    QMutexLocker twilock(&luaTWIHandlerMutex);
     if (luaTWIHandler != 0)
     {
         luaL_unref(luaState, LUA_REGISTRYINDEX, luaTWIHandler);

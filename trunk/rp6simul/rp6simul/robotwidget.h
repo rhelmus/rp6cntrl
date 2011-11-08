@@ -55,18 +55,27 @@ private:
     const int motorArrowWidth, motorArrowXSpacing;
     QSize widgetMinSize;
     QPixmap robotPixmap;
+    QPixmap m32Pixmap;
+    QSize origM32Size;
+    float m32Scale;
+    QPointF m32Positions[SLOT_END];
+    float m32Rotations[SLOT_END];
+    EM32Slot activeM32Slot;
+    bool m32PixmapDirty;
     QTimer *dataPlotUpdateTimer;
     QTime runTime;
     QMap<EDataPlotType, SDataPlotInfo> dataPlots;
     QSignalMapper dataPlotClosedSignalMapper;
     QMap<QString, int> robotADCValues, m32ADCValues;
-    QList<CLED *> LEDs;
+    QList<CLED *> robotLEDs;
     QList<CBumper *> bumpers;
     QList<CIRSensor *> IRSensors;
     QMap<EMotor, int> motorPower, motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
+    QList<CLED *> m32LEDs;
     int beeperPitch;
 
+    void updateM32Pixmap(void);
     void createDataPlotSubWindow(EDataPlotType plot);
 
 private slots:
@@ -89,10 +98,15 @@ public:
     { m32ADCValues[port] = val; }
     void addBumper(CBumper *b);
     void removeBumper(CBumper *b);
-    void addLED(CLED *l);
-    void removeLED(CLED *l);
+    void addRobotLED(CLED *l);
+    void removeRobotLED(CLED *l);
     void addIRSensor(CIRSensor *ir);
     void removeIRSensor(CIRSensor *ir);
+    void setM32Slot(EM32Slot s, const QPointF &p, float r);
+    void setM32Scale(float s) { m32Scale = s; m32PixmapDirty = true; }
+    void addM32LED(CLED *l);
+    void removeM32LED(CLED *l);
+    void setActiveM32Slot(EM32Slot s) { activeM32Slot = s; m32PixmapDirty = true; }
     void setMotorPower(EMotor m, int p) { motorPower[m] = p; update(); }
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; update(); }
     void setMotorDirection(EMotor m, EMotorDirection d)

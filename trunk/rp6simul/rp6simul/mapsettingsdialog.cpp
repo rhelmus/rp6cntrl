@@ -23,15 +23,13 @@ CMapSettingsDialog::CMapSettingsDialog(QWidget *parent) :
     QFormLayout *form = new QFormLayout;
     grid->addLayout(form, 0, 0);
 
-    form->addRow("Width", widthSpinBox = createSpinBox(100, 20000));
-    form->addRow("Height", heightSpinBox = createSpinBox(100, 20000));
-    form->addRow("Auto refresh light map", refreshLightCheckBox = new QCheckBox);
+    form->addRow("Width", widthSpinBox = createSpinBox(300, 20000));
+    form->addRow("Height", heightSpinBox = createSpinBox(300, 20000));
     form->addRow("Ambient light", createLightSlider());
     form->addRow("Shadow quality", shadowQualityComboBox = new QComboBox);
     form->addRow("Grid size", gridSizeSpinBox = createSpinBox(5, 100));
     form->addRow("Auto snap to grid", snapCheckBox = new QCheckBox);
 
-    refreshLightCheckBox->setToolTip("If necessary refresh lighting automatically when leaving edit mode.");
     shadowQualityComboBox->addItems(QStringList() << "Low (fast)" <<
                                     "Medium (default)" << "High (slow)");
     gridSizeSpinBox->setSingleStep(5);
@@ -80,11 +78,6 @@ void CMapSettingsDialog::setMapSize(const QSizeF &s)
     heightSpinBox->setValue(s.height());
 }
 
-void CMapSettingsDialog::setAutoRefreshLight(bool a)
-{
-    refreshLightCheckBox->setChecked(a);
-}
-
 void CMapSettingsDialog::setAmbientLight(float l)
 {
     ambientLightSlider->setValue(qRound(l * 100.0));
@@ -108,11 +101,6 @@ void CMapSettingsDialog::setAutoGridSnap(bool s)
 QSizeF CMapSettingsDialog::getMapSize() const
 {
     return QSizeF(widthSpinBox->value(), heightSpinBox->value());
-}
-
-bool CMapSettingsDialog::getAutoRefreshLight() const
-{
-    return refreshLightCheckBox->isChecked();
 }
 
 float CMapSettingsDialog::getAmbientLight() const

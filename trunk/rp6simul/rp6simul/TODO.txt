@@ -1,8 +1,6 @@
 - General IO: Check for overflows (reintroduce 8/16 bit separation?)
 - UART/SPI: Set ready flag when ready (instead of always enabled)
 - Error handling; check UNDONE's
-- Thread safety:
-      - More?
 - IO register class: test all operators (addition, subtraction, ... (printf), etc)
 - Check delta for avrtimer when avr thread is running at 100%
 - Fix checkDelay for ioregister class
@@ -18,16 +16,7 @@
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
 - Map:
-    - Robot start
-        - only update start position/rotation when modified by user
-        - Different gfx? (colour?, image?)
-            - Hide when plugin is running and show real robot and vice versa
-              when plugins stops.
-        - Reset when plugin stops
-    - Manual lighting update: force complete? Or remove it?
-    - Enable/disable menu options etc when project is loaded or not
     - Map selector etc: check if valid file type?
-    - Ask save file when opening another map
 - Check version on project loading
 - Use qRound for float/double --> int conversions
 - Stacked main widget: list recent projects if none loaded?
@@ -39,7 +28,6 @@
     - default values widgets
     - ...
 - move UI Lua function to separate package?
-- lock robot when selected?
 - robot context menu:
     - option to lock robot
     - reset angle
@@ -65,7 +53,23 @@
         - Disable m32 related widgets?
         - Disable robot option (m32 only)
     - Extend loadCustomDriverInfo()
+    - LEDs
 - autodetect F_CPU?
 - Robot speed: correct?
 - ADC values are not rounded
 - What is EINT1 ADC value?
+- Logging
+- Battery
+- Randomization
+    - Motors
+    - Light Sensors
+    - MIC
+- Preferences
+    - Timer variables (nanosleep, max cycles)
+    - Serial ports and their settings
+    - Audio settings (volume, others?)
+- Project settings
+    - Plugin files
+    - Drivers
+    - M32 / Robot enabling/disabling
+

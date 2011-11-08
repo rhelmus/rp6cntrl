@@ -14,19 +14,6 @@
 
 namespace {
 
-qreal toClockwiseAngle(qreal a)
-{
-    // Convert from counter-clockwise + 90 to clockwise + 0
-    return 90.0 - a;
-}
-
-qreal toCounterClockwiseAngle(qreal a)
-{
-    // Convert from clockwise + 0 to counter-clockwise + 90
-    // (yes this is the same as the other way around)
-    return 90.0 - a;
-}
-
 // Check if one of the obstacles actually causes a collision
 bool checkCollidingItems(const QList<QGraphicsItem *> &obstacles,
                          QGraphicsItem *parent)
@@ -75,61 +62,24 @@ float getRobotFrameSpeed(int motorspeed, float frametime,
 }
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
-    : CResizablePixmapGraphicsItem(parent), m32Scale(1.0),
-      activeM32Slot(SLOT_END), m32PixmapDirty(false), skipFrames(0),
-      pressedHandle(0)
+    : CRotatablePixmapGraphicsItem(parent), m32Scale(1.0),
+      activeM32Slot(SLOT_END), m32PixmapDirty(false), skipFrames(0)
 {
     QPixmap pm("../resource/rp6-top.png");
     origRobotSize = pm.size();
-    setPixmap(pm.scaledToWidth(120, Qt::SmoothTransformation), false);
+    setPixmap(pm.scaledToWidth(120, Qt::SmoothTransformation));
 
     origM32Size = QImage("../resource/m32-top.png").size();
     m32Rotations[SLOT_FRONT] = m32Rotations[SLOT_BACK] = 0.0;
 
-    setTransformOriginPoint(boundingRect().center());
-    setResizable(false);
     setDeletable(false);
     setSnapsToGrid(false);
-
-    addHandle(CHandleGraphicsItem::HANDLE_LEFT |
-              CHandleGraphicsItem::HANDLE_TOP);
-    addHandle(CHandleGraphicsItem::HANDLE_LEFT |
-              CHandleGraphicsItem::HANDLE_BOTTOM);
-    addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
-              CHandleGraphicsItem::HANDLE_TOP);
-    addHandle(CHandleGraphicsItem::HANDLE_RIGHT |
-              CHandleGraphicsItem::HANDLE_BOTTOM);
 
     connect(this, SIGNAL(posChanged(const QPointF &)), SLOT(updateBumpers()));
 
     sensorUpdateTimer = new QTimer(this);
     sensorUpdateTimer->setInterval(100);
     connect(sensorUpdateTimer, SIGNAL(timeout()), SLOT(updateSensors()));
-}
-
-void CRobotGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlags pos)
-{
-    QGraphicsRectItem *handle = new CHandleGraphicsItem(pos, this);
-    handle->hide();
-    handle->setCursor(QPixmap("../resource/rotate.png"));
-
-    QRectF hrect = handle->boundingRect();
-    const QRectF myrect(boundingRect());
-
-    hrect.moveCenter(myrect.center());
-
-    if (pos & CHandleGraphicsItem::HANDLE_LEFT)
-        hrect.moveLeft(myrect.left());
-    else if (pos & CHandleGraphicsItem::HANDLE_RIGHT)
-        hrect.moveRight(myrect.right());
-    if (pos & CHandleGraphicsItem::HANDLE_TOP)
-        hrect.moveTop(myrect.top());
-    else if (pos & CHandleGraphicsItem::HANDLE_BOTTOM)
-        hrect.moveBottom(myrect.bottom());
-
-    handle->setPos(hrect.topLeft());
-
-    handles[pos] = handle;
 }
 
 void CRobotGraphicsItem::updateM32Pixmap()
@@ -195,6 +145,10 @@ void CRobotGraphicsItem::tryMove()
       'ROTATION_FACTOR' defined in the RP6 library. This value is also based
       on this length and holds the amount of counts per degree * 100.
     */
+
+    // Don't move if selected
+    if (isSelected())
+        return;
 
     const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
     Q_ASSERT(rscene);
@@ -402,57 +356,11 @@ void CRobotGraphicsItem::advance(int phase)
     }
 }
 
-bool CRobotGraphicsItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event)
-{
-    if (event->type() == QEvent::GraphicsSceneMousePress)
-    {
-        pressedHandle = dynamic_cast<CHandleGraphicsItem *>(watched);
-        Q_ASSERT(pressedHandle);
-    }
-    else if (event->type() == QEvent::GraphicsSceneMouseRelease)
-        pressedHandle = 0;
-    else if (event->type() == QEvent::GraphicsSceneMouseMove)
-    {
-        QGraphicsSceneMouseEvent *me =
-                static_cast<QGraphicsSceneMouseEvent*>(event);
-
-        const QPointF start(mapToScene(boundingRect().center()));
-        const QPointF end(mapToScene(mapFromItem(pressedHandle, me->pos())));
-        const qreal mangle = toClockwiseAngle(QLineF(start, end).angle());
-
-        if (mangle != rotation())
-        {
-            const qreal olda = rotation();
-            setRotation(mangle);
-            emit rotationChanged(olda);
-        }
-    }
-
-    return false; // Propegate
-}
-
-QVariant CRobotGraphicsItem::itemChange(GraphicsItemChange change,
-                                        const QVariant &value)
-{
-    if (change == ItemSceneHasChanged)
-    {
-        foreach(QGraphicsItem *h, handles)
-            h->installSceneEventFilter(this);
-    }
-    else if (change == ItemSelectedHasChanged)
-    {
-        foreach(QGraphicsItem *h, handles)
-            h->setVisible(value.toBool());
-    }
-
-    return CResizablePixmapGraphicsItem::itemChange(change, value);
-}
-
 void CRobotGraphicsItem::paint(QPainter *painter,
                                const QStyleOptionGraphicsItem *option,
                                QWidget *widget)
 {
-    CResizablePixmapGraphicsItem::paint(painter, option, widget);
+    CRotatablePixmapGraphicsItem::paint(painter, option, widget);
 
     if (m32PixmapDirty)
         updateM32Pixmap();
@@ -512,24 +420,43 @@ void CRobotGraphicsItem::setM32Slot(EM32Slot s, const QPointF &p, float r)
     m32PixmapDirty = true;
 }
 
-void CRobotGraphicsItem::addLED(CLED *l)
+void CRobotGraphicsItem::addRobotLED(CLED *l)
 {
-    LEDs << l;
+    robotLEDs << l;
 }
 
-void CRobotGraphicsItem::removeLED(CLED *l)
+void CRobotGraphicsItem::removeRobotLED(CLED *l)
 {
-    LEDs.removeOne(l);
+    robotLEDs.removeOne(l);
 }
 
 void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
 {
-    const QTransform tr(sceneTransform());
-    const qreal scale = getPixmapScale();
-    foreach (CLED *l, LEDs)
+    QTransform tr(sceneTransform());
+
+    if (activeM32Slot != SLOT_FRONT) // Front m32 hides robot LEDs
     {
-        if (l->isEnabled())
-            drawLED(*painter, l, tr, scale);
+        const qreal scale = getPixmapScale();
+        foreach (CLED *l, robotLEDs)
+        {
+            if (l->isEnabled())
+                drawLED(*painter, l, tr, scale);
+        }
+    }
+
+    if (activeM32Slot != SLOT_END)
+    {
+        tr.translate(m32Positions[activeM32Slot].x(), m32Positions[activeM32Slot].y());
+        tr.translate(m32Pixmap.width()/2.0, m32Pixmap.height()/2.0);
+        tr.rotate(m32Rotations[activeM32Slot]);
+        tr.translate(-m32Pixmap.width()/2.0, -m32Pixmap.height()/2.0);
+
+        const qreal scale = (qreal)m32Pixmap.width() / (qreal)origM32Size.width();
+        foreach (CLED *l, m32LEDs)
+        {
+            if (l->isEnabled())
+                drawLED(*painter, l, tr, scale);
+        }
     }
 }
 
@@ -581,4 +508,14 @@ void CRobotGraphicsItem::removeLightSensor(CLightSensor *light)
     lightSensors.removeOne(light);
     if (IRSensors.isEmpty() && lightSensors.isEmpty())
         sensorUpdateTimer->stop();
+}
+
+void CRobotGraphicsItem::addM32LED(CLED *l)
+{
+    m32LEDs << l;
+}
+
+void CRobotGraphicsItem::removeM32LED(CLED *l)
+{
+    m32LEDs.removeOne(l);
 }

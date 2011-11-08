@@ -2,7 +2,7 @@
 #define ROBOTGRAPHICSITEM_H
 
 #include "handlegraphicsitem.h"
-#include "resizablepixmapgraphicsitem.h"
+#include "rotatablepixmapgraphicsitem.h"
 #include "rp6simul.h"
 
 class QGraphicsPolygonItem;
@@ -12,13 +12,13 @@ class CIRSensor;
 class CLED;
 class CLightSensor;
 
-class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
+class CRobotGraphicsItem : public CRotatablePixmapGraphicsItem
 {
     Q_OBJECT
 
     QSize origRobotSize;
     float cmPerPixel, robotLength;
-    QList<CLED *> LEDs;
+    QList<CLED *> robotLEDs;
     QMap<EMotor, int> motorSpeed;
     QMap<EMotor, EMotorDirection> motorDirection;
     QList<CBumper *> bumpers;
@@ -33,14 +33,10 @@ class CRobotGraphicsItem : public CResizablePixmapGraphicsItem
     float m32Rotations[SLOT_END];
     EM32Slot activeM32Slot;
     bool m32PixmapDirty;
+    QList<CLED *> m32LEDs;
     bool isBlocked;
     int skipFrames;
 
-    typedef QMap<CHandleGraphicsItem::EHandlePosFlags, QGraphicsItem *> THandleList;
-    THandleList handles;
-    CHandleGraphicsItem *pressedHandle;
-
-    void addHandle(CHandleGraphicsItem::EHandlePosFlags pos);
     void updateM32Pixmap(void);
     QPointF mapDeltaPos(qreal x, qreal y) const;
     QPointF mapDeltaPos(const QPointF &p) const { return mapDeltaPos(p.x(), p.y()); }
@@ -55,8 +51,6 @@ private slots:
 
 protected:
     void advance(int phase);
-    bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
-    QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
 public:
     CRobotGraphicsItem(QGraphicsItem *parent = 0);
@@ -69,8 +63,8 @@ public:
     void setM32Slot(EM32Slot s, const QPointF &p, float r);
     void setM32Scale(float s) { m32Scale = s; m32PixmapDirty = true; }
     void setActiveM32Slot(EM32Slot s) { activeM32Slot = s; m32PixmapDirty = true; }
-    void addLED(CLED *l);
-    void removeLED(CLED *l);
+    void addRobotLED(CLED *l);
+    void removeRobotLED(CLED *l);
     void drawLEDs(QPainter *painter) const;
     void addBumper(CBumper *b);
     void removeBumper(CBumper *b);
@@ -78,6 +72,8 @@ public:
     void removeIRSensor(CIRSensor *ir);
     void addLightSensor(CLightSensor *light);
     void removeLightSensor(CLightSensor *light);
+    void addM32LED(CLED *l);
+    void removeM32LED(CLED *l);
 
 public slots:
     void setMotorSpeed(EMotor m, int s) { motorSpeed[m] = s; }
@@ -86,7 +82,6 @@ public slots:
 signals:
     void robotMoved(const QPointF &, qreal);
     void robotBlockedChanged(bool);
-    void rotationChanged(qreal); // Manual rotate
     void bumperChanged(CBumper *, bool);
     void IRSensorChanged(CIRSensor *, float);
 };

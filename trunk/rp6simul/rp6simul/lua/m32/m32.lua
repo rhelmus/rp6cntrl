@@ -4,8 +4,8 @@ local ret = simulator(...)
 driverList =
 {
     { name = "adc", default = true },
---    { name = "led", default  = true },
---    { name = "portlog", default  = false },
+    { name = "led", default  = true },
+    { name = "portlog", default  = false },
     { name = "timer0", default  = true },
     { name = "timer1", default  = false },
     { name = "timer2", default  = false },

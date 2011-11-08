@@ -8,6 +8,7 @@
 class CBaseGraphicsItem;
 class CLightGraphicsItem;
 class CResizablePixmapGraphicsItem;
+class CRotatablePixmapGraphicsItem;
 class CRobotGraphicsItem;
 class QSettings;
 
@@ -33,7 +34,7 @@ private:
     QList<SLight> lights;
     QPixmap backGroundPixmap;
     QImage lightImage;
-    bool lightingDirty, autoRefreshLighting;
+    bool lightingDirty;
     float ambientLight;
     EShadowQuality shadowQuality;
 
@@ -44,10 +45,10 @@ private:
     QPixmap boxPixmap;
     QList<CResizablePixmapGraphicsItem *> boxes;
 
+    bool running;
+    CRotatablePixmapGraphicsItem *robotStartGraphicsItem;
     CRobotGraphicsItem *robotGraphicsItem;
     const float robotAdvanceDelay;
-    QPointF robotStartPosition;
-    qreal robotStartRotation;
     bool followRobot;
     qreal viewAngle;
 
@@ -82,8 +83,6 @@ private slots:
     void markLightingDirty(const QSizeF &olds);
     void markLightingDirty(float);
     void updateRobotFollowing(void);
-    void updateRobotStartPosition(void);
-    void updateRobotStartRotation(void);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect);
@@ -95,11 +94,11 @@ protected:
 public:
     explicit CRobotScene(QObject *parent = 0);
 
+    void start(void);
+    void stop(void);
     void setMouseMode(EMouseMode mode, bool sign=false);
     CRobotGraphicsItem *getRobotItem(void) const { return robotGraphicsItem; }
     void setMapSize(const QSizeF &size, bool force=false);
-    bool getAutoRefreshLighting(void) const { return autoRefreshLighting; }
-    void setAutoRefreshLighting(bool a);
     float getAmbientLight(void) const { return ambientLight; }
     void setAmbientLight(float l);
     EShadowQuality getShadowQuality(void) const { return shadowQuality; }

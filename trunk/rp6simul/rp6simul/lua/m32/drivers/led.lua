@@ -14,6 +14,15 @@ local LEDInfo =
 }
 
 
+function initPlugin()
+    for i=1,4 do
+        local propname = "LED" .. tostring(i)
+        LEDInfo.LEDs[i] = createLED(properties[propname].pos,
+                                    properties[propname].color,
+                                    properties[propname].radius)
+    end
+end
+
 function handleIOData(type, data)
     if bit.isSet(data, avr.PIND4) then
         local reg = avr.getIORegister(avr.IO_SPDR)
@@ -21,7 +30,7 @@ function handleIOData(type, data)
             local e = bit.isSet(reg, l-1)
             if e ~= LEDInfo.LEDStatus[l] then
                 log(string.format("LED %d %s\n", l, (e and "enabled") or "disabled"))
---                LEDInfo.LEDs[l]:setEnabled(e) UNDONE
+                LEDInfo.LEDs[l]:setEnabled(e)
                 LEDInfo.LEDStatus[l] = e
                 updateRobotStatus("leds", tostring(l), (e and "ON") or "OFF")
             end
