@@ -3035,6 +3035,8 @@ void CRP6Simulator::debugSetRobotRightPower(int power)
 bool CRP6Simulator::loadCustomDriverInfo(const QString &file, QString &name,
                                          QString &desc)
 {
+    // NOTE: Currently the lua state of the robot simulator is used for both
+    //       robot AND m32 drivers.
     lua_getglobal(robotSimulator->getLuaState(), "getDriver");
     lua_pushstring(robotSimulator->getLuaState(), qPrintable(file));
 

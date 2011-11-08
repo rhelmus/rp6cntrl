@@ -153,7 +153,6 @@ local function setCompareRegisterA(data)
             speed are roughly the same. For this the following formula is used:
             CV = CPU_MHz / (power * effective_encoder_read_frequency)
         --]]
-        -- UNDONE: cpu speed configurable
         local freq = 1000 / getEffectiveSpeedTimerBase()
         rightEncTimer:setCompareValue(properties.clockSpeed / (data * freq))
         if not rightEncTimer:isEnabled() then
@@ -178,7 +177,6 @@ local function setCompareRegisterB(data)
         end
     else
         -- Comments: see setCompareRegisterA
-        -- UNDONE: cpu speed configurable
         local freq = 1000 / getEffectiveSpeedTimerBase()
         leftEncTimer:setCompareValue(properties.clockSpeed / (data * freq))
         if not leftEncTimer:isEnabled() then

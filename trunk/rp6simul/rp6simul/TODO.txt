@@ -53,7 +53,6 @@
         - Disable m32 related widgets?
         - Disable robot option (m32 only)
     - Extend loadCustomDriverInfo()
-    - LEDs
 - autodetect F_CPU?
 - Robot speed: correct?
 - ADC values are not rounded
@@ -68,9 +67,5 @@
     - Timer variables (nanosleep, max cycles)
     - Serial ports and their settings
     - Audio settings (volume, others?)
-- Project settings
-    - Plugin files
-    - Drivers
-    - M32 / Robot enabling/disabling
 - More menu options (from toolbar)
 
