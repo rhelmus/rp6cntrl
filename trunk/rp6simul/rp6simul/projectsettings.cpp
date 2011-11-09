@@ -60,14 +60,9 @@ QWidget *CProjectSettingsDialog::createRobotTab()
     vbox->addWidget(group);
     QVBoxLayout *subvbox = new QVBoxLayout(group);
 
-#ifdef Q_OS_WIN32
-    const QString filter("plugin files (*.dll)");
-#else
-    const QString filter("plugin files (*.so)");
-#endif
     robotPluginInput = new CPathInput("Open RP6 plugin file",
                                       CPathInput::PATH_EXISTFILE, QString(),
-                                      filter);
+                                      getPluginFilter());
     subvbox->addWidget(robotPluginInput);
 
 
@@ -91,13 +86,9 @@ QWidget *CProjectSettingsDialog::createM32Tab()
     vbox->addWidget(group);
     QVBoxLayout *subvbox = new QVBoxLayout(group);
 
-#ifdef Q_OS_WIN32
-    const QString filter("plugin files (*.dll)");
-#else
-    const QString filter("plugin files (*.so)");
-#endif
     m32PluginInput = new CPathInput("Open m32 plugin file",
-                                    CPathInput::PATH_EXISTFILE, QString(), filter);
+                                    CPathInput::PATH_EXISTFILE, QString(),
+                                    getPluginFilter());
     subvbox->addWidget(m32PluginInput);
 
 
