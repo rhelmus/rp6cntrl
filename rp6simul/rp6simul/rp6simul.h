@@ -203,7 +203,6 @@ class CRP6Simulator : public QMainWindow
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendRobotSerialOutput(lua_State *l);
     static int luaAppendM32SerialOutput(lua_State *l);
-    static int luaSetDriverLists(lua_State *l);
     static int luaSetCmPerPixel(lua_State *l);
     static int luaSetRobotLength(lua_State *l);
     static int luaSetRobotM32Slot(lua_State *l);

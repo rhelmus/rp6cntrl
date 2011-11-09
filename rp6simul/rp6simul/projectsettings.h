@@ -84,6 +84,15 @@ inline QString projectFilePath(const QString &dir, const QString &name)
     return QDir(dir).absoluteFilePath(name + ".rp6");
 }
 
+inline const char *getPluginFilter(void)
+{
+#ifdef Q_OS_WIN32
+    return "plugin files (*.dll)";
+#else
+    return "plugin files (*.so)";
+#endif
+}
+
 bool verifyPluginFile(const QString &file);
 
 #endif // PROJECTSETTINGS_H

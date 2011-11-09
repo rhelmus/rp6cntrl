@@ -1523,24 +1523,6 @@ int CRP6Simulator::luaAppendM32SerialOutput(lua_State *l)
     return 0;
 }
 
-int CRP6Simulator::luaSetDriverLists(lua_State *l)
-{
-    // This function should only be called by init(), where we do
-    // not have to worry about threads
-
-    luaL_checktype(l, 1, LUA_TTABLE); // Driver descriptions
-    luaL_checktype(l, 2, LUA_TTABLE); // Default driver list
-
-    QVariantHash list = NLua::convertLuaTable(l, 1);
-    QHash<QString, QString> descmap;
-    for(QVariantHash::iterator it=list.begin(); it!=list.end(); ++it)
-        descmap[it.key()] = it.value().toString();
-
-    instance->projectWizard->setDriverLists(descmap,
-                                            NLua::getStringList(l, 2));
-    return 0;
-}
-
 int CRP6Simulator::luaSetCmPerPixel(lua_State *l)
 {
     // This function should only be called by init(), where we do
