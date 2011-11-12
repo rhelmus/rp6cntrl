@@ -11,6 +11,23 @@
 #include <QLibrary>
 #include <QtGui>
 
+namespace {
+
+QStringList getDefaultDriverList(const TDriverInfoList &driverlist)
+{
+    QStringList ret;
+    for (TDriverInfoList::const_iterator it=driverlist.begin();
+         it!=driverlist.end(); ++it)
+    {
+        if (it->isDefault)
+            ret << it->name;
+    }
+
+    return ret;
+}
+
+}
+
 CProjectWizard::CProjectWizard(QWidget *parent) : QWizard(parent)
 {
     setDefaultProperty("CPathInput", "path",
@@ -44,14 +61,17 @@ void CProjectWizard::accept()
         prsettings.setValue("name", field("projectName"));
         prsettings.setValue("simulator", projectSimulatorPage->getSimulator());
 
-        // UNDONE: Drivers
         prsettings.beginGroup("robot");
         prsettings.setValue("plugin", field("robot.plugin"));
+        prsettings.setValue("drivers",
+                            getDefaultDriverList(CRP6Simulator::getInstance()->getRobotDriverInfoList()));
         prsettings.endGroup();
 
         prsettings.beginGroup("m32");
         prsettings.setValue("plugin", field("m32.plugin"));
         prsettings.setValue("slot", field("m32.slot"));
+        prsettings.setValue("drivers",
+                            getDefaultDriverList(CRP6Simulator::getInstance()->getM32DriverInfoList()));
         prsettings.endGroup();
 
         QDialog::accept();
@@ -171,12 +191,12 @@ CNewProjectRobotPage::CNewProjectRobotPage(QWidget *parent)
     setSubTitle("Please fill in the RP6 settings below.\n"
                 "NOTE: See the manual for details on how to create plugin files.");
 
-    QVBoxLayout *vbox = new QVBoxLayout(this);
+    QFormLayout *form = new QFormLayout(this);
 
     CPathInput *pathinput = new CPathInput("Open RP6 plugin file",
                                            CPathInput::PATH_EXISTFILE,
                                            QDir::homePath(), getPluginFilter());
-    vbox->addWidget(pathinput);
+    form->addRow("RP6 plugin", pathinput);
     registerField("robot.plugin", pathinput);
     connect(pathinput, SIGNAL(pathTextChanged(const QString &)),
             SIGNAL(completeChanged()));
@@ -243,189 +263,4 @@ bool CNewProjectM32Page::validatePage()
 {
     const QString file(field("m32.plugin").toString());
     return verifyPluginFile(file);
-}
-
-
-CNewProjectSettingsPage::CNewProjectSettingsPage(QWidget *parent)
-    : QWizardPage(parent), initDriverList(true)
-{
-    setTitle("Project settings");
-
-    // UNDONE: Description?
-    // UNDONE: Move to seperate reusable widget?
-
-    QGridLayout *grid = new QGridLayout(this);
-
-    QGroupBox *group = new QGroupBox("RP6 plugin");
-    grid->addWidget(group, 0, 0);
-    QVBoxLayout *vbox = new QVBoxLayout(group);
-    // UNDONE: File filter (.so/.dll)
-    CPathInput *pathinput = new CPathInput("Open RP6 plugin file",
-                                           CPathInput::PATH_EXISTFILE);
-    vbox->addWidget(pathinput);
-    registerField("RP6Plugin", pathinput);
-    connect(pathinput, SIGNAL(pathTextChanged(const QString &)), this,
-            SIGNAL(completeChanged()));
-
-    group = new QGroupBox("Drivers");
-    grid->addWidget(group, 1, 0, 1, 2);
-    QHBoxLayout *hbox = new QHBoxLayout(group);
-
-    hbox->addWidget(driverTreeWidget = new QTreeWidget);
-    driverTreeWidget->setHeaderLabels(QStringList() << "Driver" << "Description");
-    driverTreeWidget->setRootIsDecorated(false);
-
-    hbox->addLayout(vbox = new QVBoxLayout);
-
-    vbox->addWidget(addDriverButton = new QPushButton("Add driver"));
-    QMenu *menu = new QMenu(addDriverButton);
-    menu->addSeparator();
-    addCustomDriverAction = menu->addAction("Add custom driver...");
-    connect(menu, SIGNAL(triggered(QAction*)), this, SLOT(addDriver(QAction*)));
-    addDriverButton->setMenu(menu);
-
-    vbox->addWidget(delDriverButton = new QPushButton("Remove driver"));
-    connect(delDriverButton, SIGNAL(clicked()), this, SLOT(delDriver()));
-
-    QPushButton *button = new QPushButton("Reset");
-    connect(button, SIGNAL(clicked()), this, SLOT(resetDriverTree()));
-    vbox->addWidget(button);
-}
-
-QAction *CNewProjectSettingsPage::getAddAction(const QString &driver)
-{
-    QList<QAction *> actions = addDriverButton->menu()->actions();
-    foreach(QAction *a, actions)
-    {
-        if (a->text() == driver)
-            return a;
-    }
-
-    return 0;
-}
-
-void CNewProjectSettingsPage::addDriver(QAction *action)
-{
-    // Special case: add custom driver
-    if (action == addCustomDriverAction)
-    {
-        QString file = QFileDialog::getOpenFileName(this, "Open custom driver",
-                                                    QDir::homePath(),
-                                                    "driver files (*.lua)");
-        if (!file.isEmpty())
-        {
-            QString name, desc;
-            const bool ok =
-                    CRP6Simulator::getInstance()->loadCustomDriverInfo(file,
-                                                                       name,
-                                                                       desc);
-            if (!ok)
-                QMessageBox::critical(this, "Custom driver error",
-                                      "Could not load custom driver (see error log");
-            else
-            {
-                QTreeWidgetItem *item =
-                        new QTreeWidgetItem(driverTreeWidget,
-                                            QStringList() << name << desc);
-                item->setData(0, Qt::UserRole, file);
-            }
-        }
-    }
-    else
-    {
-        action->setVisible(false);
-        QStringList l = QStringList() << action->text() <<
-                                         driverDescList[action->text()];
-        new QTreeWidgetItem(driverTreeWidget, l);
-    }
-
-    if (!delDriverButton->isEnabled())
-        delDriverButton->setEnabled(true);
-}
-
-void CNewProjectSettingsPage::delDriver()
-{
-    QTreeWidgetItem *item = driverTreeWidget->currentItem();
-    Q_ASSERT(item);
-
-    QAction *a = getAddAction(item->text(0));
-    Q_ASSERT(a || !item->data(0, Qt::UserRole).isNull());
-    if (a)
-        a->setVisible(true);
-
-    delete item;
-    if (!driverTreeWidget->topLevelItemCount())
-        delDriverButton->setEnabled(false);
-}
-
-void CNewProjectSettingsPage::resetDriverTree()
-{
-    driverTreeWidget->clear();
-
-    for (QHash<QString, QString>::iterator it=driverDescList.begin();
-         it != driverDescList.end(); ++it)
-    {
-        bool def = defaultDriverList.contains(it.key());
-        if (def)
-        {
-            QStringList l = QStringList() << it.key() << it.value();
-            new QTreeWidgetItem(driverTreeWidget, l);
-        }
-
-        QAction *a = getAddAction(it.key());
-        Q_ASSERT(a);
-        a->setVisible(!def);
-    }
-
-    if (!delDriverButton->isEnabled())
-        delDriverButton->setEnabled(true);
-}
-
-void CNewProjectSettingsPage::initializePage()
-{
-    setField("RP6Plugin", QDir::homePath());
-
-    if (initDriverList)
-    {
-        for(QHash<QString, QString>::iterator it=driverDescList.begin();
-            it!=driverDescList.end(); ++it)
-        {
-            QAction *a = new QAction(it.key(), addDriverButton->menu());
-            addDriverButton->menu()->insertAction(addCustomDriverAction, a);
-            a->setToolTip(it.value());
-        }
-        initDriverList = false;
-    }
-
-    resetDriverTree();
-}
-
-bool CNewProjectSettingsPage::isComplete() const
-{
-    return (QWizardPage::isComplete() &&
-            QFileInfo(field("RP6Plugin").toString()).isFile());
-}
-
-bool CNewProjectSettingsPage::validatePage()
-{
-    QString file(field("RP6Plugin").toString());
-    return verifyPluginFile(file);
-}
-
-QStringList CNewProjectSettingsPage::getSelectedDrivers() const
-{
-    const int count = driverTreeWidget->topLevelItemCount();
-    QStringList ret;
-    for (int i=0; i<count; ++i)
-    {
-        // Custom driver?
-        QTreeWidgetItem *item = driverTreeWidget->topLevelItem(i);
-        QVariant d = item->data(0, Qt::UserRole);
-        if (!d.isNull())
-            ret << d.toString();
-        else
-            ret << item->text(0);
-    }
-
-    return ret;
 }

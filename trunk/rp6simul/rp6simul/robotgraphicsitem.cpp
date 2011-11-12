@@ -62,7 +62,7 @@ float getRobotFrameSpeed(int motorspeed, float frametime,
 }
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
-    : CRotatablePixmapGraphicsItem(parent), m32Scale(1.0),
+    : CRotatablePixmapGraphicsItem(parent), m32Enabled(false), m32Scale(1.0),
       activeM32Slot(SLOT_END), m32PixmapDirty(false), skipFrames(0)
 {
     QPixmap pm("../resource/rp6-top.png");
@@ -362,11 +362,14 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 {
     CRotatablePixmapGraphicsItem::paint(painter, option, widget);
 
-    if (m32PixmapDirty)
-        updateM32Pixmap();
+    if (m32Enabled)
+    {
+        if (m32PixmapDirty)
+            updateM32Pixmap();
 
-    if (!m32Pixmap.isNull()) // null if active slot isn't set yet
-        painter->drawPixmap(m32Positions[activeM32Slot], m32Pixmap);
+        if (!m32Pixmap.isNull()) // null if active slot isn't set yet
+            painter->drawPixmap(m32Positions[activeM32Slot], m32Pixmap);
+    }
 
     foreach (CIRSensor *ir, IRSensors)
     {
@@ -434,7 +437,7 @@ void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
 {
     QTransform tr(sceneTransform());
 
-    if (activeM32Slot != SLOT_FRONT) // Front m32 hides robot LEDs
+    if (!m32Enabled || (activeM32Slot != SLOT_FRONT)) // Front m32 hides robot LEDs
     {
         const qreal scale = getPixmapScale();
         foreach (CLED *l, robotLEDs)
@@ -444,7 +447,7 @@ void CRobotGraphicsItem::drawLEDs(QPainter *painter) const
         }
     }
 
-    if (activeM32Slot != SLOT_END)
+    if (m32Enabled && (activeM32Slot != SLOT_END))
     {
         tr.translate(m32Positions[activeM32Slot].x(), m32Positions[activeM32Slot].y());
         tr.translate(m32Pixmap.width()/2.0, m32Pixmap.height()/2.0);

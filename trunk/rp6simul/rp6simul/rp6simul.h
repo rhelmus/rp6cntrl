@@ -65,6 +65,8 @@ class CRP6Simulator : public QMainWindow
     enum { EXTEEPROM_PAGESIZE = 64, EXTEEPROM_CAPACITY = 32 * 1024,
            EXTEEPROM_TABLEDIMENSION = 8 };
     enum EExtEEPROMMode { EXTEEPROMMODE_NUMERICAL=0, EXTEEPROMMODE_CHAR=1 };
+    enum { BOTTOMTAB_LOG=0, BOTTOMTAB_ROBOTSERIAL, BOTTOMTAB_M32SERIAL,
+           BOTTOMTAB_IRCOMM };
 
     QextSerialPort *robotSerialDevice, *m32SerialDevice;
     float audioCurrentCycle, audioFrequency;
@@ -81,8 +83,7 @@ class CRP6Simulator : public QMainWindow
     bool currentMapIsTemplate;
     TDriverInfoList robotDriverInfoList, m32DriverInfoList;
 
-    CProjectWizard *projectWizard;
-    QList<QAction *> mapMenuActionList;
+    QList<QAction *> projectActionList, mapMenuActionList;
     QAction *saveMapAsAction, *editProjectSettingsAction;
     QAction *runPluginAction, *stopPluginAction, *resetPluginAction;
     QToolButton *handClapButton;
@@ -97,6 +98,7 @@ class CRP6Simulator : public QMainWindow
     CRobotWidget *robotWidget;
     CRobotScene *robotScene;
     QGraphicsView *graphicsView;
+    QTabWidget *bottomTabWidget;
     QPlainTextEdit *logWidget;
     QPlainTextEdit *robotSerialOutputWidget;
     QLineEdit *robotSerialInputWidget;
@@ -112,7 +114,7 @@ class CRP6Simulator : public QMainWindow
     QTreeWidget *mapSelectorTreeWidget;
     QTreeWidgetItem *mapTemplatesTreeItem;
     QTreeWidgetItem *mapHistoryTreeItem;
-    QDockWidget *ADCDockWidget;
+    QDockWidget *ADCDockWidget, *extEEPROMDockWidget;
     QTableWidget *robotADCTableWidget, *m32ADCTableWidget;
     QComboBox *IORegisterTableSelector;
     QTableWidget *IORegisterTableWidget;
@@ -171,7 +173,7 @@ class CRP6Simulator : public QMainWindow
     QWidget *createProjectPlaceHolderWidget(void);
     QWidget *createRobotWidget(void);
     QWidget *createRobotSceneWidget(void);
-    QWidget *createBottomTabs(void);
+    QTabWidget *createBottomTabWidget(void);
     QWidget *createLogTab(void);
     QWidget *createSerialRobotTab(void);
     QWidget *createSerialM32Tab(void);
@@ -184,6 +186,7 @@ class CRP6Simulator : public QMainWindow
     void updateMainStackedWidget(void);
     void updateMapStackedWidget(void);
     void openProjectFile(const QString &file);
+    void updateProjectSettings(QSettings &prsettings);
     void loadMapFile(const QString &file, bool istemplate);
     bool checkMapChange(void);
     void loadMapTemplatesTree(void);
@@ -280,6 +283,9 @@ private slots:
     void sendIRCOMM(void);
     void debugSetRobotLeftPower(int power);
     void debugSetRobotRightPower(int power);
+
+protected:
+    void closeEvent(QCloseEvent *event);
 
 public:
     CRP6Simulator(QWidget *parent = 0);

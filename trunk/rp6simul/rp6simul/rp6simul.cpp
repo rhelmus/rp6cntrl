@@ -156,13 +156,11 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
 
     resize(850, 600);
 
-    projectWizard = new CProjectWizard(this);
-
     QSplitter *splitter = new QSplitter(Qt::Vertical, this);
     setCentralWidget(splitter);
 
     splitter->addWidget(createMainWidget());
-    splitter->addWidget(createBottomTabs());
+    splitter->addWidget(bottomTabWidget = createBottomTabWidget());
     splitter->setSizes(QList<int>() << 600 << 300);
 
     createMenus();
@@ -170,21 +168,22 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
 
     updateMainStackedWidget();
 
-    QDockWidget *statdock, *regdock, *eepromdock;
+    QDockWidget *statdock, *regdock;
     addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, ADCDockWidget = createADCDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, regdock = createRegisterDock(),
                   Qt::Vertical);
-    addDockWidget(Qt::LeftDockWidgetArea, eepromdock = createExtEEPROMDock(),
+    addDockWidget(Qt::LeftDockWidgetArea, extEEPROMDockWidget = createExtEEPROMDock(),
                   Qt::Vertical);
     tabifyDockWidget(statdock, ADCDockWidget);
     tabifyDockWidget(ADCDockWidget, regdock);
-    tabifyDockWidget(regdock, eepromdock);
+    tabifyDockWidget(regdock, extEEPROMDockWidget);
     activateDockTab(this, "Status");
 
     ADCDockWidget->setEnabled(false);
+    extEEPROMDockWidget->setEnabled(false);
 
     // Do this after toolbars and dockedwidgets are created, as the
     // tabViewChanged slot needs some.
@@ -437,15 +436,22 @@ TDriverInfoList CRP6Simulator::getLuaDriverInfoList(lua_State *l)
         ret << SDriverInfo(name, desc, def);
     }
 
+    lua_pop(l, 1);
+
     return ret;
 }
 
 void CRP6Simulator::createMenus()
 {
     QMenu *menu = menuBar()->addMenu("&File");
-    menu->addAction("New Project", this, SLOT(newProject()), tr("ctrl+N"));
-    menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
-                    "Open Project", this, SLOT(openProject()), tr("ctrl+O"));
+    QAction *a = menu->addAction("New Project", this, SLOT(newProject()),
+                                 tr("ctrl+N"));
+    projectActionList << a;
+    a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
+                        "Open Project", this, SLOT(openProject()), tr("ctrl+O"));
+    projectActionList << a;
+    // UNDONE: Do something here...
+    // UNDONE: add to projectActionList
     menu->addMenu("Open recent...")->addAction("blah"); // UNDONE
 
     menu->addSeparator();
@@ -455,7 +461,7 @@ void CRP6Simulator::createMenus()
 
     menu = menuBar()->addMenu("&Map");
 
-    QAction *a = menu->addAction("New map", this, SLOT(newMap()));
+    a = menu->addAction("New map", this, SLOT(newMap()));
     mapMenuActionList << a;
 
     a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
@@ -480,6 +486,7 @@ void CRP6Simulator::createMenus()
     editProjectSettingsAction =  menu->addAction("Project settings", this,
                                                  SLOT(editProjectSettings()));
     editProjectSettingsAction->setEnabled(false);
+    projectActionList << editProjectSettingsAction;
 
     menu->addSeparator();
 
@@ -802,10 +809,11 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
     return mapStackedWidget;
 }
 
-QWidget *CRP6Simulator::createBottomTabs()
+QTabWidget *CRP6Simulator::createBottomTabWidget()
 {
     QTabWidget *ret = new QTabWidget;
     ret->setTabPosition(QTabWidget::South);
+    // Note: keep in sync with enum
     ret->addTab(createLogTab(), "log");
     ret->addTab(createSerialRobotTab(), "serial - robot");
     ret->addTab(createSerialM32Tab(), "serial - m32");
@@ -1153,19 +1161,7 @@ void CRP6Simulator::openProjectFile(const QString &file)
     if (!verifySettingsFile(prsettings))
         return;
 
-    // UNDONE
-    robotScene->getRobotItem()->setActiveM32Slot(SLOT_BACK);
-    robotWidget->setActiveM32Slot(SLOT_BACK);
-
-    prsettings.beginGroup("robot");
-    if (!robotSimulator->loadProjectFile(prsettings))
-        return;
-    prsettings.endGroup();
-
-    prsettings.beginGroup("m32");
-    if (!m32Simulator->loadProjectFile(prsettings))
-        return; // UNDONE: Close robot simulator?
-    prsettings.endGroup();
+    updateProjectSettings(prsettings);
 
     stopPluginAction->setEnabled(false);
     runPluginAction->setEnabled(true);
@@ -1181,6 +1177,74 @@ void CRP6Simulator::openProjectFile(const QString &file)
 
     updateMainStackedWidget();
     updateExtEEPROM(extEEPROMPageSpinBox->value());
+}
+
+void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
+{
+    const ESimulator simulator =
+            static_cast<ESimulator>(prsettings.value("simulator", SIMULATOR_ROBOT).toInt());
+    const bool hasrobot = ((simulator == SIMULATOR_ROBOT) ||
+                           (simulator == SIMULATOR_ROBOTM32));
+    const bool hasm32 = ((simulator == SIMULATOR_M32) ||
+                         (simulator == SIMULATOR_ROBOTM32));
+
+    robotWidget->setSimulator(simulator);
+    robotScene->getRobotItem()->setM32Enabled(simulator == SIMULATOR_ROBOTM32);
+
+    bottomTabWidget->setTabEnabled(BOTTOMTAB_ROBOTSERIAL, hasrobot);
+    bottomTabWidget->setTabEnabled(BOTTOMTAB_M32SERIAL, hasm32);
+    bottomTabWidget->setTabEnabled(BOTTOMTAB_IRCOMM, hasrobot);
+    robotADCTableWidget->setEnabled(hasrobot);
+    m32ADCTableWidget->setEnabled(hasm32);
+    extEEPROMDockWidget->setEnabled(hasm32);
+
+    if (simulator == SIMULATOR_ROBOT)
+    {
+        IORegisterTableSelector->setCurrentIndex(0); // Switch to robot
+        IORegisterTableSelector->setVisible(false); // and hide
+    }
+    else if (simulator == SIMULATOR_M32)
+    {
+        IORegisterTableSelector->setCurrentIndex(1); // Switch to m32
+        IORegisterTableSelector->setVisible(false); // and hide
+    }
+    else // Both
+        IORegisterTableSelector->setVisible(true);
+
+    if (hasrobot)
+    {
+        projectTabWidget->setTabEnabled(1, true); // Enable map tab
+
+        prsettings.beginGroup("robot");
+        const bool ret = robotSimulator->loadProjectFile(prsettings);
+        prsettings.endGroup();
+        if (!ret)
+            return;
+    }
+
+    if (hasm32)
+    {
+        prsettings.beginGroup("m32");
+
+        if (simulator == SIMULATOR_ROBOTM32)
+        {
+            const EM32Slot m32slot =
+                    static_cast<EM32Slot>(prsettings.value("slot", SLOT_BACK).toInt());
+            robotScene->getRobotItem()->setActiveM32Slot(m32slot);
+            robotWidget->setActiveM32Slot(m32slot);
+        }
+        else
+        {
+            // Disable map tab and activate robot widget tab
+            projectTabWidget->setTabEnabled(1, false);
+            projectTabWidget->setCurrentIndex(0);
+        }
+
+        const bool ret = m32Simulator->loadProjectFile(prsettings);
+        prsettings.endGroup();
+        if (!ret)
+            return; // UNDONE: Close robot simulator?
+    }
 }
 
 void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
@@ -2208,13 +2272,9 @@ void CRP6Simulator::updateM32ClockDisplay(unsigned long hz)
 
 void CRP6Simulator::newProject()
 {
-    // UNDONE: Check if running
-
-    // According to docs this should be called auto when show is called,
-    // but it's not ...
-    projectWizard->restart();
-    if (projectWizard->exec() == QDialog::Accepted)
-        openProjectFile(projectWizard->getProjectFile());
+    CProjectWizard *wizard = new CProjectWizard(this);
+    if (wizard->exec() == QDialog::Accepted)
+        openProjectFile(wizard->getProjectFile());
 }
 
 void CRP6Simulator::openProject()
@@ -2223,7 +2283,6 @@ void CRP6Simulator::openProject()
             QFileDialog::getOpenFileName(this, "Open project file",
                                          QDir::homePath(),
                                          "RP6 simulator project files (*.rp6)");
-    // UNDONE: Check if running
     if (!file.isEmpty())
         openProjectFile(file);
 }
@@ -2386,7 +2445,10 @@ void CRP6Simulator::editProjectSettings()
     dialog.loadSettings(prsettings);
 
     if (dialog.exec() == QDialog::Accepted)
+    {
         dialog.saveSettings(prsettings);
+        updateProjectSettings(prsettings);
+    }
 }
 
 void CRP6Simulator::showAbout()
@@ -2565,8 +2627,28 @@ void CRP6Simulator::timedLEDUpdate()
 
 void CRP6Simulator::runPlugin()
 {
-    if (!robotSimulator->runPlugin() || !m32Simulator->runPlugin())
+    CProjectSettings prsettings(currentProjectFile);
+    if (!verifySettingsFile(prsettings))
         return;
+
+    const ESimulator simulator =
+            static_cast<ESimulator>(prsettings.value("simulator", SIMULATOR_ROBOT).toInt());
+
+    if (simulator == SIMULATOR_ROBOT)
+    {
+        if (!robotSimulator->runPlugin())
+            return;
+    }
+    else if (simulator == SIMULATOR_M32)
+    {
+        if (!m32Simulator->runPlugin())
+            return;
+    }
+    else // both
+    {
+        if (!robotSimulator->runPlugin() || !m32Simulator->runPlugin())
+            return;
+    }
 
     robotSerialOutputWidget->clear();
     robotStatusTreeWidget->clear();
@@ -2579,6 +2661,9 @@ void CRP6Simulator::runPlugin()
     stopPluginAction->setEnabled(true);
     resetPluginAction->setEnabled(true);
     ADCDockWidget->setEnabled(true);
+
+    foreach (QAction *a, projectActionList)
+        a->setEnabled(false);
 }
 
 void CRP6Simulator::stopPlugin()
@@ -2668,6 +2753,9 @@ void CRP6Simulator::stopPlugin()
     keyPadWidget->setEnabled(false);
 
     robotIsBlocked = false;
+
+    foreach (QAction *a, projectActionList)
+        a->setEnabled(true);
 }
 
 void CRP6Simulator::doHandClap()
@@ -3012,6 +3100,14 @@ void CRP6Simulator::debugSetRobotRightPower(int power)
         robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_FWD);
     else
         robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_BWD);
+}
+
+void CRP6Simulator::closeEvent(QCloseEvent *event)
+{
+    if (checkMapChange())
+        event->accept();
+    else
+        event->ignore();
 }
 
 bool CRP6Simulator::loadCustomDriverInfo(const QString &file, QString &name,
