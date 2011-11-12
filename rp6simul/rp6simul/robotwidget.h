@@ -54,6 +54,7 @@ private:
     QSize origRobotSize;
     const int motorArrowWidth, motorArrowXSpacing;
     QSize widgetMinSize;
+    ESimulator simulator;
     QPixmap robotPixmap;
     QPixmap m32Pixmap;
     QSize origM32Size;
@@ -89,6 +90,8 @@ public:
 
     QSize minimumSizeHint(void) const { return widgetMinSize; }
 
+    void setSimulator(ESimulator sim)
+    { simulator = sim; m32PixmapDirty = true; update(); }
     void start(void);
     void stop(void);
     void showDataPlot(EDataPlotType plot);

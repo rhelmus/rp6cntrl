@@ -90,7 +90,7 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
 
     // Create timer before plot subwindows!
     dataPlotUpdateTimer = new QTimer;
-    dataPlotUpdateTimer->setInterval(250); // UNDONE: Configurable?
+    dataPlotUpdateTimer->setInterval(250);
     connect(dataPlotUpdateTimer, SIGNAL(timeout()), SLOT(dataPlotTimedUpdate()));
 
     for (int i=0; i<DATAPLOT_MAX; ++i)
@@ -99,20 +99,30 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
 
 void CRobotWidget::updateM32Pixmap()
 {
-    if (activeM32Slot == SLOT_END)
-        return;
+    if (simulator == SIMULATOR_ROBOTM32)
+    {
+        if (activeM32Slot == SLOT_END)
+            return;
 
-    const float w = robotPixmap.width() * m32Scale;
-    m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+        const float w = robotPixmap.width() * m32Scale;
+        m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
 
-    const QPointF c(m32Pixmap.rect().center());
-    QTransform tr;
-    tr.translate(c.x(), c.y());
-    tr.rotate(m32Rotations[activeM32Slot]);
-    tr.translate(-c.x(), -c.y());
-    m32Pixmap = m32Pixmap.transformed(tr, Qt::SmoothTransformation);
+        const QPointF c(m32Pixmap.rect().center());
+        QTransform tr;
+        tr.translate(c.x(), c.y());
+        tr.rotate(m32Rotations[activeM32Slot]);
+        tr.translate(-c.x(), -c.y());
+        m32Pixmap = m32Pixmap.transformed(tr, Qt::SmoothTransformation);
 
-    m32PixmapDirty = false;
+        m32PixmapDirty = false;
+    }
+    else if (simulator == SIMULATOR_M32)
+    {
+        // Make it bigger if no robot
+        const float w = robotPixmap.width() * 1.5;
+        m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+        m32PixmapDirty = false;
+    }
 }
 
 void CRobotWidget::createDataPlotSubWindow(EDataPlotType plot)
@@ -265,57 +275,121 @@ void CRobotWidget::paintEvent(QPaintEvent *event)
     // Background
     painter.fillRect(rect(), Qt::darkCyan);
 
-    // center
-    const int imgx = (width() - robotPixmap.width()) / 2;
-    const int imgy = (height() - robotPixmap.height()) / 2;
-    painter.drawPixmap(imgx, imgy, robotPixmap);
-
-    QTransform tr;
-    tr.translate(imgx, imgy);
-
-    // Equal aspect ratio, so scaling equals for width and height
-    // UNDONE: move to transform
-    const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
-
-    foreach (CLED *l, robotLEDs)
+    if ((simulator == SIMULATOR_ROBOT) || (simulator == SIMULATOR_ROBOTM32))
     {
-        if (l->isEnabled())
-            drawLED(painter, l, tr, scale);
-    }
+        // center
+        const int imgx = (width() - robotPixmap.width()) / 2;
+        const int imgy = (height() - robotPixmap.height()) / 2;
+        painter.drawPixmap(imgx, imgy, robotPixmap);
 
-    foreach (CBumper *b, bumpers)
-    {
-        if (b->isHit())
-            drawBumper(painter, b, tr, scale);
-    }
+        QTransform tr;
+        tr.translate(imgx, imgy);
 
-    foreach (CIRSensor *ir, IRSensors)
-    {
-        if (ir->getHitDistance() < ir->getTraceDistance())
+        // Equal aspect ratio, so scaling equals for width and height
+        const qreal scale = (qreal)robotPixmap.width() / (qreal)origRobotSize.width();
+
+        foreach (CLED *l, robotLEDs)
         {
-            QPointF pos = ir->getPosition();
-            pos.rx() *= scale;
-            pos.ry() *= scale;
-            pos = tr.map(pos);
+            if (l->isEnabled())
+                drawLED(painter, l, tr, scale);
+        }
 
-            const float rad = ir->getRadius() * scale;
-            painter.setBrush(ir->getColor());
-            painter.drawEllipse(pos, rad, rad);
+        foreach (CBumper *b, bumpers)
+        {
+            if (b->isHit())
+                drawBumper(painter, b, tr, scale);
+        }
+
+        foreach (CIRSensor *ir, IRSensors)
+        {
+            if (ir->getHitDistance() < ir->getTraceDistance())
+            {
+                QPointF pos = ir->getPosition();
+                pos.rx() *= scale;
+                pos.ry() *= scale;
+                pos = tr.map(pos);
+
+                const float rad = ir->getRadius() * scale;
+                painter.setBrush(ir->getColor());
+                painter.drawEllipse(pos, rad, rad);
+            }
+        }
+
+        if (simulator == SIMULATOR_ROBOTM32)
+        {
+            if (m32PixmapDirty)
+                updateM32Pixmap();
+
+            if (!m32Pixmap.isNull()) // null if slot not set yet
+            {
+                const QPointF m32pos(m32Positions[activeM32Slot]);
+                painter.drawPixmap(tr.map(m32pos), m32Pixmap);
+
+                tr.translate(m32pos.x(), m32pos.y());
+                tr.translate(m32Pixmap.width()/2.0, m32Pixmap.height()/2.0);
+                tr.rotate(m32Rotations[activeM32Slot]);
+                tr.translate(-m32Pixmap.width()/2.0, -m32Pixmap.height()/2.0);
+
+                const qreal m32scale =
+                        (qreal)m32Pixmap.width() / (qreal)origM32Size.width();
+                foreach (CLED *l, m32LEDs)
+                {
+                    if (l->isEnabled())
+                        drawLED(painter, l, tr, m32scale);
+                }
+            }
+        }
+
+        const int arrowyoffset = robotPixmap.height() * 0.2;
+        const int arrowmaxheight = robotPixmap.height() - (2 * arrowyoffset);
+        const int arrowtexth = painter.fontMetrics().height();
+
+        if (motorPower[MOTOR_LEFT] != 0)
+        {
+            const int arrowheight = motorPower[MOTOR_LEFT] * arrowmaxheight / 200;
+            const int bottom = (imgy + robotPixmap.height()) - arrowyoffset;
+            const int y = bottom - arrowheight;
+            QRect rect(imgx - (motorArrowWidth + motorArrowXSpacing), y,
+                       motorArrowWidth, arrowheight);
+            drawMotorIndicator(painter, rect, arrowmaxheight,
+                               motorDirection[MOTOR_LEFT]);
+
+            const QString text(QString::number(motorPower[MOTOR_LEFT]));
+            QRect trect(rect.left(), rect.top() - arrowtexth, rect.width(),
+                        arrowtexth);
+            painter.setPen(Qt::blue);
+            painter.drawText(trect, Qt::AlignCenter, text);
+        }
+
+        if (motorPower[MOTOR_RIGHT] != 0)
+        {
+            const int arrowheight = motorPower[MOTOR_RIGHT] * arrowmaxheight / 200;
+            const int bottom = (imgy + robotPixmap.height()) - arrowyoffset;
+            const int y = bottom - arrowheight;
+            QRect rect(imgx + robotPixmap.width() + motorArrowXSpacing, y,
+                       motorArrowWidth, arrowheight);
+            drawMotorIndicator(painter, rect, arrowmaxheight,
+                               motorDirection[MOTOR_RIGHT]);
+
+            QRect trect(rect.left(), rect.top() - arrowtexth, rect.width(),
+                        arrowtexth);
+            painter.setPen(Qt::blue);
+            painter.drawText(trect, Qt::AlignCenter,
+                             QString::number(motorPower[MOTOR_RIGHT]));
         }
     }
-
-    if (m32PixmapDirty)
-        updateM32Pixmap();
-
-    if (!m32Pixmap.isNull()) // null if active slot isn't set yet
+    else // Only draw m32
     {
-        const QPointF m32pos(m32Positions[activeM32Slot]);
-        painter.drawPixmap(tr.map(m32pos), m32Pixmap);
+        if (m32PixmapDirty)
+            updateM32Pixmap();
 
-        tr.translate(m32pos.x(), m32pos.y());
-        tr.translate(m32Pixmap.width()/2.0, m32Pixmap.height()/2.0);
-        tr.rotate(m32Rotations[activeM32Slot]);
-        tr.translate(-m32Pixmap.width()/2.0, -m32Pixmap.height()/2.0);
+        // center
+        const int imgx = (width() - m32Pixmap.width()) / 2;
+        const int imgy = (height() - m32Pixmap.height()) / 2;
+        painter.drawPixmap(imgx, imgy, m32Pixmap);
+
+        QTransform tr;
+        tr.translate(imgx, imgy);
 
         const qreal m32scale =
                 (qreal)m32Pixmap.width() / (qreal)origM32Size.width();
@@ -324,44 +398,6 @@ void CRobotWidget::paintEvent(QPaintEvent *event)
             if (l->isEnabled())
                 drawLED(painter, l, tr, m32scale);
         }
-    }
-
-    const int arrowyoffset = robotPixmap.height() * 0.2;
-    const int arrowmaxheight = robotPixmap.height() - (2 * arrowyoffset);
-    const int arrowtexth = painter.fontMetrics().height();
-
-    if (motorPower[MOTOR_LEFT] != 0)
-    {
-        const int arrowheight = motorPower[MOTOR_LEFT] * arrowmaxheight / 200;
-        const int bottom = (imgy + robotPixmap.height()) - arrowyoffset;
-        const int y = bottom - arrowheight;
-        QRect rect(imgx - (motorArrowWidth + motorArrowXSpacing), y,
-                   motorArrowWidth, arrowheight);
-        drawMotorIndicator(painter, rect, arrowmaxheight,
-                           motorDirection[MOTOR_LEFT]);
-
-        const QString text(QString::number(motorPower[MOTOR_LEFT]));
-        QRect trect(rect.left(), rect.top() - arrowtexth, rect.width(),
-                    arrowtexth);
-        painter.setPen(Qt::blue);
-        painter.drawText(trect, Qt::AlignCenter, text);
-    }
-
-    if (motorPower[MOTOR_RIGHT] != 0)
-    {
-        const int arrowheight = motorPower[MOTOR_RIGHT] * arrowmaxheight / 200;
-        const int bottom = (imgy + robotPixmap.height()) - arrowyoffset;
-        const int y = bottom - arrowheight;
-        QRect rect(imgx + robotPixmap.width() + motorArrowXSpacing, y,
-                   motorArrowWidth, arrowheight);
-        drawMotorIndicator(painter, rect, arrowmaxheight,
-                           motorDirection[MOTOR_RIGHT]);
-
-        QRect trect(rect.left(), rect.top() - arrowtexth, rect.width(),
-                    arrowtexth);
-        painter.setPen(Qt::blue);
-        painter.drawText(trect, Qt::AlignCenter,
-                         QString::number(motorPower[MOTOR_RIGHT]));
     }
 }
 

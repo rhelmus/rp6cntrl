@@ -7,12 +7,8 @@
     - Settings
 - Check for initial register settings
     - Applying these outside lua
-- Enabling / disabling drivers during runtime?
-- Handle nop and sysSleep macros?
 - UI ideas
-    - Lock layout
     - About
-    - Enable/disable dockwidgets
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
 - Map:
@@ -41,7 +37,6 @@
 - robot widget: show motor speeds?
 - powerON/powerOFF currently don't affect encoders and such
 - acs: min hit distance?
-- Update default drivers
 - Destruction: instance may be zero when it shouldn't yet
 - Test/verify atomic register array
 - Test/verify reduced lua locks (if done: remove comments and commented stuff)
@@ -49,9 +44,6 @@
 - Reset ADC after project/plugin load?
 - m32 support:
     - Improve error checking on starting plugin etc?
-    - Enabling/disabling m32 in project settings
-        - Disable m32 related widgets?
-        - Disable robot option (m32 only)
     - Extend loadCustomDriverInfo()
 - autodetect F_CPU?
 - Robot speed: correct?
@@ -68,4 +60,4 @@
     - Serial ports and their settings
     - Audio settings (volume, others?)
 - More menu options (from toolbar)
-
+- Serial port connection button instead of auto connection
