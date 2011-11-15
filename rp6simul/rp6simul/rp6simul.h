@@ -24,10 +24,11 @@ class QActionGroup;
 class QCheckBox;
 class QComboBox;
 class QGraphicsView;
-class QPushButton;
 class QLabel;
 class QLineEdit;
+class QMenu;
 class QPlainTextEdit;
+class QPushButton;
 class QSpinBox;
 class QStackedWidget;
 class QTableWidget;
@@ -82,8 +83,10 @@ class CRP6Simulator : public QMainWindow
     QString currentMapFile;
     bool currentMapIsTemplate;
     TDriverInfoList robotDriverInfoList, m32DriverInfoList;
+    bool pluginRunning;
 
     QList<QAction *> projectActionList, mapMenuActionList;
+    QMenu *recentProjectsMenu;
     QAction *saveMapAsAction, *editProjectSettingsAction;
     QAction *runPluginAction, *stopPluginAction, *resetPluginAction;
     QToolButton *handClapButton;
@@ -187,6 +190,8 @@ class CRP6Simulator : public QMainWindow
     void updateMapStackedWidget(void);
     void openProjectFile(const QString &file);
     void updateProjectSettings(QSettings &prsettings);
+    void cleanRecentProjects(void);
+    void addRecentProject(const QString &file);
     void loadMapFile(const QString &file, bool istemplate);
     bool checkMapChange(void);
     void loadMapTemplatesTree(void);
@@ -250,11 +255,14 @@ private slots:
     void timedLEDUpdate(void);
     void newProject(void);
     void openProject(void);
+    void updateRecentProjectMenu(void);
+    void openRecentProject(QAction *a);
     void newMap(void);
     bool saveMap(void);
     bool saveMapAs(void);
     void loadMap(void);
     void editProjectSettings(void);
+    void editPreferences(void);
     void showAbout(void);
     void runPlugin(void);
     void stopPlugin(void);

@@ -39,7 +39,8 @@ SOURCES += main.cpp\
     progressdialog.cpp \
     robotwidget.cpp \
     dataplotwidget.cpp \
-    rotatablepixmapgraphicsitem.cpp
+    rotatablepixmapgraphicsitem.cpp \
+    preferencesdialog.cpp
 
 HEADERS  += rp6simul.h \
     pluginthread.h \
@@ -67,7 +68,8 @@ HEADERS  += rp6simul.h \
     irsensor.h \
     lightsensor.h \
     dataplotwidget.h \
-    rotatablepixmapgraphicsitem.h
+    rotatablepixmapgraphicsitem.h \
+    preferencesdialog.h
 
 OTHER_FILES += \
     TODO.txt \
@@ -161,6 +163,12 @@ else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
     LIBS += -llua
 }
+
+
+
+
+
+
 
 
 

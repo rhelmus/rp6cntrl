@@ -7,6 +7,7 @@
 #include "lua.h"
 #include "mapsettingsdialog.h"
 #include "pathinput.h"
+#include "preferencesdialog.h"
 #include "projectsettings.h"
 #include "projectwizard.h"
 #include "resizablepixmapgraphicsitem.h"
@@ -143,7 +144,7 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     beeperPitch(0), playingBeep(false), handClapMode(CLAP_NORMAL),
     playingHandClap(false), handClapSoundPos(0),
     extEEPROMMode(EXTEEPROMMODE_NUMERICAL), currentMapIsTemplate(false),
-    robotIsBlocked(false), robotSerialSendLuaCallback(0),
+    pluginRunning(false), robotIsBlocked(false), robotSerialSendLuaCallback(0),
     m32SerialSendLuaCallback(0), IRCOMMSendLuaCallback(0),
     luaHandleExtInt1Callback(0), luaHandleSoundCallback(0),
     luaHandleKeyPressCallback(0)
@@ -450,9 +451,12 @@ void CRP6Simulator::createMenus()
     a = menu->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogOpenButton)),
                         "Open Project", this, SLOT(openProject()), tr("ctrl+O"));
     projectActionList << a;
-    // UNDONE: Do something here...
-    // UNDONE: add to projectActionList
-    menu->addMenu("Open recent...")->addAction("blah"); // UNDONE
+    recentProjectsMenu = menu->addMenu("Open recent project...");
+    // NOTE: updateRecentProjectMenu() is connected to parent menu. This is so
+    // we can correctly enable/disable the recent files menu
+    connect(menu, SIGNAL(aboutToShow()), SLOT(updateRecentProjectMenu()));
+    connect(recentProjectsMenu, SIGNAL(triggered(QAction *)),
+            SLOT(openRecentProject(QAction *)));
 
     menu->addSeparator();
 
@@ -490,7 +494,7 @@ void CRP6Simulator::createMenus()
 
     menu->addSeparator();
 
-    menu->addAction("Preferences");
+    menu->addAction("Preferences", this, SLOT(editPreferences()));
 
 
     menu = menuBar()->addMenu("&Help");
@@ -1177,6 +1181,8 @@ void CRP6Simulator::openProjectFile(const QString &file)
 
     updateMainStackedWidget();
     updateExtEEPROM(extEEPROMPageSpinBox->value());
+
+    addRecentProject(file);
 }
 
 void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
@@ -1245,6 +1251,38 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
         if (!ret)
             return; // UNDONE: Close robot simulator?
     }
+}
+
+void CRP6Simulator::cleanRecentProjects()
+{
+    QSettings settings;
+    QStringList list = settings.value("recentProjects").toStringList();
+    QStringList cleanList;
+    bool update = false;
+
+    foreach(QString p, list)
+    {
+        if (!QFile::exists(p))
+            update = true;
+        else
+            cleanList << p;
+    }
+
+    if (update)
+        settings.setValue("recentProjects", cleanList);
+}
+
+void CRP6Simulator::addRecentProject(const QString &file)
+{
+    cleanRecentProjects();
+    QSettings settings;
+    QStringList recent = settings.value("recentProjects").toStringList();
+    recent.removeAll(file);
+    recent.push_front(file);
+
+    if (recent.size() > 10)
+        recent.pop_back();
+    settings.setValue("recentProjects", recent);
 }
 
 void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
@@ -2287,6 +2325,34 @@ void CRP6Simulator::openProject()
         openProjectFile(file);
 }
 
+void CRP6Simulator::updateRecentProjectMenu()
+{
+    if (pluginRunning)
+    {
+        recentProjectsMenu->setEnabled(false);
+        return; // Always disabled if running
+    }
+
+    cleanRecentProjects();
+    QSettings settings;
+    QStringList list = settings.value("recentProjects").toStringList();
+    recentProjectsMenu->clear();
+
+    if (list.empty())
+        recentProjectsMenu->setEnabled(false);
+    else
+    {
+        recentProjectsMenu->setEnabled(true);
+        foreach(QString p, list)
+            recentProjectsMenu->addAction(p);
+    }
+}
+
+void CRP6Simulator::openRecentProject(QAction *a)
+{
+    openProjectFile(a->text());
+}
+
 void CRP6Simulator::newMap()
 {
     if (!checkMapChange())
@@ -2448,6 +2514,21 @@ void CRP6Simulator::editProjectSettings()
     {
         dialog.saveSettings(prsettings);
         updateProjectSettings(prsettings);
+    }
+}
+
+void CRP6Simulator::editPreferences()
+{
+    QSettings settings;
+    if (!verifySettingsFile(settings))
+        return;
+
+    CPreferencesDialog dialog;
+//    dialog.loadSettings(prsettings);
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        // UNDONE
     }
 }
 
@@ -2664,6 +2745,8 @@ void CRP6Simulator::runPlugin()
 
     foreach (QAction *a, projectActionList)
         a->setEnabled(false);
+
+    pluginRunning = true;
 }
 
 void CRP6Simulator::stopPlugin()
@@ -2753,6 +2836,7 @@ void CRP6Simulator::stopPlugin()
     keyPadWidget->setEnabled(false);
 
     robotIsBlocked = false;
+    pluginRunning = false;
 
     foreach (QAction *a, projectActionList)
         a->setEnabled(true);
