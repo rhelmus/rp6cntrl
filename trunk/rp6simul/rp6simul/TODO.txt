@@ -44,7 +44,7 @@
 - Reset ADC after project/plugin load?
 - m32 support:
     - Improve error checking on starting plugin etc?
-    - Extend loadCustomDriverInfo()
+    - Extend loadCustomDriverInfo()?
 - autodetect F_CPU?
 - Robot speed: correct?
 - ADC values are not rounded
