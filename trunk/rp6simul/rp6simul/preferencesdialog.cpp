@@ -57,7 +57,7 @@ QWidget *CPreferencesDialog::createSerialTab()
     QWidget *ret = new QWidget;
     QVBoxLayout *vbox = new QVBoxLayout(ret);
 
-    QLabel *l = new QLabel("In this creen you can link a virtual or physical "
+    QLabel *l = new QLabel("Here you can link a virtual or physical "
                            "virtual port to the RP6 or m32 serial lines. "
                            "Most often you only want to change the serial port. "
                            "See the manual for more details.");
@@ -85,14 +85,26 @@ QWidget *CPreferencesDialog::createSimulationTab()
 
     QVBoxLayout *vbox = new QVBoxLayout(ret);
 
-    QGroupBox *group = new QGroupBox("Sound");
-    group->setCheckable(true);
-    group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    QGroupBox *group = new QGroupBox("CPU usage");
     vbox->addWidget(group, 0, Qt::AlignTop);
-    QFormLayout *form = new QFormLayout(group);
+    QVBoxLayout *subvbox = new QVBoxLayout(group);
 
-    // UNDONE: Label
-    form->addRow("CPU usage", new QComboBox);
+    QLabel *l = new QLabel("Here you can roughly select the amount of CPU cycles "
+                           "the simulator(s) will consume. In general you want "
+                           "to keep this at 'normal'. However if you notice that "
+                           "the simulated frequency is below the normal value "
+                           "(i.e. below 8 or 16 MHz) than it may be useful to "
+                           "change the setting to 'max'. If you want to save "
+                           "some CPU cycles you may choose the 'low' setting, "
+                           "but be careful that simulation frequencies stay OK!");
+    l->setWordWrap(true);
+    l->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    subvbox->addWidget(l);
+
+    QComboBox *combo;
+    subvbox->addWidget(combo = new QComboBox);
+    combo->addItems(QStringList() << "low" << "normal" << "max");
+    combo->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     return ret;
 }
