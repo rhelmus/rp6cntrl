@@ -42,6 +42,98 @@ void activateDockTab(QObject *p, const QString &tab)
     qDebug() << "Warning: couldn't activate dock tab" << tab << "(not found)";
 }
 
+void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
+{
+    const QString port(settings.value("port").toString());
+    dev->setPortName(port);
+
+    const int baud = settings.value("baudRate", 38400).toInt();
+    BaudRateType btype;
+    switch (baud)
+    {
+    case 50: btype = BAUD50; break;
+    case 75: btype = BAUD75; break;
+    case 110: btype = BAUD110; break;
+    case 134: btype = BAUD134; break;
+    case 150: btype = BAUD150; break;
+    case 200: btype = BAUD200; break;
+    case 300: btype = BAUD300; break;
+    case 600: btype = BAUD600; break;
+    case 1200: btype = BAUD1200; break;
+    case 1800: btype = BAUD1800; break;
+    case 2400: btype = BAUD2400; break;
+    case 4800: btype = BAUD4800; break;
+    case 9600: btype = BAUD9600; break;
+    case 14400: btype = BAUD14400; break;
+    case 19200: btype = BAUD19200; break;
+    case 38400: btype = BAUD38400; break;
+    case 56000: btype = BAUD56000; break;
+    case 57600: btype = BAUD57600; break;
+    case 76800: btype = BAUD76800; break;
+    case 115200: btype = BAUD115200; break;
+    case 128000: btype = BAUD128000; break;
+    case 256000: btype = BAUD256000; break;
+    default:
+        qWarning() << "Unknown baud rate:" << baud;
+        qWarning() << "Defaulting to 38400";
+        btype = BAUD38400;
+        break;
+    }
+    dev->setBaudRate(btype);
+
+    const QString parity(settings.value("parity", "none").toString());
+    ParityType ptype;
+    if (parity == "none")
+        ptype = PAR_NONE;
+    else if (parity == "odd")
+        ptype = PAR_ODD;
+    else if (parity == "even")
+        ptype = PAR_EVEN;
+    else if (parity == "space")
+        ptype = PAR_SPACE;
+    else if (parity == "mark")
+        ptype = PAR_MARK;
+    else
+    {
+        qWarning() << "Unknown parity:" << parity;
+        qWarning() << "Defaulting to none";
+        ptype = PAR_NONE;
+    }
+    dev->setParity(ptype);
+
+    const int dbits = settings.value("dataBits", 8).toInt();
+    DataBitsType dtype;
+    switch (dbits)
+    {
+    case 5: dtype = DATA_5; break;
+    case 6: dtype = DATA_6; break;
+    case 7: dtype = DATA_7; break;
+    case 8: dtype = DATA_8; break;
+    default:
+        qWarning() << "Unknown amount of data bits:" << dbits;
+        qWarning() << "Defaulting to 8";
+        dtype = DATA_8;
+        break;
+    }
+    dev->setDataBits(dtype);
+
+    const QString sbits(settings.value("stopBits", "1").toString());
+    StopBitsType stype;
+    if (sbits == "1")
+        stype = STOP_1;
+    else if (sbits == "2")
+        stype = STOP_2;
+    else if (sbits == "1.5")
+        stype = STOP_1_5;
+    else
+    {
+        qWarning() << "Unknown amount of stop bits:" << sbits;
+        qWarning() << "Defaulting to 1";
+        stype = STOP_1;
+    }
+    dev->setStopBits(stype);
+}
+
 QTableWidget *createADCTableWidget(const QStringList &adclist)
 {
     QTableWidget *ret = new QTableWidget(adclist.size(), 2);
@@ -140,9 +232,9 @@ QByteArray handleSerialDeviceData(QextSerialPort *dev, lua_State *l, int luacb)
 CRP6Simulator *CRP6Simulator::instance = 0;
 
 CRP6Simulator::CRP6Simulator(QWidget *parent) :
-    QMainWindow(parent), audioCurrentCycle(0.0), audioFrequency(0.0),
-    beeperPitch(0), playingBeep(false), handClapMode(CLAP_NORMAL),
-    playingHandClap(false), handClapSoundPos(0),
+    QMainWindow(parent), audioInitialized(false), audioCurrentCycle(0.0),
+    audioFrequency(0.0), beeperPitch(0), playingBeep(false),
+    handClapMode(CLAP_NORMAL), playingHandClap(false), handClapSoundPos(0),
     extEEPROMMode(EXTEEPROMMODE_NUMERICAL), currentMapIsTemplate(false),
     pluginRunning(false), robotIsBlocked(false), robotSerialSendLuaCallback(0),
     m32SerialSendLuaCallback(0), IRCOMMSendLuaCallback(0),
@@ -202,24 +294,22 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
             SLOT(timedLEDUpdate()));
     pluginUpdateLEDsTimer->setInterval(50);
 
-    // UNDONE: port config and only open if set
-    robotSerialDevice = new QextSerialPort("/dev/pts/3",
-                                           QextSerialPort::EventDriven);
+    robotSerialDevice = new QextSerialPort(QextSerialPort::EventDriven);
+    robotSerialDevice->setParent(this);
+    robotSerialDevice->setFlowControl(FLOW_OFF);
     connect(robotSerialDevice, SIGNAL(readyRead()),
             SLOT(handleRobotSerialDeviceData()));
-    initSerialPort(robotSerialDevice);
-    openSerialPort(robotSerialDevice);
 
-    m32SerialDevice = new QextSerialPort("/dev/pts/4",
-                                         QextSerialPort::EventDriven);
+    m32SerialDevice = new QextSerialPort(QextSerialPort::EventDriven);
+    m32SerialDevice->setParent(this);
+    m32SerialDevice->setFlowControl(FLOW_OFF);
     connect(m32SerialDevice, SIGNAL(readyRead()),
             SLOT(handleM32SerialDeviceData()));
-    initSerialPort(m32SerialDevice);
-    openSerialPort(m32SerialDevice);
 
-    initSDL();
     initSimulators();
 
+    QSettings settings;
+    updatePreferences(settings);
 
     // UNDONE
     openProjectFile("/home/rick/test.rp6");
@@ -243,17 +333,6 @@ CRP6Simulator::~CRP6Simulator()
     SDL_Quit();
 }
 
-void CRP6Simulator::initSerialPort(QextSerialPort *port)
-{
-    port->setParent(this);
-    // UNDONE: Config
-    port->setBaudRate(BAUD38400);
-    port->setFlowControl(FLOW_OFF);
-    port->setParity(PAR_NONE);
-    port->setDataBits(DATA_8);
-    port->setStopBits(STOP_1);
-}
-
 void CRP6Simulator::openSerialPort(QextSerialPort *port)
 {
     if (port->open(QIODevice::ReadWrite) == true)
@@ -264,7 +343,7 @@ void CRP6Simulator::openSerialPort(QextSerialPort *port)
     }
     else // UNDONE
         QMessageBox::critical(this, "Serial port error",
-                              QString("Failed to open serial port:\n%1").arg(port->errorString()));
+                              QString("Failed to open serial port %1:\n%2").arg(port->portName()).arg(port->errorString()));
 }
 
 void CRP6Simulator::initSDL()
@@ -279,21 +358,8 @@ void CRP6Simulator::initSDL()
         return;
     }
 
-    SDL_AudioSpec spec, retspec;
-
-    spec.freq = AUDIO_SAMPLERATE;
-    spec.format = AUDIO_S16SYS;
-    spec.channels = 1;
-    spec.samples = 512;
-    spec.callback = SDLAudioCallback;
-
-    if (SDL_OpenAudio(&spec, &retspec))
-    {
-        // UNDONE
-        QMessageBox::critical(this, "Audio error",
-                              QString("Failed to open audio device:\n%1").arg(SDL_GetError()));
+    if (!openSDLAudio())
         return;
-    }
 
     // Based on http://www.libsdl.org/intro.en/usingsound.html
     SDL_AudioSpec wave;
@@ -315,6 +381,29 @@ void CRP6Simulator::initSDL()
     handClapCVT.len = dlen;
     SDL_ConvertAudio(&handClapCVT);
     SDL_FreeWAV(data);
+
+    audioInitialized = true;
+}
+
+bool CRP6Simulator::openSDLAudio()
+{
+    SDL_AudioSpec spec, retspec;
+
+    spec.freq = AUDIO_SAMPLERATE;
+    spec.format = AUDIO_S16SYS;
+    spec.channels = 1;
+    spec.samples = 512;
+    spec.callback = SDLAudioCallback;
+
+    if (SDL_OpenAudio(&spec, &retspec))
+    {
+        // UNDONE
+        QMessageBox::critical(this, "Audio error",
+                              QString("Failed to open audio device:\n%1").arg(SDL_GetError()));
+        return false;
+    }
+
+    return true;
 }
 
 void CRP6Simulator::initSimulators()
@@ -494,7 +583,8 @@ void CRP6Simulator::createMenus()
 
     menu->addSeparator();
 
-    menu->addAction("Preferences", this, SLOT(editPreferences()));
+    editPreferencesAction = menu->addAction("Preferences", this,
+                                            SLOT(editPreferences()));
 
 
     menu = menuBar()->addMenu("&Help");
@@ -538,6 +628,13 @@ void CRP6Simulator::createToolbars()
     connect(resetPluginAction, SIGNAL(triggered()), SLOT(stopPlugin()));
     connect(resetPluginAction, SIGNAL(triggered()), SLOT(runPlugin()));
     resetPluginAction->setEnabled(false);
+
+    serialPassAction = toolb->addAction(QIcon("../resource/connect-serial.png"),
+                                        "Toggle serial pass through");
+    serialPassAction->setCheckable(true);
+    connect(serialPassAction, SIGNAL(toggled(bool)),
+            SLOT(toggleSerialPass(bool)));
+    serialPassAction->setEnabled(false);
 
     toolb->addSeparator();
 
@@ -1139,6 +1236,57 @@ QDockWidget *CRP6Simulator::createExtEEPROMDock()
     return ret;
 }
 
+void CRP6Simulator::updatePreferences(QSettings &settings)
+{
+    defaultProjectDirectory = settings.value("defaultProjectDir",
+                                             QDir::homePath()).toString();
+
+    soundEnabled = settings.value("soundEnabled", true).toBool();
+    piezoVolume = settings.value("piezoVolume", 75).toInt();
+
+    if (soundEnabled)
+    {
+        if (!audioInitialized)
+            initSDL();
+        else if (SDL_GetAudioStatus() == SDL_AUDIO_STOPPED)
+            openSDLAudio();
+    }
+    else if (audioInitialized && !soundEnabled)
+        SDL_CloseAudio();
+
+    settings.beginGroup("robot");
+    updateSerialPassPreferences(robotSerialDevice, settings);
+    const bool robotpass = settings.value("enabled", false).toBool();
+    if (serialPassAction->isChecked())
+    {
+        if (robotpass && !robotSerialDevice->isOpen())
+            openSerialPort(robotSerialDevice);
+        else if (!robotpass && robotSerialDevice->isOpen())
+            robotSerialDevice->close();
+    }
+    settings.endGroup();
+
+    settings.beginGroup("m32");
+    updateSerialPassPreferences(m32SerialDevice, settings);
+    const bool m32pass = settings.value("enabled", false).toBool();
+    if (serialPassAction->isChecked())
+    {
+        if (m32pass && !m32SerialDevice->isOpen())
+            openSerialPort(m32SerialDevice);
+        else if (!m32pass && m32SerialDevice->isOpen())
+            m32SerialDevice->close();
+    }
+    settings.endGroup();
+
+    serialPassAction->setEnabled(robotpass || m32pass);
+
+    const ESimulatorCPUUsage usage =
+            static_cast<ESimulatorCPUUsage>(settings.value("simulationCPUUsage",
+                                                           CPU_NORMAL).toInt());
+    robotSimulator->getAVRClock()->setCPUUsage(usage);
+    m32Simulator->getAVRClock()->setCPUUsage(usage);
+}
+
 void CRP6Simulator::updateMainStackedWidget()
 {
     if (currentProjectFile.isEmpty())
@@ -1579,8 +1727,10 @@ void CRP6Simulator::SDLAudioCallback(void *, Uint8 *stream, int length)
                 f += a * sin(pre2PI * instance->audioCurrentCycle/AUDIO_SAMPLERATE * k)/(b*k);
             }
 
-            // UNDONE: configurable amplitude (volume)
-            stream16[i] = 32760/5.0 * f;
+            const float maxamplitude = 32760.0/5.0;
+            const float amplitude = maxamplitude *
+                    ((float)instance->piezoVolume / 100.0);
+            stream16[i] = amplitude * f;
             instance->audioCurrentCycle += instance->audioFrequency;
         }
     }
@@ -2186,23 +2336,25 @@ int CRP6Simulator::luaSetBeeperEnabled(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
 
-    const bool e = NLua::checkBoolean(l, 1);
-    const bool playing = (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING);
-
-    if (e != playing)
+    if (instance->audioInitialized && instance->soundEnabled)
     {
-        instance->playingBeep = e;
+        const bool e = NLua::checkBoolean(l, 1);
+        const bool playing = (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING);
 
-        if (e)
+        if (e != playing)
         {
-            instance->audioCurrentCycle = 0.0;
-            instance->emit beeperPitchChanged(instance->beeperPitch);
-        }
-        else
-            instance->emit beeperPitchChanged(0);
+            instance->playingBeep = e;
 
-        // UNDONE: Check if audio is enabled/not in error state
-        SDL_PauseAudio(!e);
+            if (e)
+            {
+                instance->audioCurrentCycle = 0.0;
+                instance->emit beeperPitchChanged(instance->beeperPitch);
+            }
+            else
+                instance->emit beeperPitchChanged(0);
+
+            SDL_PauseAudio(!e);
+        }
     }
 
     return 0;
@@ -2212,16 +2364,18 @@ int CRP6Simulator::luaSetBeeperFrequency(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
 
-    instance->beeperPitch = luaL_checkint(l, 1);
-    const float freq = luaL_checknumber(l, 2);
+    if (instance->audioInitialized && instance->soundEnabled)
+    {
+        instance->beeperPitch = luaL_checkint(l, 1);
+        const float freq = luaL_checknumber(l, 2);
 
-    // UNDONE: Check if audio is enabled/not in error state
-    SDL_LockAudio();
-    instance->audioFrequency = freq;
-    SDL_UnlockAudio();
+        SDL_LockAudio();
+        instance->audioFrequency = freq;
+        SDL_UnlockAudio();
 
-    if (instance->playingBeep)
-        instance->emit beeperPitchChanged(instance->beeperPitch);
+        if (instance->playingBeep)
+            instance->emit beeperPitchChanged(instance->beeperPitch);
+    }
 
     return 0;
 }
@@ -2310,7 +2464,7 @@ void CRP6Simulator::updateM32ClockDisplay(unsigned long hz)
 
 void CRP6Simulator::newProject()
 {
-    CProjectWizard *wizard = new CProjectWizard(this);
+    CProjectWizard *wizard = new CProjectWizard(defaultProjectDirectory, this);
     if (wizard->exec() == QDialog::Accepted)
         openProjectFile(wizard->getProjectFile());
 }
@@ -2524,11 +2678,12 @@ void CRP6Simulator::editPreferences()
         return;
 
     CPreferencesDialog dialog;
-//    dialog.loadSettings(prsettings);
+    dialog.loadPreferences(settings);
 
     if (dialog.exec() == QDialog::Accepted)
     {
-        // UNDONE
+        dialog.savePreferences(settings);
+        updatePreferences(settings);
     }
 }
 
@@ -2738,6 +2893,7 @@ void CRP6Simulator::runPlugin()
     robotScene->start();
     robotWidget->start();
 
+    editPreferencesAction->setEnabled(false);
     runPluginAction->setEnabled(false);
     stopPluginAction->setEnabled(true);
     resetPluginAction->setEnabled(true);
@@ -2825,6 +2981,7 @@ void CRP6Simulator::stopPlugin()
     timedUIUpdate();
     timedLEDUpdate();
 
+    editPreferencesAction->setEnabled(true);
     runPluginAction->setEnabled(true);
     stopPluginAction->setEnabled(false);
     resetPluginAction->setEnabled(false);
@@ -2842,36 +2999,50 @@ void CRP6Simulator::stopPlugin()
         a->setEnabled(true);
 }
 
+void CRP6Simulator::toggleSerialPass(bool e)
+{
+    if (e)
+    {
+        QSettings settings;
+        if (settings.value("robot/enabled", false).toBool())
+            openSerialPort(robotSerialDevice);
+        if (settings.value("m32/enabled", false).toBool())
+            openSerialPort(m32SerialDevice);
+    }
+    else
+    {
+        robotSerialDevice->close();
+        m32SerialDevice->close();
+    }
+}
+
 void CRP6Simulator::doHandClap()
 {
-    if (!playingHandClap)
+    if (luaHandleSoundCallback)
     {
-        if (luaHandleSoundCallback)
+        NLua::CLuaLocker lualock(m32Simulator->getLuaState());
+        lua_rawgeti(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
+                    luaHandleSoundCallback);
+        switch (handClapMode)
         {
-            NLua::CLuaLocker lualock(m32Simulator->getLuaState());
-            lua_rawgeti(m32Simulator->getLuaState(), LUA_REGISTRYINDEX,
-                        luaHandleSoundCallback);
-            switch (handClapMode)
-            {
-            case CLAP_SOFT:
-                lua_pushstring(m32Simulator->getLuaState(), "soft");
-                break;
-            case CLAP_NORMAL:
-                lua_pushstring(m32Simulator->getLuaState(), "normal");
-                break;
-            case CLAP_LOUD:
-                lua_pushstring(m32Simulator->getLuaState(), "loud");
-                break;
-            }
-            lua_call(m32Simulator->getLuaState(), 1, 0);
+        case CLAP_SOFT:
+            lua_pushstring(m32Simulator->getLuaState(), "soft");
+            break;
+        case CLAP_NORMAL:
+            lua_pushstring(m32Simulator->getLuaState(), "normal");
+            break;
+        case CLAP_LOUD:
+            lua_pushstring(m32Simulator->getLuaState(), "loud");
+            break;
         }
+        lua_call(m32Simulator->getLuaState(), 1, 0);
+    }
 
-        if (handClapCVT.buf)
-        {
-            handClapSoundPos = 0;
-            playingHandClap = true;
-            SDL_PauseAudio(0);
-        }
+    if (!playingHandClap && audioInitialized && soundEnabled && handClapCVT.buf)
+    {
+        handClapSoundPos = 0;
+        playingHandClap = true;
+        SDL_PauseAudio(0);
     }
 }
 

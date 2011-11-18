@@ -28,12 +28,13 @@ QStringList getDefaultDriverList(const TDriverInfoList &driverlist)
 
 }
 
-CProjectWizard::CProjectWizard(QWidget *parent) : QWizard(parent)
+CProjectWizard::CProjectWizard(const QString &projdir, QWidget *parent)
+    : QWizard(parent)
 {
     setDefaultProperty("CPathInput", "path",
                        SIGNAL(pathTextChanged(const QString &)));
     setModal(true);
-    setPage(PAGE_PROJDEST, new CNewProjectDestPage);
+    setPage(PAGE_PROJDEST, new CNewProjectDestPage(projdir));
     setPage(PAGE_SIMULATOR, projectSimulatorPage = new CNewProjectSimulatorPage);
     setPage(PAGE_ROBOT, new CNewProjectRobotPage);
     setPage(PAGE_M32, new CNewProjectM32Page);
@@ -87,7 +88,8 @@ QString CProjectWizard::getProjectFile() const
 }
 
 
-CNewProjectDestPage::CNewProjectDestPage(QWidget *parent) : QWizardPage(parent)
+CNewProjectDestPage::CNewProjectDestPage(const QString &projdir, QWidget *parent)
+    : QWizardPage(parent)
 {
     setTitle("Project destination");
 
@@ -109,14 +111,9 @@ CNewProjectDestPage::CNewProjectDestPage(QWidget *parent) : QWizardPage(parent)
     registerField("projectName*", line);
 
     CPathInput *dirinput = new CPathInput("Select project directory",
-                                          CPathInput::PATH_EXISTDIR);
+                                          CPathInput::PATH_EXISTDIR, projdir);
     form->addRow("Project directory", dirinput);
     registerField("projectDir*", dirinput);
-}
-
-void CNewProjectDestPage::initializePage()
-{
-    setField("projectDir", QDir::homePath());
 }
 
 bool CNewProjectDestPage::validatePage()

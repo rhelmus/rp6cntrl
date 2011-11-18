@@ -69,7 +69,13 @@ class CRP6Simulator : public QMainWindow
     enum { BOTTOMTAB_LOG=0, BOTTOMTAB_ROBOTSERIAL, BOTTOMTAB_M32SERIAL,
            BOTTOMTAB_IRCOMM };
 
+    // Preferences
+    QString defaultProjectDirectory;
+    bool soundEnabled;
+    int piezoVolume;
+
     QextSerialPort *robotSerialDevice, *m32SerialDevice;
+    bool audioInitialized;
     float audioCurrentCycle, audioFrequency;
     int beeperPitch; // As set by plugin code
     bool playingBeep;
@@ -87,8 +93,9 @@ class CRP6Simulator : public QMainWindow
 
     QList<QAction *> projectActionList, mapMenuActionList;
     QMenu *recentProjectsMenu;
-    QAction *saveMapAsAction, *editProjectSettingsAction;
+    QAction *saveMapAsAction, *editProjectSettingsAction, *editPreferencesAction;
     QAction *runPluginAction, *stopPluginAction, *resetPluginAction;
+    QAction *serialPassAction;
     QToolButton *handClapButton;
     QWidget *keyPadWidget;
     QToolBar *robotToolBar;
@@ -160,9 +167,9 @@ class CRP6Simulator : public QMainWindow
 
     static CRP6Simulator *instance;
 
-    void initSerialPort(QextSerialPort *port);
     void openSerialPort(QextSerialPort *port);
     void initSDL(void);
+    bool openSDLAudio(void);
     void initSimulators(void);
     void registerLuaGeneric(lua_State *l);
     void registerLuaRobot(lua_State *l);
@@ -186,6 +193,7 @@ class CRP6Simulator : public QMainWindow
     QDockWidget *createRegisterDock(void);
     QDockWidget *createExtEEPROMDock(void);
 
+    void updatePreferences(QSettings &settings);
     void updateMainStackedWidget(void);
     void updateMapStackedWidget(void);
     void openProjectFile(const QString &file);
@@ -266,6 +274,7 @@ private slots:
     void showAbout(void);
     void runPlugin(void);
     void stopPlugin(void);
+    void toggleSerialPass(bool e);
     void doHandClap(void);
     void setHandClapMode(int m);
     void handleKeyPadPress(int key);

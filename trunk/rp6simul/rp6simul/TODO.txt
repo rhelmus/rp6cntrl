@@ -11,6 +11,7 @@
     - About
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
+- Test port enumeration on Windows
 - Map:
     - Map selector etc: check if valid file type?
 - Check version on project loading
@@ -55,9 +56,5 @@
     - Motors
     - Light Sensors
     - MIC
-- Preferences
-    - Timer variables (nanosleep, max cycles)
-    - Serial ports and their settings
-    - Audio settings (volume, others?)
 - More menu options (from toolbar)
-- Serial port connection button instead of auto connection
+- Serial port pass through: are settings important for virtual ports? add dts/rts settings?

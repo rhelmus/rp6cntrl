@@ -16,6 +16,8 @@
 
 typedef void (*TCallPluginMainFunc)(void);
 
+enum ESimulatorCPUUsage { CPU_LOW=0, CPU_NORMAL, CPU_MAX };
+
 enum EISRTypes
 {
     // UART
