@@ -23,6 +23,8 @@ CAVRClock::CAVRClock(void) : targetClockSpeed(0), initClockTime(true),
     connect(clockTimer, SIGNAL(timeout()), this, SLOT(run()));
     connect(this, SIGNAL(startTimer()), clockTimer, SLOT(start()));
     connect(this, SIGNAL(stopTimer()), clockTimer, SLOT(stop()));
+
+    setCPUUsage(CPU_NORMAL);
 }
 
 CAVRClock::~CAVRClock()
@@ -60,24 +62,19 @@ void CAVRClock::run()
     }
 
     const unsigned long delta = getUSDiff(lastClockTime, curtime);
+    totalDeltaTime += delta;
+    lastClockTime = curtime;
 
     const CTicks newticks(remainingTicks + (targetClockSpeed / 1000000 * delta));
     const CTicks finalticks = currentTicks + newticks;
     const CTicks curticks(currentTicks);
 
-    totalDeltaTime += delta;
     runsPerSec++;
-
-    CAVRTimer *timer;
-    int timeouts;
-
     currentTicks = finalticks; // May be less, see below
-    lastClockTime = curtime;
+    CAVRTimer *timer;
+    int timeouts = 0;
 
-    timeouts = 0;
-
-    // UNDONE: Make this an option; ie higher value gives 'faster timer' (more correct MHz), but hammers CPU more.
-    while (timeouts < 15000)
+    while (timeouts < maxTimeOutsCycle)
     {
         timer = getClosestTimer();
         if (!timer)
@@ -107,30 +104,44 @@ void CAVRClock::run()
 
     if (totalDeltaTime >= 1000000)
     {
+        const double corr = 1000000.0 / totalDeltaTime; // Correction factor
+
         qDebug() << "totalDeltaTime:" << totalDeltaTime << (void*)this;
         qDebug() << "runsPerSec:" << runsPerSec << (void*)this;
         qDebug() << "AVG delta:" << (totalDeltaTime / runsPerSec) << (void*)this;
         qDebug() << "AVG timeout:" << (timeOutsPerSec / runsPerSec) << (void*)this;
-        qDebug() << "Frequency (ticks/s):" << ticksPerSec << (void*)this;
+        qDebug() << "Frequency (ticks/s) (uncorrected):" << ticksPerSec << (void*)this;
+        qDebug() << "Frequency (ticks/s) (corrected):" << (unsigned long)(ticksPerSec.get() * corr) << (void*)this;
         qDebug() << "avg timeout time:" << totalTimeOutTime / runsPerSec << (void*)this;
         totalDeltaTime = runsPerSec = 0;
         timeOutsPerSec = 0;
         totalTimeOutTime = 0;
 
         // UNDONE: Move out of debug code
-        emit clockSpeed(ticksPerSec.get());
+        emit clockSpeed(ticksPerSec.get() * corr);
         ticksPerSec.reset();
     }
 
     // Relieve CPU a bit
-    // UNDONE: Make optional (same reasoning as above: get more accurate MHz for fast timers)
-
-#ifdef Q_OS_WIN32
-    usleep(1);
+    if (sleepTime)
+    {
+#ifdef Q_OS_WIN
+        usleep(sleepTime);
 #else
-    timespec ts = { 0, 1000 };
-    nanosleep(&ts, 0);
+        timespec ts = { 0, sleepTime * 1000 };
+        nanosleep(&ts, 0);
 #endif
+    }
+}
+
+void CAVRClock::setCPUUsage(ESimulatorCPUUsage usage)
+{
+    switch(usage)
+    {
+    case CPU_LOW: maxTimeOutsCycle = 100; sleepTime = 3; break;
+    case CPU_NORMAL: maxTimeOutsCycle = 10000; sleepTime = 1; break;
+    case CPU_MAX: maxTimeOutsCycle = 1000000; sleepTime = 0; break;
+    }
 }
 
 CAVRTimer *CAVRClock::createTimer(CAVRTimer::TTimeOut t, void *d)

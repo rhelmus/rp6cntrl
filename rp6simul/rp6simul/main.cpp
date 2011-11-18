@@ -6,7 +6,7 @@
 
 int main(int argc, char *argv[])
 {
-#ifndef Q_OS_WIN32
+#ifndef Q_OS_WIN
     // Restrict SIGUSR1 to 'main AVR thread'
     sigset_t sset;
     sigemptyset(&sset);

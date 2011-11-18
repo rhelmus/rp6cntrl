@@ -1,10 +1,10 @@
 #ifndef CLOCK_H
 #define CLOCK_H
 
-// For Q_OS_WIN32
+// For Q_OS_WIN
 #include <QtGlobal>
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 
 #include <time.h>
 

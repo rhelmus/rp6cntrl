@@ -13,7 +13,7 @@ class CCallPluginMainThread : public QThread
 public:
     CCallPluginMainThread(TCallPluginMainFunc func, QObject *parent = 0);
 
-#ifndef Q_OS_WIN32
+#ifndef Q_OS_WIN
     pthread_t getThreadID(void) const { return (pthread_t)threadID; }
 #endif
 

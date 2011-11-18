@@ -86,7 +86,7 @@ inline QString projectFilePath(const QString &dir, const QString &name)
 
 inline const char *getPluginFilter(void)
 {
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
     return "plugin files (*.dll)";
 #else
     return "plugin files (*.so)";

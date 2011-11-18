@@ -2,7 +2,7 @@
 
 #include <signal.h>
 
-#ifndef Q_OS_WIN32
+#ifndef Q_OS_WIN
 namespace {
 
 void threadCancelHandler(int)
@@ -27,7 +27,7 @@ void CCallPluginMainThread::run()
     Q_ASSERT(mainFunc != 0);
     setTerminationEnabled(true);
 
-#ifndef Q_OS_WIN32
+#ifndef Q_OS_WIN
     // SIGUSR1 was blocked by main thread (see main.cpp)
     sigset_t sset;
     sigemptyset(&sset);

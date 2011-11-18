@@ -151,7 +151,6 @@ QDebug operator<<(QDebug dbg, const CTicks &ticks);
 
 // Not really a 8 or 16 bit timer. Instead it uses a 32 bit uint that also
 // takes care of any prescalers.
-// The timer either calls an ISR or lua function
 class CAVRTimer
 {
 public:
@@ -200,6 +199,7 @@ private:
     Q_OBJECT
 
     unsigned long targetClockSpeed;
+    int maxTimeOutsCycle, sleepTime; // sleep time in microseconds
     TTimerList timerList;
     CTicks currentTicks, remainingTicks;
     QTimer *clockTimer;
@@ -221,6 +221,7 @@ public:
     ~CAVRClock(void);
 
     void setTargetClockSpeed(unsigned long t) { targetClockSpeed = t; }
+    void setCPUUsage(ESimulatorCPUUsage usage);
     CAVRTimer *createTimer(CAVRTimer::TTimeOut t, void *d);
     void enableTimer(CAVRTimer *timer, bool e);
     void removeTimer(CAVRTimer *timer);

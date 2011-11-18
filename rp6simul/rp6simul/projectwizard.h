@@ -19,7 +19,7 @@ class CProjectWizard : public QWizard
 public:
     enum { PAGE_PROJDEST, PAGE_SIMULATOR, PAGE_ROBOT, PAGE_M32 };
 
-    explicit CProjectWizard(QWidget *parent = 0);
+    explicit CProjectWizard(const QString &projdir, QWidget *parent = 0);
 
     void accept(void);
 
@@ -29,9 +29,8 @@ public:
 class CNewProjectDestPage : public QWizardPage
 {
 public:
-    explicit CNewProjectDestPage(QWidget *parent = 0);
+    explicit CNewProjectDestPage(const QString &projdir, QWidget *parent = 0);
 
-    void initializePage();
     bool validatePage();
 };
 

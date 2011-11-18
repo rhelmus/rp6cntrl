@@ -8,7 +8,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 #include <windows.h>
 #endif
 
@@ -599,7 +599,7 @@ void CSimulator::terminatePluginMainThread()
                 {
                     prgdialog.setLabelText("Plugin seems to be stuck, not asking anymore!");
                     // UNDONE: Winies support
-#ifndef Q_OS_WIN32
+#ifndef Q_OS_WIN
                     sigval sv;
                     pthread_sigqueue(pluginMainThread->getThreadID(),
                                      SIGUSR1, sv);
@@ -703,7 +703,7 @@ void CSimulator::checkPluginThreadDelay()
     {
         if (quitPlugin)
         {
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
             ExitThread(0);
 #else
             pthread_exit(0);
@@ -723,7 +723,7 @@ void CSimulator::checkPluginThreadDelay()
             if (delta > 50) // Delay every 50 us
             {
                 lastPluginDelay = ts;
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
                 usleep(1);
 #else
                 ts.tv_sec = 0; ts.tv_nsec = 1000;
