@@ -54,7 +54,15 @@ struct SDriverInfo
         : name(n), description(d), isDefault(def) { }
 };
 
+struct SDriverLogEntry
+{
+    bool logWarnings, logDebug;
+    bool inUse;
+    SDriverLogEntry(void) : logWarnings(true), logDebug(false), inUse(true) { }
+};
+
 typedef QList<SDriverInfo> TDriverInfoList;
+typedef QMap<QString, SDriverLogEntry> TDriverLogList;
 
 class CRP6Simulator : public QMainWindow
 {
@@ -110,6 +118,7 @@ class CRP6Simulator : public QMainWindow
     QGraphicsView *graphicsView;
     QTabWidget *bottomTabWidget;
     QPlainTextEdit *logWidget;
+    QToolButton *logFilterButton;
     QPlainTextEdit *robotSerialOutputWidget;
     QLineEdit *robotSerialInputWidget;
     QPushButton *robotSerialSendButton;
@@ -137,6 +146,7 @@ class CRP6Simulator : public QMainWindow
 
     QString logTextBuffer;
     QMutex logBufferMutex;
+    TDriverLogList robotDriverLogEntries, m32DriverLogEntries;
     QString robotSerialTextBuffer, m32SerialTextBuffer;
     QMutex robotSerialBufferMutex, m32SerialBufferMutex;
     QList<QStringList> robotStatusUpdateBuffer;
@@ -216,6 +226,7 @@ class CRP6Simulator : public QMainWindow
     static void SDLAudioCallback(void *, Uint8 *stream, int length);
 
     // Lua bindings
+    static int luaAddDriverLoaded(lua_State *l);
     static int luaAppendLogOutput(lua_State *l);
     static int luaAppendRobotSerialOutput(lua_State *l);
     static int luaAppendM32SerialOutput(lua_State *l);
@@ -295,6 +306,7 @@ private slots:
     void applyExtEEPROMChange(void);
     void setRobotIsBlocked(bool b) { robotIsBlocked = b; }
     void setLuaBumper(CBumper *b, bool e);
+    void showLogFilter(void);
     void sendRobotSerialText(void);
     void sendM32SerialText(void);
     void sendIRCOMM(void);

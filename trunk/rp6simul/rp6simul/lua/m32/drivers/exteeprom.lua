@@ -25,7 +25,7 @@ local function handleEEPROMData(data)
         elseif data == 0x04 then EEPROMInfo.writeEnabled = false
         elseif data == 0x05 then EEPROMInfo.state = "readstat"
         elseif data == 0x01 then -- write status
-            errorLog("Setting write status register is unsupported!\n");
+            warning("Setting write status register is unsupported!\n");
         end
     elseif (EEPROMInfo.state == "read" or EEPROMInfo.state == "write") and
             not EEPROMInfo.address then

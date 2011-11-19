@@ -28,7 +28,7 @@ local TWIInfo =
 
 
 local function TWIMSGHandler(msg, ...)
-    log("Received TWI MSG:", TWIInfo.isMaster, msg, ..., "\n")
+--    log("Received TWI MSG:", TWIInfo.isMaster, msg, ..., "\n")
 
     local maybeexecisr = false
     local TWCR = avr.getIORegister(avr.IO_TWCR)
@@ -44,7 +44,7 @@ local function TWIMSGHandler(msg, ...)
             maybeexecisr = true
         elseif msg == "swriteack" and TWIInfo.state == "mwrite" then
             local slack = selectOne(1, ...)
-            log("swriteack:", slack, "\n")
+--            log("swriteack:", slack, "\n")
             avr.setIORegister(avr.IO_TWSR, (slack and 0x28) or 0x30)
             maybeexecisr = true
         elseif msg == "sreadadrack" and TWIInfo.state == "mread" then
@@ -175,7 +175,7 @@ local function handleMasterEvent(data)
                 end
             elseif TWIInfo.state == "mwrite" then  -- plain data
                 avr.sendTWIMSG("mdata", d)
-                log("sending data to slave\n")
+--                log("sending data to slave\n")
             end
         else
             warning("Ignoring data: SLA+R/W received without master start condition!\n")
@@ -248,7 +248,7 @@ function handleIOData(type, data)
         end
     elseif type == avr.IO_TWSR and TWIInfo.isMaster then -- Prescaler (on write access)
         if data ~= 0 then
-            errorLog("TWI driver does not support any prescaler!")
+            warning("TWI driver does not support any prescaler!")
         end
     elseif type == avr.IO_TWCR then
         if bit.isSet(data, avr.TWINT) then

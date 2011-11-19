@@ -276,7 +276,7 @@ function handleIOData(type, data)
         if motorInfo.enabled and (bit.isSet(data, avr.OCIE1A) or
             bit.isSet(data, avr.OCIE1B)) then
             motorInfo.enabled = false
-            log("Disabling motor control: timer1 enabled")
+            warning("Disabling motor control: timer1 enabled")
         end
     elseif motorInfo.enabled then
         if type == avr.IO_TCCR1A then

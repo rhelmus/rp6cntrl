@@ -257,7 +257,7 @@ void CSerialPreferencesWidget::showSerialPortSelection()
 {
     QDialog dialog(this);
 
-    QVBoxLayout *vbox= new QVBoxLayout(&dialog);
+    QVBoxLayout *vbox = new QVBoxLayout(&dialog);
 
     QTreeWidget *tree = new QTreeWidget;
     tree->setHeaderLabels(QStringList() << "Port" << "Descriptive name");

@@ -50,7 +50,6 @@
 - Robot speed: correct?
 - ADC values are not rounded
 - What is EINT1 ADC value?
-- Logging
 - Battery
 - Randomization
     - Motors
@@ -58,3 +57,4 @@
     - MIC
 - More menu options (from toolbar)
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
+- BUG: sometimes crashes on exit
