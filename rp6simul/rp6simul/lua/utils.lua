@@ -46,7 +46,7 @@ end
 -- Convenience log functions
 function log(s, ...)
 --    debugLog(string.format("LOG: %s", getVarargString(s, ...)))
-    appendLogOutput("LOG", getVarargString(s, ...))
+    appendLogOutput("log", nil, getVarargString(s, ...))
 end
 
 function debugLog(s, ...)
@@ -56,11 +56,11 @@ end
 
 function warning(s, ...)
     debugLog(string.format("WARNING: %s", getVarargString(s, ...)))
-    appendLogOutput("WARNING", getVarargString(s, ...))
+    appendLogOutput("warning", nil, getVarargString(s, ...))
 end
 
 function errorLog(s, ...)
     debugLog(string.format("ERROR: %s", getVarargString(s, ...)))
-    appendLogOutput("ERROR", getVarargString(s, ...))
+    appendLogOutput("error", nil, getVarargString(s, ...))
 end
 

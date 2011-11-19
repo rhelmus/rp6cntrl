@@ -100,6 +100,8 @@ local function initDriver(d)
     table.insert(weakDriverList, driver)
 
     callOptTabFunc(driver, "initPlugin")
+
+    addDriverLoaded(baseName(d))
 end
 
 
@@ -241,10 +243,11 @@ function simulator(name)
     setmetatable(ret, { __index = _G })
 
     -- Neater logging
-    ret.log = function(s, ...) log(string.format("<%s> %s", name, s), ...) end
-    ret.debug = function(s, ...) debug(string.format("<%s> %s", name, s), ...) end
-    ret.warning = function(s, ...) warning(string.format("<%s> %s", name, s), ...) end
-    ret.errorLog = function(s, ...) errorLog(string.format("<%s> %s", name, s), ...) end
+    -- UNDONE: need this
+    --    ret.log = function(s, ...) log(string.format("<%s> %s", name, s), ...) end
+    --    ret.debugLog = function(s, ...) debugLog(string.format("<%s> %s", name, s), ...) end
+    --    ret.warning = function(s, ...) warning(string.format("<%s> %s", name, s), ...) end
+    --    ret.errorLog = function(s, ...) errorLog(string.format("<%s> %s", name, s), ...) end
 
     setfenv(2, ret)
     return ret
@@ -257,10 +260,10 @@ function driver(name)
     setmetatable(ret, { __index = simulatorEnv })
 
     -- Neater logging
-    ret.log = function(s, ...) log(string.format("<%s> %s", name, s), ...) end
-    ret.debug = function(s, ...) debugLog(string.format("<%s> %s", name, s), ...) end
-    ret.warning = function(s, ...) warning(string.format("<%s> %s", name, s), ...) end
-    ret.errorLog = function(s, ...) errorLog(string.format("<%s> %s", name, s), ...) end
+    ret.log = function(s, ...) appendLogOutput("log", name, getVarargString(s, ...)) end
+    ret.debugLog = function(s, ...) debugLog(string.format("<%s> %s", name, s), ...) end
+    ret.warning = function(s, ...) appendLogOutput("warning", name, getVarargString(s, ...)) end
+    ret.errorLog = function(s, ...) appendLogOutput("error", name, getVarargString(s, ...)) end
 
     setfenv(2, ret)
     return ret

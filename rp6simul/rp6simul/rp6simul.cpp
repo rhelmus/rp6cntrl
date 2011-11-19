@@ -134,6 +134,15 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
     dev->setStopBits(stype);
 }
 
+QCheckBox *getTableCheckBox(QTableWidget *tablew, int row, int col)
+{
+    // NOTE: checkboxes are actually child widgets
+    QWidget *w = tablew->cellWidget(row, col);
+    QList<QCheckBox *> l(w->findChildren<QCheckBox *>());
+    Q_ASSERT(l.size() == 1);
+    return l[0];
+}
+
 QTableWidget *createADCTableWidget(const QStringList &adclist)
 {
     QTableWidget *ret = new QTableWidget(adclist.size(), 2);
@@ -163,15 +172,6 @@ QTableWidget *createADCTableWidget(const QStringList &adclist)
     ret->resizeColumnToContents(0);
 
     return ret;
-}
-
-QCheckBox *getADCTableCheckBox(QTableWidget *tablew, int row, int col)
-{
-    // NOTE: checkboxes are actually child widgets
-    QWidget *w = tablew->cellWidget(row, col);
-    QList<QCheckBox *> l(w->findChildren<QCheckBox *>());
-    Q_ASSERT(l.size() == 1);
-    return l[0];
 }
 
 void applyADCTable(lua_State *l, QTableWidget *tablew)
@@ -207,6 +207,52 @@ QToolButton *createKeyButton(int key)
     const QRect rect(ret->fontMetrics().boundingRect(txt));
     ret->setMaximumWidth(rect.width() + 15);
     ret->setMaximumHeight(rect.height() + 5);
+    return ret;
+}
+
+QTableWidget *createLogFilterTable(const TDriverLogList &logentries)
+{
+    int dcount = 0;
+    for (TDriverLogList::const_iterator it=logentries.begin();
+         it!=logentries.end(); ++it)
+    {
+        if (it.value().inUse)
+            ++dcount; // Only add drivers that are in use
+    }
+
+    QTableWidget *ret = new QTableWidget(dcount, 3);
+    ret->setHorizontalHeaderLabels(QStringList() << "Driver" << "Warnings" <<
+                                     "Debug");
+    ret->verticalHeader()->hide();
+    ret->horizontalHeader()->setResizeMode(QHeaderView::Stretch);
+
+    int row = 0;
+    for (TDriverLogList::const_iterator it=logentries.begin();
+         it!=logentries.end(); ++it)
+    {
+        if (!it.value().inUse)
+            continue;
+
+        ret->setItem(row, 0, new QTableWidgetItem(it.key()));
+
+        for (int col=1; col<3; ++col)
+        {
+            QWidget *cw = new QWidget;
+            QHBoxLayout *chbox = new QHBoxLayout(cw);
+            chbox->setAlignment(Qt::AlignCenter);
+            chbox->setMargin(0);
+
+            QCheckBox *check = new QCheckBox;
+            check->setChecked((col==1) ? it.value().logWarnings : it.value().logDebug);
+            chbox->addWidget(check);
+            ret->setCellWidget(row, col, cw);
+        }
+
+        ++row;
+    }
+
+    ret->resizeRowsToContents();
+
     return ret;
 }
 
@@ -434,6 +480,7 @@ void CRP6Simulator::initSimulators()
 
 void CRP6Simulator::registerLuaGeneric(lua_State *l)
 {
+    NLua::registerFunction(l, luaAddDriverLoaded, "addDriverLoaded");
     NLua::registerFunction(l, luaAppendLogOutput, "appendLogOutput");
     NLua::registerFunction(l, luaUpdateRobotStatus, "updateRobotStatus");
 
@@ -924,9 +971,26 @@ QTabWidget *CRP6Simulator::createBottomTabWidget()
 
 QWidget *CRP6Simulator::createLogTab()
 {
-    logWidget = new QPlainTextEdit;
+    QWidget *ret = new QWidget;
+    QHBoxLayout *hbox = new QHBoxLayout(ret);
+
+    hbox->addWidget(logWidget = new QPlainTextEdit);
     logWidget->setReadOnly(true);
-    return logWidget;
+
+    QVBoxLayout *vbox = new QVBoxLayout;
+    hbox->addLayout(vbox);
+
+    vbox->addWidget(logFilterButton = new QToolButton);
+    logFilterButton->setIcon(QIcon("../resource/filter.png"));
+    logFilterButton->setEnabled(false);
+    connect(logFilterButton, SIGNAL(clicked()), SLOT(showLogFilter()));
+
+    QToolButton *button = new QToolButton;
+    vbox->addWidget(button);
+    button->setIcon(QIcon("../resource/clear.png"));
+    connect(button, SIGNAL(clicked()), logWidget, SLOT(clear()));
+
+    return ret;
 }
 
 QWidget *CRP6Simulator::createSerialRobotTab()
@@ -1736,23 +1800,68 @@ void CRP6Simulator::SDLAudioCallback(void *, Uint8 *stream, int length)
     }
 }
 
+int CRP6Simulator::luaAddDriverLoaded(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const char *driver = luaL_checkstring(l, 1);
+
+    if (l == instance->robotSimulator->getLuaState())
+    {
+        if (!instance->robotDriverLogEntries.contains(driver))
+            instance->robotDriverLogEntries.insert(driver, SDriverLogEntry());
+        else
+            instance->robotDriverLogEntries[driver].inUse = true;
+    }
+    else
+    {
+        if (!instance->m32DriverLogEntries.contains(driver))
+            instance->m32DriverLogEntries.insert(driver, SDriverLogEntry());
+        else
+            instance->m32DriverLogEntries[driver].inUse = true;
+    }
+
+    return 0;
+}
+
 int CRP6Simulator::luaAppendLogOutput(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
     QMutexLocker loglocker(&instance->logBufferMutex);
 
     const char *type = luaL_checkstring(l, 1);
-    const char *text = luaL_checkstring(l, 2);
+    const char *driver = 0;
+    if (!lua_isnil(l, 2))
+        driver = luaL_checkstring(l, 2);
+    QString text = luaL_checkstring(l, 3);
 
     ELogType t;
-    if (!strcmp(type, "LOG"))
+    if (!strcmp(type, "log"))
         t = LOG_LOG;
-    else if (!strcmp(type, "WARNING"))
+    else if (!strcmp(type, "warning"))
         t = LOG_WARNING;
-    else if (!strcmp(type, "ERROR"))
+    else if (!strcmp(type, "error"))
         t = LOG_ERROR;
     else
         luaL_argerror(l, 1, "Wrong log type.");
+
+    if (driver && (t != LOG_ERROR))
+    {
+        // See if driver is filtered (errors are always displayed)
+        SDriverLogEntry logentry;
+        if (l == instance->robotSimulator->getLuaState())
+            logentry = instance->robotDriverLogEntries[driver];
+        else
+            logentry = instance->m32DriverLogEntries[driver];
+
+        if ((t == LOG_WARNING) && !logentry.logWarnings)
+            return 0;
+        else if ((t == LOG_LOG) && !logentry.logDebug)
+            return 0;
+    }
+
+    if (driver)
+        text.prepend(QString("<%1>: ").arg(driver));
 
     instance->logTextBuffer += instance->getLogOutput(t, text);
 
@@ -2898,6 +3007,7 @@ void CRP6Simulator::runPlugin()
     stopPluginAction->setEnabled(true);
     resetPluginAction->setEnabled(true);
     ADCDockWidget->setEnabled(true);
+    logFilterButton->setEnabled(true);
 
     foreach (QAction *a, projectActionList)
         a->setEnabled(false);
@@ -2986,6 +3096,7 @@ void CRP6Simulator::stopPlugin()
     stopPluginAction->setEnabled(false);
     resetPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
+    logFilterButton->setEnabled(false);
 
     robotSerialSendButton->setEnabled(false);
     IRCOMMSendButton->setEnabled(false);
@@ -2997,6 +3108,13 @@ void CRP6Simulator::stopPlugin()
 
     foreach (QAction *a, projectActionList)
         a->setEnabled(true);
+
+    for (TDriverLogList::iterator it=robotDriverLogEntries.begin();
+         it!=robotDriverLogEntries.end(); ++it)
+        it.value().inUse = false;
+    for (TDriverLogList::iterator it=m32DriverLogEntries.begin();
+         it!=m32DriverLogEntries.end(); ++it)
+        it.value().inUse = false;
 }
 
 void CRP6Simulator::toggleSerialPass(bool e)
@@ -3177,9 +3295,9 @@ void CRP6Simulator::resetADCTable()
     for (int i=0; i<maxsize; ++i)
     {
         if (i < rsize)
-            getADCTableCheckBox(robotADCTableWidget, i, 0)->setChecked(false);
+            getTableCheckBox(robotADCTableWidget, i, 0)->setChecked(false);
         if (i < msize)
-            getADCTableCheckBox(m32ADCTableWidget, i, 0)->setChecked(false);
+            getTableCheckBox(m32ADCTableWidget, i, 0)->setChecked(false);
     }
 
     applyADCTable();
@@ -3286,6 +3404,79 @@ void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
                 bumperLuaCallbacks[b]);
     lua_pushboolean(robotSimulator->getLuaState(), e);
     lua_call(robotSimulator->getLuaState(), 1, 0);
+}
+
+void CRP6Simulator::showLogFilter()
+{
+    CProjectSettings prsettings(currentProjectFile);
+    if (!verifySettingsFile(prsettings))
+        return;
+
+    QDialog dialog(this);
+    dialog.resize(300, 350);
+    QVBoxLayout *vbox = new QVBoxLayout(&dialog);
+
+    const ESimulator simulator =
+            static_cast<ESimulator>(prsettings.value("simulator", SIMULATOR_ROBOT).toInt());
+    const bool hasrobot = ((simulator == SIMULATOR_ROBOT) ||
+                           (simulator == SIMULATOR_ROBOTM32));
+    const bool hasm32 = ((simulator == SIMULATOR_M32) ||
+                         (simulator == SIMULATOR_ROBOTM32));
+
+    QTableWidget *robottable = 0, *m32table = 0;
+
+    if (hasrobot)
+    {
+        QGroupBox *group = new QGroupBox("RP6");
+        vbox->addWidget(group);
+        QVBoxLayout *subvbox = new QVBoxLayout(group);
+        robottable = createLogFilterTable(robotDriverLogEntries);
+        subvbox->addWidget(robottable);
+    }
+
+    if (hasm32)
+    {
+        QGroupBox *group = new QGroupBox("m32");
+        vbox->addWidget(group);
+        QVBoxLayout *subvbox = new QVBoxLayout(group);
+        m32table = createLogFilterTable(m32DriverLogEntries);
+        subvbox->addWidget(m32table);
+    }
+
+    QDialogButtonBox *bbox = new QDialogButtonBox(QDialogButtonBox::Ok |
+                                                  QDialogButtonBox::Cancel);
+    connect(bbox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+    connect(bbox, SIGNAL(rejected()), &dialog, SLOT(reject()));
+    vbox->addWidget(bbox);
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        if (hasrobot)
+        {
+            const int rows = robottable->rowCount();
+            for (int i=0; i<rows; ++i)
+            {
+                const QString d(robottable->item(i, 0)->text());
+                robotDriverLogEntries[d].logWarnings =
+                        getTableCheckBox(robottable, i, 1)->isChecked();
+                robotDriverLogEntries[d].logDebug =
+                        getTableCheckBox(robottable, i, 2)->isChecked();
+            }
+        }
+
+        if (hasm32)
+        {
+            const int rows = m32table->rowCount();
+            for (int i=0; i<rows; ++i)
+            {
+                const QString d(m32table->item(i, 0)->text());
+                m32DriverLogEntries[d].logWarnings =
+                        getTableCheckBox(m32table, i, 1)->isChecked();
+                m32DriverLogEntries[d].logDebug =
+                        getTableCheckBox(m32table, i, 2)->isChecked();
+            }
+        }
+    }
 }
 
 void CRP6Simulator::sendRobotSerialText()
