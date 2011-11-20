@@ -88,7 +88,7 @@ class CSimulator : public QObject
 
     QString currentPluginFileName;
     QStringList currentDriverList;
-    QLibrary RP6Plugin;
+    QLibrary pluginLibrary;
 
     static timeval startTimeMS;
     static bool timeMSInitialized;
@@ -99,7 +99,6 @@ class CSimulator : public QObject
     void initAVRClock(void);
     void terminateAVRClock(void);
     void terminatePluginMainThread(void);
-    bool initPlugin(void);
     void checkPluginThreadDelay(void);
     TIORegisterData getIORegister(EIORegisterTypes type) const;
     void setIORegister(EIORegisterTypes type, TIORegisterData data);
@@ -154,7 +153,9 @@ public:
     bool loadProjectFile(const QSettings &settings);
     void execISR(EISRTypes type);
     CAVRClock *getAVRClock(void) { return AVRClock; }
-    bool runPlugin(void);
+    QString getPluginLibraryName(void) { return currentPluginFileName; }
+    bool initPlugin(void);
+    void runPlugin(void);
     void stopPlugin(void);
 #if USEATOMIC
     const QAtomicInt *getIORegisterArray(void) const { return IORegisterData; }

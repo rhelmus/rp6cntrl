@@ -107,16 +107,6 @@ inline CSimulator *getInstanceFromData(void *d)
     return reinterpret_cast<CSimulator *>(d);
 }
 
-template <typename TF> TF getLibFunc(QLibrary &lib, const char *f)
-{
-    TF ret = (TF)lib.resolve(f);
-
-    if (!ret)
-        qDebug() << "Failed to get lib function" << f;
-
-    return ret;
-}
-
 QString constructISRFunc(EISRTypes type)
 {
     QString f;
@@ -626,68 +616,6 @@ void CSimulator::terminatePluginMainThread()
     }
 }
 
-bool CSimulator::initPlugin()
-{
-    if (RP6Plugin.isLoaded() && !RP6Plugin.unload())
-    {
-        QMessageBox::critical(CRP6Simulator::getInstance(), "Unload plugin error",
-                              "Could not unload plugin file!\n"
-                              "This may result in undefined behaviour"
-                              "when simulation is started. It's best"
-                              "to restart the application.");
-        return false;
-    }
-
-    if (currentPluginFileName.isEmpty())
-    {
-        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error", "Project has no RP6 plugin set");
-        return false;
-    }
-
-    RP6Plugin.setFileName(currentPluginFileName);
-
-    if (!RP6Plugin.load())
-    {
-        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error",
-                              "Failed to load plugin:\n" + RP6Plugin.errorString());
-        return false;
-    }
-
-    TCallPluginMainFunc mainfunc =
-            getLibFunc<TCallPluginMainFunc>(RP6Plugin, "callAvrMain");
-    TSetPluginCallbacks setplugincb =
-            getLibFunc<TSetPluginCallbacks>(RP6Plugin, "setPluginCallbacks");
-
-    if (!mainfunc || !setplugincb)
-    {
-        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error",
-                              "Could not resolve mandatory symbols.\n"
-                              "Incorrect plugin specified?");
-        return false;
-    }
-
-    setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB, this);
-
-    lua_getglobal(luaState, "initPlugin");
-
-    // Push driver list
-    if (!currentDriverList.isEmpty())
-    {
-        NLua::pushStringList(luaState, currentDriverList);
-        lua_call(luaState, 1, 0);
-    }
-    else
-    {
-        qDebug() << "Running without any drivers!";
-        lua_call(luaState, 0, 0);
-    }
-
-    Q_ASSERT(!pluginMainThread);
-    pluginMainThread = new CCallPluginMainThread(mainfunc, this);
-
-    return true;
-}
-
 void CSimulator::checkPluginThreadDelay()
 {
     // This function is called whenever register data is accessed (get/set)
@@ -1193,7 +1121,7 @@ void CSimulator::execISR(EISRTypes type)
     if (!ISRCacheArray[type])
     {
         QString func = constructISRFunc(type);
-        ISRCacheArray[type] = getLibFunc<TISR>(RP6Plugin, qPrintable(func));
+        ISRCacheArray[type] = getLibFunc<TISR>(pluginLibrary, qPrintable(func));
 
         if (!ISRCacheArray[type])
         {
@@ -1208,10 +1136,69 @@ void CSimulator::execISR(EISRTypes type)
     isr();
 }
 
-bool CSimulator::runPlugin()
+bool CSimulator::initPlugin()
 {
-    if (!initPlugin())
+    if (pluginLibrary.isLoaded() && !pluginLibrary.unload())
+    {
+        QMessageBox::critical(CRP6Simulator::getInstance(), "Unload plugin error",
+                              "Could not unload plugin file!\n"
+                              "This may result in undefined behaviour "
+                              "when simulation is started. It is best "
+                              "to restart the application.");
         return false;
+    }
+
+    if (currentPluginFileName.isEmpty())
+    {
+        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error", "Project has no RP6 plugin set");
+        return false;
+    }
+
+    pluginLibrary.setFileName(currentPluginFileName);
+
+    if (!pluginLibrary.load())
+    {
+        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error",
+                              "Failed to load plugin:\n" + pluginLibrary.errorString());
+        return false;
+    }
+
+    TCallPluginMainFunc mainfunc =
+            getLibFunc<TCallPluginMainFunc>(pluginLibrary, "callAvrMain");
+    TSetPluginCallbacks setplugincb =
+            getLibFunc<TSetPluginCallbacks>(pluginLibrary, "setPluginCallbacks");
+
+    if (!mainfunc || !setplugincb)
+    {
+        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error",
+                              "Could not resolve mandatory symbols.\n"
+                              "Incorrect plugin specified?");
+        return false;
+    }
+
+    Q_ASSERT(!pluginMainThread);
+    pluginMainThread = new CCallPluginMainThread(mainfunc, this);
+
+    setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB, this);
+
+    return true;
+}
+
+void CSimulator::runPlugin()
+{
+    lua_getglobal(luaState, "initPlugin");
+
+    // Push driver list
+    if (!currentDriverList.isEmpty())
+    {
+        NLua::pushStringList(luaState, currentDriverList);
+        lua_call(luaState, 1, 0);
+    }
+    else
+    {
+        qDebug() << "Running without any drivers!";
+        lua_call(luaState, 0, 0);
+    }
 
     Q_ASSERT(!pluginMainThread->isRunning());
 
@@ -1219,8 +1206,6 @@ bool CSimulator::runPlugin()
     AVRClock->start();
     lastPluginDelay.tv_sec = lastPluginDelay.tv_nsec = 0;
     pluginMainThread->start();
-
-    return true;
 }
 
 void CSimulator::stopPlugin()

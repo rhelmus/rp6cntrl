@@ -61,6 +61,12 @@ struct SDriverLogEntry
     SDriverLogEntry(void) : logWarnings(true), logDebug(false), inUse(true) { }
 };
 
+struct SRobotConfigDefinitions
+{
+    float encoderResolution;
+    int rotationFactor, speedTimerBase;
+};
+
 typedef QList<SDriverInfo> TDriverInfoList;
 typedef QMap<QString, SDriverLogEntry> TDriverLogList;
 
@@ -93,10 +99,12 @@ class CRP6Simulator : public QMainWindow
     int handClapSoundPos;
     EExtEEPROMMode extEEPROMMode;
     CSimulator *robotSimulator, *m32Simulator;
+    ESimulator currentSimulator;
     QString currentProjectFile;
     QString currentMapFile;
     bool currentMapIsTemplate;
     TDriverInfoList robotDriverInfoList, m32DriverInfoList;
+    SRobotConfigDefinitions robotConfigDefinitions;
     bool pluginRunning;
 
     QList<QAction *> projectActionList, mapMenuActionList;
@@ -204,6 +212,12 @@ class CRP6Simulator : public QMainWindow
     QDockWidget *createExtEEPROMDock(void);
 
     void updatePreferences(QSettings &settings);
+    bool hasRobotSimulator(void) const
+    { return ((currentSimulator == SIMULATOR_ROBOT) ||
+              (currentSimulator == SIMULATOR_ROBOTM32)); }
+    bool hasM32Simulator(void) const
+    { return ((currentSimulator == SIMULATOR_M32) ||
+              (currentSimulator == SIMULATOR_ROBOTM32)); }
     void updateMainStackedWidget(void);
     void updateMapStackedWidget(void);
     void openProjectFile(const QString &file);
@@ -243,6 +257,7 @@ class CRP6Simulator : public QMainWindow
     static int luaCreateLED(lua_State *l);
     static int luaLEDSetEnabled(lua_State *l);
     static int luaLEDDestr(lua_State *l);
+    static int luaGetSpeedTimerBase(lua_State *l);
     static int luaSetMotorPower(lua_State *l);
     static int luaSetMotorDriveSpeed(lua_State *l);
     static int luaSetMotorMoveSpeed(lua_State *l);
@@ -325,6 +340,8 @@ public:
     { return robotDriverInfoList; }
     TDriverInfoList getM32DriverInfoList(void) const
     { return m32DriverInfoList; }
+    SRobotConfigDefinitions getRobotConfigDefinitions(void) const
+    { return robotConfigDefinitions; }
     bool loadCustomDriverInfo(const QString &file, QString &name,
                               QString &desc);
 

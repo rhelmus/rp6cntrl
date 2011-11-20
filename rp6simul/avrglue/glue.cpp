@@ -1,5 +1,7 @@
 #include "glue.h"
 
+#include "RP6Config.h"
+
 namespace {
 NRP6SimulGlue::TEnableISRsCB enableISRsCallback = 0;
 }
@@ -37,3 +39,22 @@ EXPORT void setPluginCallbacks(NRP6SimulGlue::TIORegisterSetCB s,
     enableISRsCallback = i;
     NRP6SimulGlue::callBackData = d;
 }
+
+#ifdef RP6_BUILD
+
+EXPORT float getEncoderResolution()
+{
+    return ENCODER_RESOLUTION;
+}
+
+EXPORT int getRotationFactor()
+{
+    return ROTATION_FACTOR;
+}
+
+EXPORT int getSpeedTimerBase()
+{
+    return SPEED_TIMER_BASE;
+}
+
+#endif // RP6_BUILD

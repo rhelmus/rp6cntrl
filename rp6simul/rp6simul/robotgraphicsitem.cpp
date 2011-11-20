@@ -38,16 +38,15 @@ float getRobotFrameSpeed(int motorspeed, float frametime,
     if (!motorspeed)
         return 0.0;
 
-    // UNDONE: Make this configurable/load from plugin
-    const float encresolution = 0.24;
-    const float speedtimerbase = 200.0;
+    const SRobotConfigDefinitions config =
+            CRP6Simulator::getInstance()->getRobotConfigDefinitions();
 
     // Necessary correction for RP6 library bug: see motor driver
-    const float effspeedtimerbase = 1.1 * (speedtimerbase + 2.0);
+    const float effspeedtimerbase = 1.1 * (config.speedTimerBase + 2.0);
 
     const float speedfreq = 1000.0 / effspeedtimerbase;
     const float counts_s = (float)motorspeed * speedfreq;
-    const float mm_s = counts_s * encresolution;
+    const float mm_s = counts_s * config.encoderResolution;
     const float px_s = mm_s / (cmperpx * 10.0);
 
     // Amount of pixels moved during this frame
@@ -152,6 +151,7 @@ void CRobotGraphicsItem::tryMove()
 
     const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
     Q_ASSERT(rscene);
+
     // Delay between calls to this function (frame time)
     const float advdelay = rscene->getRobotAdvanceDelay();
 
@@ -177,7 +177,6 @@ void CRobotGraphicsItem::tryMove()
       Therefore a positive bias (ie. turn too far) can clearly be seen when
       rotation is simulated (without any artificial deviations).
     */
-    // UNDONE: Correct for modified ROTATION_FACTOR values
     // UNDONE: Somehow correct for positive bias caused by low speed update
     //         frequency of RP6 library code?
     const float rotspeed = (lspeed - rspeed) / 2.0;
@@ -187,7 +186,11 @@ void CRobotGraphicsItem::tryMove()
         const float robotlengthpx = robotLength / cmPerPixel;
         const float perimeter = robotlengthpx * M_PI;
         const float pxperdeg = perimeter / 360.0;
-        degspeed = rotspeed / pxperdeg;
+        // Correct for changed ROTATION_FACTOR values. The default is 688.
+        // Note that this will slightly affect the moving speed.
+        const float correction = 688.0f /
+                CRP6Simulator::getInstance()->getRobotConfigDefinitions().rotationFactor;
+        degspeed = rotspeed / pxperdeg * correction;
     }
 
     /*

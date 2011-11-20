@@ -5,6 +5,8 @@
 
 #include <time.h>
 
+#include <QLibrary>
+
 class QPainter;
 class QSettings;
 class QString;
@@ -23,5 +25,11 @@ void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
              qreal scale);
 qreal toClockwiseAngle(qreal a);
 qreal toCounterClockwiseAngle(qreal a);
+
+template <typename TF> TF getLibFunc(QLibrary &lib, const char *f)
+{
+    TF ret = (TF)lib.resolve(f);
+    return ret;
+}
 
 #endif // UTILS_H

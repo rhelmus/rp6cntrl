@@ -498,6 +498,7 @@ void CRP6Simulator::registerLuaRobot(lua_State *l)
     NLua::registerFunction(l, luaAppendRobotSerialOutput, "appendSerialOutput");
     NLua::registerFunction(l, luaLogIRCOMM, "logIRCOMM");
     NLua::registerFunction(l, luaRobotIsBlocked, "robotIsBlocked");
+    NLua::registerFunction(l, luaGetSpeedTimerBase, "getSpeedTimerBase");
     NLua::registerFunction(l, luaSetMotorPower, "setMotorPower");
     NLua::registerFunction(l, luaSetMotorDriveSpeed, "setMotorDriveSpeed");
     NLua::registerFunction(l, luaSetMotorMoveSpeed, "setMotorMoveSpeed");
@@ -1399,15 +1400,13 @@ void CRP6Simulator::openProjectFile(const QString &file)
 
 void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
 {
-    const ESimulator simulator =
+    currentSimulator =
             static_cast<ESimulator>(prsettings.value("simulator", SIMULATOR_ROBOT).toInt());
-    const bool hasrobot = ((simulator == SIMULATOR_ROBOT) ||
-                           (simulator == SIMULATOR_ROBOTM32));
-    const bool hasm32 = ((simulator == SIMULATOR_M32) ||
-                         (simulator == SIMULATOR_ROBOTM32));
+    const bool hasrobot = hasRobotSimulator();
+    const bool hasm32 = hasM32Simulator();
 
-    robotWidget->setSimulator(simulator);
-    robotScene->getRobotItem()->setM32Enabled(simulator == SIMULATOR_ROBOTM32);
+    robotWidget->setSimulator(currentSimulator);
+    robotScene->getRobotItem()->setM32Enabled(currentSimulator == SIMULATOR_ROBOTM32);
 
     bottomTabWidget->setTabEnabled(BOTTOMTAB_ROBOTSERIAL, hasrobot);
     bottomTabWidget->setTabEnabled(BOTTOMTAB_M32SERIAL, hasm32);
@@ -1416,12 +1415,12 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
     m32ADCTableWidget->setEnabled(hasm32);
     extEEPROMDockWidget->setEnabled(hasm32);
 
-    if (simulator == SIMULATOR_ROBOT)
+    if (currentSimulator == SIMULATOR_ROBOT)
     {
         IORegisterTableSelector->setCurrentIndex(0); // Switch to robot
         IORegisterTableSelector->setVisible(false); // and hide
     }
-    else if (simulator == SIMULATOR_M32)
+    else if (currentSimulator == SIMULATOR_M32)
     {
         IORegisterTableSelector->setCurrentIndex(1); // Switch to m32
         IORegisterTableSelector->setVisible(false); // and hide
@@ -1444,7 +1443,7 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
     {
         prsettings.beginGroup("m32");
 
-        if (simulator == SIMULATOR_ROBOTM32)
+        if (currentSimulator == SIMULATOR_ROBOTM32)
         {
             const EM32Slot m32slot =
                     static_cast<EM32Slot>(prsettings.value("slot", SLOT_BACK).toInt());
@@ -2140,6 +2139,13 @@ int CRP6Simulator::luaLEDDestr(lua_State *l)
 
     delete led;
     return 0;
+}
+
+int CRP6Simulator::luaGetSpeedTimerBase(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    lua_pushinteger(l, instance->robotConfigDefinitions.speedTimerBase);
+    return 1;
 }
 
 int CRP6Simulator::luaSetMotorPower(lua_State *l)
@@ -2976,24 +2982,46 @@ void CRP6Simulator::runPlugin()
     if (!verifySettingsFile(prsettings))
         return;
 
-    const ESimulator simulator =
-            static_cast<ESimulator>(prsettings.value("simulator", SIMULATOR_ROBOT).toInt());
+    if (hasRobotSimulator())
+    {
+        if (!robotSimulator->initPlugin())
+            return;
 
-    if (simulator == SIMULATOR_ROBOT)
-    {
-        if (!robotSimulator->runPlugin())
+        QLibrary lib(robotSimulator->getPluginLibraryName());
+        TGetEncoderResolution encfunc =
+                getLibFunc<TGetEncoderResolution>(lib, "getEncoderResolution");
+        TGetRotationFactor rotfunc =
+                getLibFunc<TGetRotationFactor>(lib, "getRotationFactor");
+        TGetTimerSpeedBase speedfunc =
+                getLibFunc<TGetTimerSpeedBase>(lib, "getSpeedTimerBase");
+
+        if (!encfunc || !rotfunc || !speedfunc)
+        {
+            QMessageBox::critical(this, "Plugin error",
+                                  "Could not resolve mandatory symbols.\n"
+                                  "Incorrect plugin specified?");
             return;
+        }
+
+        robotConfigDefinitions.encoderResolution = encfunc();
+        robotConfigDefinitions.rotationFactor = rotfunc();
+        robotConfigDefinitions.speedTimerBase = speedfunc();
+
+        qDebug() << "config:" << robotConfigDefinitions.encoderResolution <<
+                    robotConfigDefinitions.rotationFactor <<
+                    robotConfigDefinitions.speedTimerBase;
+
+        lib.unload();
     }
-    else if (simulator == SIMULATOR_M32)
-    {
-        if (!m32Simulator->runPlugin())
-            return;
-    }
-    else // both
-    {
-        if (!robotSimulator->runPlugin() || !m32Simulator->runPlugin())
-            return;
-    }
+
+    if (hasM32Simulator() && !m32Simulator->initPlugin())
+        return;
+
+    // Run plugin(s) after succesfull initialization
+    if (hasRobotSimulator())
+        robotSimulator->runPlugin();
+    if (hasM32Simulator())
+        m32Simulator->runPlugin();
 
     robotSerialOutputWidget->clear();
     robotStatusTreeWidget->clear();
@@ -3408,24 +3436,13 @@ void CRP6Simulator::setLuaBumper(CBumper *b, bool e)
 
 void CRP6Simulator::showLogFilter()
 {
-    CProjectSettings prsettings(currentProjectFile);
-    if (!verifySettingsFile(prsettings))
-        return;
-
     QDialog dialog(this);
     dialog.resize(300, 350);
     QVBoxLayout *vbox = new QVBoxLayout(&dialog);
 
-    const ESimulator simulator =
-            static_cast<ESimulator>(prsettings.value("simulator", SIMULATOR_ROBOT).toInt());
-    const bool hasrobot = ((simulator == SIMULATOR_ROBOT) ||
-                           (simulator == SIMULATOR_ROBOTM32));
-    const bool hasm32 = ((simulator == SIMULATOR_M32) ||
-                         (simulator == SIMULATOR_ROBOTM32));
-
     QTableWidget *robottable = 0, *m32table = 0;
 
-    if (hasrobot)
+    if (hasRobotSimulator())
     {
         QGroupBox *group = new QGroupBox("RP6");
         vbox->addWidget(group);
@@ -3434,7 +3451,7 @@ void CRP6Simulator::showLogFilter()
         subvbox->addWidget(robottable);
     }
 
-    if (hasm32)
+    if (hasM32Simulator())
     {
         QGroupBox *group = new QGroupBox("m32");
         vbox->addWidget(group);
@@ -3451,7 +3468,7 @@ void CRP6Simulator::showLogFilter()
 
     if (dialog.exec() == QDialog::Accepted)
     {
-        if (hasrobot)
+        if (hasRobotSimulator())
         {
             const int rows = robottable->rowCount();
             for (int i=0; i<rows; ++i)
@@ -3464,7 +3481,7 @@ void CRP6Simulator::showLogFilter()
             }
         }
 
-        if (hasm32)
+        if (hasM32Simulator())
         {
             const int rows = m32table->rowCount();
             for (int i=0; i<rows; ++i)
