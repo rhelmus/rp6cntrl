@@ -3,6 +3,7 @@
 
 #include <QDialog>
 
+class QCheckBox;
 class QComboBox;
 class QGroupBox;
 class QLineEdit;
@@ -17,6 +18,7 @@ class CPreferencesDialog : public QDialog
     Q_OBJECT
 
     CPathInput *defaultProjectDirPathInput;
+    QCheckBox *loadPrevProjectCheckBox;
     QGroupBox *soundGroupBox;
     QSlider *piezoVolumeSlider;
     QGroupBox *robotSerialGroupBox, *m32SerialGroupBox;

@@ -59,6 +59,8 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
+    void start(void);
+    void stop(void);
     void setCmPerPixel(float c) { cmPerPixel = c / getPixmapScale(); }
     void setRobotLength(float l) { robotLength = l; }
     void setM32Enabled(bool e) { m32Enabled = e; }

@@ -419,6 +419,17 @@ void CRobotGraphicsItem::paint(QPainter *painter,
 #endif
 }
 
+void CRobotGraphicsItem::start()
+{
+}
+
+void CRobotGraphicsItem::stop()
+{
+    motorSpeed.clear();
+    motorDirection.clear();
+    update();
+}
+
 void CRobotGraphicsItem::setM32Slot(EM32Slot s, const QPointF &p, float r)
 {
     m32Positions[s] = p * getPixmapScale();

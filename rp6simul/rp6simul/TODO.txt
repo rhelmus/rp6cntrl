@@ -1,8 +1,5 @@
 - General IO: Check for overflows (reintroduce 8/16 bit separation?)
 - UART/SPI: Set ready flag when ready (instead of always enabled)
-- Error handling; check UNDONE's
-- IO register class: test all operators (addition, subtraction, ... (printf), etc)
-- Check delta for avrtimer when avr thread is running at 100%
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
 - Test port enumeration on Windows
@@ -13,11 +10,6 @@
 - Stacked main widget: list recent projects if none loaded?
 - IR transmitter for robot widget and property
 - check leds: colors, positions
-- Proper initialization after restart of plugin
-    - default values registers
-    - default values drivers
-    - default values widgets
-    - ...
 - move UI Lua function to separate package?
 - robot context menu:
     - option to lock robot
@@ -42,9 +34,11 @@
 - What is EINT1 ADC value?
 - Battery
 - Randomization
+    - Battery
     - Motors
     - Light Sensors
     - MIC
+    - ACS
 - More menu options (from toolbar)
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
 - BUG: sometimes crashes on exit

@@ -150,7 +150,7 @@ public:
 
     void startLua(const char *name);
     lua_State *getLuaState(void) const { return luaState; }
-    bool loadProjectFile(const QSettings &settings);
+    void loadProjectFile(const QSettings &settings);
     void execISR(EISRTypes type);
     CAVRClock *getAVRClock(void) { return AVRClock; }
     QString getPluginLibraryName(void) { return currentPluginFileName; }

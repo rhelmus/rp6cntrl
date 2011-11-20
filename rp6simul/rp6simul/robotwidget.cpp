@@ -413,11 +413,13 @@ void CRobotWidget::stop()
 {
     dataPlotUpdateTimer->stop();
     robotLEDs.clear();
+    m32LEDs.clear();
     bumpers.clear();
     IRSensors.clear();
     motorPower.clear();
     motorSpeed.clear();
     motorDirection.clear();
+    beeperPitch = 0;
     update();
 }
 

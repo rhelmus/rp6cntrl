@@ -1094,7 +1094,7 @@ void CSimulator::startLua(const char *name)
     lua_call(luaState, 1, 0);
 }
 
-bool CSimulator::loadProjectFile(const QSettings &settings)
+void CSimulator::loadProjectFile(const QSettings &settings)
 {
     currentPluginFileName = settings.value("plugin").toString();
     currentDriverList = settings.value("drivers").toStringList();
@@ -1103,7 +1103,6 @@ bool CSimulator::loadProjectFile(const QSettings &settings)
         QMessageBox::warning(CRP6Simulator::getInstance(), "Empty driverlist",
                              "Project does not have any drivers specified!");
 
-    return true;
 }
 
 void CSimulator::execISR(EISRTypes type)

@@ -20,7 +20,7 @@ inline unsigned long getUSDiff(const timespec &start, const timespec &end)
             ((end.tv_nsec-start.tv_nsec) / 1000);
 }
 
-bool verifySettingsFile(QSettings &file);
+bool verifySettingsFile(QSettings &file, bool silent=false);
 void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
              qreal scale);
 qreal toClockwiseAngle(qreal a);

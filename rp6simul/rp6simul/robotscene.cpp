@@ -632,12 +632,40 @@ void CRobotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     dragging = draggedEnough = false;
 }
 
+void CRobotScene::wheelEvent(QGraphicsSceneWheelEvent *event)
+{
+    // Based on code from http://www.qtcentre.org/threads/35738-How-to-zooming-like-in-AutoCAD-with-QGraphicsView
+
+    // zoom only when CTRL key pressed
+    if (event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        const int numsteps = event->delta() / 15 / 8;
+
+        if (numsteps == 0)
+        {
+            event->ignore();
+            return;
+        }
+
+        scaleGraphicsView(pow(1.1, numsteps));
+
+        if (!followRobot && (numsteps > 0))
+        {
+            QGraphicsView *view = getGraphicsView();
+            view->centerOn(event->scenePos());
+        }
+
+        event->accept();
+    }
+}
+
 void CRobotScene::start()
 {
     robotStartGraphicsItem->setVisible(false);
     robotGraphicsItem->setPos(robotStartGraphicsItem->pos());
     robotGraphicsItem->setRotation(robotStartGraphicsItem->rotation());
     robotGraphicsItem->setVisible(true);
+    robotGraphicsItem->start();
     running = true;
 }
 
@@ -645,6 +673,7 @@ void CRobotScene::stop()
 {
     robotStartGraphicsItem->setVisible(true);
     robotGraphicsItem->setVisible(false);
+    robotGraphicsItem->stop();
     running = false;
 }
 
