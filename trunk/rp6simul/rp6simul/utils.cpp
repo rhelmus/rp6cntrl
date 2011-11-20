@@ -10,14 +10,22 @@
 #include <QSettings>
 #include <QString>
 
-bool verifySettingsFile(QSettings &file)
+bool verifySettingsFile(QSettings &file, bool silent)
 {
     file.sync();
 
     if (file.status() == QSettings::AccessError)
-        QMessageBox::critical(CRP6Simulator::getInstance(), "File access error", "Unable to access project file!");
+    {
+        if (!silent)
+            QMessageBox::critical(CRP6Simulator::getInstance(), "File error",
+                                  "Unable to access file!");
+    }
     else if (file.status() == QSettings::FormatError)
-        QMessageBox::critical(CRP6Simulator::getInstance(), "File format error", "Invalid file format!");
+    {
+        if (!silent)
+            QMessageBox::critical(CRP6Simulator::getInstance(), "File error",
+                                  "Invalid file format!");
+    }
     else
         return true;
 

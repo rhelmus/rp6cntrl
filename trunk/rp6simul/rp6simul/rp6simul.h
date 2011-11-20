@@ -221,7 +221,7 @@ class CRP6Simulator : public QMainWindow
               (currentSimulator == SIMULATOR_ROBOTM32)); }
     void updateMainStackedWidget(void);
     void updateMapStackedWidget(void);
-    void openProjectFile(const QString &file);
+    void openProjectFile(const QString &file, bool silent=false);
     void updateProjectSettings(QSettings &prsettings);
     void cleanRecentProjects(void);
     void addRecentProject(const QString &file);
@@ -290,6 +290,7 @@ private slots:
     void timedLEDUpdate(void);
     void newProject(void);
     void openProject(void);
+    void fixWindowTitle(void);
     void updateRecentProjectMenu(void);
     void openRecentProject(QAction *a);
     void newMap(void);

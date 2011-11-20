@@ -10,17 +10,15 @@ namespace NRP6SimulGlue {
 
 class CIORegister
 {
-public:
-    static TIORegisterGetCB getCallback;
-    static TIORegisterSetCB setCallback;
-
-private:
     EIORegisterTypes IOType;
 
     void set(TIORegisterData d) { setCallback(IOType, d, callBackData); }
     TIORegisterData get(void) const { return getCallback(IOType, callBackData); }
 
 public:
+    static TIORegisterGetCB getCallback;
+    static TIORegisterSetCB setCallback;
+
     CIORegister(EIORegisterTypes t) : IOType(t) { }
     CIORegister(const CIORegister &other)
     { set(other.getCallback(IOType, callBackData)); }
@@ -28,12 +26,22 @@ public:
     CIORegister &operator=(TIORegisterData d) { set(d); return *this; }
     CIORegister &operator=(CIORegister &other) { set(other); return *this; }
     operator TIORegisterData(void) { return get(); }
-    CIORegister &operator|=(TIORegisterData d)
-    { set(get() | d); return *this; }
-    CIORegister &operator&=(TIORegisterData d)
-    { set(get() & d); return *this; }
-    CIORegister &operator^=(TIORegisterData d)
-    { set(get() ^ d); return *this; }
+    CIORegister &operator+=(TIORegisterData d) { set(get() + d); return *this; }
+    CIORegister &operator-=(TIORegisterData d) { set(get() - d); return *this; }
+    CIORegister &operator*=(TIORegisterData d) { set(get() * d); return *this; }
+    CIORegister &operator/=(TIORegisterData d) { set(get() / d); return *this; }
+    CIORegister &operator%=(TIORegisterData d) { set(get() % d); return *this; }
+    CIORegister &operator<<=(TIORegisterData d) { set(get() << d); return *this; }
+    CIORegister &operator>>=(TIORegisterData d) { set(get() >> d); return *this; }
+    CIORegister &operator|=(TIORegisterData d) { set(get() | d); return *this; }
+    CIORegister &operator&=(TIORegisterData d) { set(get() & d); return *this; }
+    CIORegister &operator^=(TIORegisterData d) { set(get() ^ d); return *this; }
+    CIORegister &operator++(void) { set(get() + 1); return *this; }
+    CIORegister operator++(int)
+    { CIORegister ret = *this; set(ret + 1); return ret; }
+    CIORegister &operator--(void) { set(get() - 1); return *this; }
+    CIORegister operator--(int)
+    { CIORegister ret = *this; set(ret - 1); return ret; }
 };
 
 }

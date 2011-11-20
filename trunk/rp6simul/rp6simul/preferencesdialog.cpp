@@ -52,6 +52,9 @@ QWidget *CPreferencesDialog::createGeneralTab()
                                                 CPathInput::PATH_EXISTDIR);
     form->addRow("Default project directory", defaultProjectDirPathInput);
 
+    form->addRow("Load last project on program start",
+                 loadPrevProjectCheckBox = new QCheckBox);
+
     return ret;
 }
 
@@ -137,7 +140,9 @@ void CPreferencesDialog::loadPreferences(QSettings &settings)
       - Simulation CPU usage
     */
 
-    defaultProjectDirPathInput->setPath(settings.value("defaultProjectDir", QDir::homePath()).toString());
+    defaultProjectDirPathInput->setPath(settings.value("defaultProjectDir",
+                                                       QDir::homePath()).toString());
+    loadPrevProjectCheckBox->setChecked(settings.value("loadPrevProjectStartup", true).toBool());
 
     soundGroupBox->setChecked(settings.value("soundEnabled", true).toBool());
     piezoVolumeSlider->setValue(settings.value("piezoVolume", 75).toInt());
@@ -160,6 +165,8 @@ void CPreferencesDialog::loadPreferences(QSettings &settings)
 void CPreferencesDialog::savePreferences(QSettings &settings)
 {
     settings.setValue("defaultProjectDir", defaultProjectDirPathInput->getPath());
+    settings.setValue("loadPrevProjectStartup",
+                      loadPrevProjectCheckBox->isChecked());
 
     settings.setValue("soundEnabled", soundGroupBox->isChecked());
     settings.setValue("piezoVolume", piezoVolumeSlider->value());

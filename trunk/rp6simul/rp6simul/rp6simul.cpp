@@ -256,6 +256,15 @@ QTableWidget *createLogFilterTable(const TDriverLogList &logentries)
     return ret;
 }
 
+void appendPlainText(QPlainTextEdit *edit, const QString &text)
+{
+    // Append text, without adding a new paragraph
+    QTextCursor cur = edit->textCursor();
+    cur.movePosition(QTextCursor::End);
+    edit->setTextCursor(cur);
+    edit->insertPlainText(text);
+}
+
 QByteArray handleSerialDeviceData(QextSerialPort *dev, lua_State *l, int luacb)
 {
     QByteArray bytes;
@@ -357,8 +366,11 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     QSettings settings;
     updatePreferences(settings);
 
-    // UNDONE
-    openProjectFile("/home/rick/test.rp6");
+    if (settings.value("loadPrevProjectStartup", true).toBool())
+    {
+        QStringList list = settings.value("recentProjects").toStringList();
+        openProjectFile(list.at(0), true);
+    }
 }
 
 CRP6Simulator::~CRP6Simulator()
@@ -991,12 +1003,14 @@ QWidget *CRP6Simulator::createLogTab()
 
     vbox->addWidget(logFilterButton = new QToolButton);
     logFilterButton->setIcon(QIcon("../resource/filter.png"));
+    logFilterButton->setToolTip("Filter driver log output");
     logFilterButton->setEnabled(false);
     connect(logFilterButton, SIGNAL(clicked()), SLOT(showLogFilter()));
 
     QToolButton *button = new QToolButton;
     vbox->addWidget(button);
     button->setIcon(QIcon("../resource/clear.png"));
+    button->setToolTip("Clear log");
     connect(button, SIGNAL(clicked()), logWidget, SLOT(clear()));
 
     return ret;
@@ -1372,12 +1386,28 @@ void CRP6Simulator::updateMapStackedWidget()
                                (projectTabWidget->currentIndex() == 1));
 }
 
-void CRP6Simulator::openProjectFile(const QString &file)
+void CRP6Simulator::openProjectFile(const QString &file, bool silent)
 {
-    CProjectSettings prsettings(file);
-
-    if (!verifySettingsFile(prsettings))
+    if (file == currentProjectFile)
         return;
+
+    if (!QFile::exists(file))
+    {
+        if (!silent)
+            QMessageBox::critical(this, "Project file error",
+                                  "Project file does not exist!");
+        return;
+    }
+
+    CProjectSettings prsettings(file);
+    if (!verifySettingsFile(prsettings, silent))
+        return;
+
+    // This function may be called from the constructor, however
+    // setWindowFilePath doesn't seem to have any affect in such a case.
+    // Therefore, a timer is used to call to make sure this function is called
+    // after construction.
+    QTimer::singleShot(0, this, SLOT(fixWindowTitle()));
 
     updateProjectSettings(prsettings);
 
@@ -1385,10 +1415,6 @@ void CRP6Simulator::openProjectFile(const QString &file)
     runPluginAction->setEnabled(true);
     resetPluginAction->setEnabled(false);
     robotToolBar->setEnabled(true);
-
-    foreach (QAction *a, mapMenuActionList)
-        a->setEnabled(true);
-    saveMapAsAction->setEnabled(!currentMapFile.isNull());
     editProjectSettingsAction->setEnabled(true);
 
     currentProjectFile = file;
@@ -1416,6 +1442,11 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
     m32ADCTableWidget->setEnabled(hasm32);
     extEEPROMDockWidget->setEnabled(hasm32);
 
+    foreach (QAction *a, mapMenuActionList)
+        a->setEnabled(hasrobot);
+    saveMapAsAction->setEnabled(hasrobot && !currentMapFile.isNull());
+    mapSelectorTreeWidget->setEnabled(hasrobot);
+
     if (currentSimulator == SIMULATOR_ROBOT)
     {
         IORegisterTableSelector->setCurrentIndex(0); // Switch to robot
@@ -1431,13 +1462,11 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
 
     if (hasrobot)
     {
-        projectTabWidget->setTabEnabled(1, true); // Enable map tab
-
         prsettings.beginGroup("robot");
-        const bool ret = robotSimulator->loadProjectFile(prsettings);
+        robotSimulator->loadProjectFile(prsettings);
         prsettings.endGroup();
-        if (!ret)
-            return;
+
+        projectTabWidget->setTabEnabled(1, true); // Enable map tab
     }
 
     if (hasm32)
@@ -1458,10 +1487,8 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
             projectTabWidget->setCurrentIndex(0);
         }
 
-        const bool ret = m32Simulator->loadProjectFile(prsettings);
+        m32Simulator->loadProjectFile(prsettings);
         prsettings.endGroup();
-        if (!ret)
-            return;
     }
 }
 
@@ -1499,6 +1526,16 @@ void CRP6Simulator::addRecentProject(const QString &file)
 
 void CRP6Simulator::loadMapFile(const QString &file, bool istemplate)
 {
+    if (!QFile::exists(file))
+    {
+        QMessageBox::critical(this, "Map file error",
+                              "Map file does not exist!");
+        return;
+    }
+
+    // Activate map tab, even if map already loaded.
+    projectTabWidget->setCurrentIndex(1);
+
     if (file == currentMapFile)
         return;
 
@@ -2591,6 +2628,12 @@ void CRP6Simulator::openProject()
         openProjectFile(file);
 }
 
+void CRP6Simulator::fixWindowTitle()
+{
+    if (!currentProjectFile.isEmpty())
+        setWindowFilePath(currentProjectFile);
+}
+
 void CRP6Simulator::updateRecentProjectMenu()
 {
     if (pluginRunning)
@@ -2705,6 +2748,7 @@ void CRP6Simulator::newMap()
         }
 
         robotScene->newMap(s, QSizeF(size, size));
+        s.sync();
         loadMapFile(path, false);
         break;
     }
@@ -2802,13 +2846,15 @@ void CRP6Simulator::editPreferences()
 void CRP6Simulator::showAbout()
 {
     QDialog dialog(this);
-    dialog.setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
     dialog.setWindowTitle("About");
     QVBoxLayout *vbox = new QVBoxLayout(&dialog);
 
+    QTabWidget *tabw = new QTabWidget;
+    vbox->addWidget(tabw);
+
 
     QTextBrowser *textw = new QTextBrowser;
-    textw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     textw->setOpenExternalLinks(true);
     textw->setWordWrapMode(QTextOption::NoWrap);
     textw->setReadOnly(true);
@@ -2821,13 +2867,23 @@ void CRP6Simulator::showAbout()
                    .arg(QCoreApplication::applicationName())
                    .arg(QCoreApplication::organizationDomain())
                    .arg(QCoreApplication::applicationVersion()));
-    vbox->addWidget(textw);
+    tabw->addTab(textw, "About");
+
+    QPlainTextEdit *plaintextw = new QPlainTextEdit;
+    plaintextw->setReadOnly(true);
+    QFile file("../COPYING");
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        while (!file.atEnd())
+            appendPlainText(plaintextw, file.readLine());
+    }
+    tabw->addTab(plaintextw, "License");
 
     QDialogButtonBox *bbox = new QDialogButtonBox(QDialogButtonBox::Ok);
     connect(bbox, SIGNAL(accepted()), &dialog, SLOT(accept()));
     vbox->addWidget(bbox);
 
-    dialog.resize(450, 100);
+    dialog.resize(450, 200);
     dialog.exec();
 }
 
@@ -2888,14 +2944,12 @@ void CRP6Simulator::timedUIUpdate()
     QMutexLocker rserialocker(&instance->robotSerialBufferMutex);
     if (!robotSerialTextBuffer.isEmpty())
     {
-        // Append text, without adding a new paragraph
-        QTextCursor cur = robotSerialOutputWidget->textCursor();
-        cur.movePosition(QTextCursor::End);
-        robotSerialOutputWidget->setTextCursor(cur);
+        // Apply black color
         QTextCharFormat cf(robotSerialOutputWidget->currentCharFormat());
         cf.setForeground(Qt::black);
         robotSerialOutputWidget->setCurrentCharFormat(cf);
-        robotSerialOutputWidget->insertPlainText(robotSerialTextBuffer);
+
+        appendPlainText(robotSerialOutputWidget, robotSerialTextBuffer);
 
         if (robotSerialDevice->isWritable())
             robotSerialDevice->write(robotSerialTextBuffer.toLatin1());
@@ -2906,14 +2960,12 @@ void CRP6Simulator::timedUIUpdate()
     QMutexLocker mserialocker(&instance->m32SerialBufferMutex);
     if (!m32SerialTextBuffer.isEmpty())
     {
-        // Append text, without adding a new paragraph
-        QTextCursor cur = m32SerialOutputWidget->textCursor();
-        cur.movePosition(QTextCursor::End);
-        m32SerialOutputWidget->setTextCursor(cur);
+        // Apply black color
         QTextCharFormat cf(m32SerialOutputWidget->currentCharFormat());
         cf.setForeground(Qt::black);
         m32SerialOutputWidget->setCurrentCharFormat(cf);
-        m32SerialOutputWidget->insertPlainText(m32SerialTextBuffer);
+
+        appendPlainText(m32SerialOutputWidget, m32SerialTextBuffer);
 
         if (m32SerialDevice->isWritable())
             m32SerialDevice->write(m32SerialTextBuffer.toLatin1());
@@ -3284,8 +3336,6 @@ void CRP6Simulator::tabViewChanged(int index)
     const bool robottab = (index == 0);
 
     robotToolBar->setEnabled(robottab);
-
-    mapSelectorTreeWidget->setEnabled(!robottab);
     editMapToolBar->setEnabled(!robottab && !currentMapFile.isEmpty());
 }
 
