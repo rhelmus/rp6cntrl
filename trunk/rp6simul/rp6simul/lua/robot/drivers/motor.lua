@@ -34,14 +34,6 @@ local motorInfo = {
 
 local leftEncTimer, rightEncTimer, encReadoutTimer
 
-local function getSpeedTimerBase()
-    -- This function should return the same value, defined as
-    -- 'SPEED_TIMER_BASE' in the plugin (defined in RP6Config.h shipped
-    -- with the RP6 library)
-    -- UNDONE: Get this from plugin/setting?
-    return 200
-end
-
 local function getEffectiveSpeedTimerBase()
     --[[
         There is a small bug/glitch in the shipped RP6 library by Arexx

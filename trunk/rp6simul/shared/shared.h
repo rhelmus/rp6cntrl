@@ -90,6 +90,9 @@ typedef TIORegisterData (*TIORegisterGetCB)(EIORegisterTypes, void *);
 typedef void (*TEnableISRsCB)(bool, void *);
 typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
                                     TEnableISRsCB, void *);
+typedef float (*TGetEncoderResolution)(void);
+typedef int (*TGetRotationFactor)(void);
+typedef int (*TGetTimerSpeedBase)(void);
 #ifdef GLUE
 } // end namespace
 #endif

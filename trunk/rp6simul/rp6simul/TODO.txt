@@ -58,3 +58,5 @@
 - More menu options (from toolbar)
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
 - BUG: sometimes crashes on exit
+- Disable sound if SDL failed
+- BUG: LEDs etc not refreshed if robot item does not move
