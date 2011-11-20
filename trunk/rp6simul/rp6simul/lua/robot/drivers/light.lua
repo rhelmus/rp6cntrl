@@ -11,16 +11,11 @@ function initPlugin()
 end
 
 function getADCValue(a)
-    -- UNDONE? robot status is only updated if ADC value is requested.
-    -- Although this happens frequently when task_ADC() is called from the
-    -- plugin.
     if a == "LS_L" then
         local l = leftLightSensor:getLight()
-        updateRobotStatus("light", "left", l)
         return l
     elseif a == "LS_R" then
         local l = rightLightSensor:getLight()
-        updateRobotStatus("light", "right", l)
         return l
     end
 

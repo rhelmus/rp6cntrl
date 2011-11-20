@@ -186,6 +186,7 @@ class CRP6Simulator : public QMainWindow
     static CRP6Simulator *instance;
 
     void openSerialPort(QextSerialPort *port);
+    void handleSoundError(const QString &error, const QString &reason);
     void initSDL(void);
     bool openSDLAudio(void);
     void initSimulators(void);

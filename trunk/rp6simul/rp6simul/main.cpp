@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     pthread_sigmask(SIG_BLOCK, &sset, 0);
 #endif
 
-    QApplication::setGraphicsSystem("raster"); // UNDONE
+    QApplication::setGraphicsSystem("raster"); // UNDONE: Required on Windows?
 
     QCoreApplication::setOrganizationName("rp6simul");
     // UNDONE

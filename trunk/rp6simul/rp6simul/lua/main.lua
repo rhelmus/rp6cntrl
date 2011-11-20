@@ -243,7 +243,7 @@ function simulator(name)
     setmetatable(ret, { __index = _G })
 
     -- Neater logging
-    -- UNDONE: need this
+    -- UNDONE: need this?
     --    ret.log = function(s, ...) log(string.format("<%s> %s", name, s), ...) end
     --    ret.debugLog = function(s, ...) debugLog(string.format("<%s> %s", name, s), ...) end
     --    ret.warning = function(s, ...) warning(string.format("<%s> %s", name, s), ...) end

@@ -161,7 +161,7 @@ QTableWidget *createADCTableWidget(const QStringList &adclist)
         ret->setCellWidget(i, 0, cw);
 
         QSpinBox *spin = new QSpinBox;
-        spin->setRange(0, 1023); // UNDONE? ADC may have lower max
+        spin->setRange(0, 1023);
         spin->setEnabled(false);
         QObject::connect(check, SIGNAL(toggled(bool)), spin,
                          SLOT(setEnabled(bool)));
@@ -387,9 +387,20 @@ void CRP6Simulator::openSerialPort(QextSerialPort *port)
         port->setDtr(false);
         port->setRts(false);
     }
-    else // UNDONE
+    else
         QMessageBox::critical(this, "Serial port error",
                               QString("Failed to open serial port %1:\n%2").arg(port->portName()).arg(port->errorString()));
+}
+
+void CRP6Simulator::handleSoundError(const QString &error, const QString &reason)
+{
+    QMessageBox::critical(this, error,
+                          QString("%1\nSound will be disabled. You can "
+                                  "re-enable it again in the Preferences screen.")
+                          .arg(reason));
+    QSettings settings;
+    settings.setValue("soundEnabled", false);
+    soundEnabled = false;
 }
 
 void CRP6Simulator::initSDL()
@@ -398,9 +409,8 @@ void CRP6Simulator::initSDL()
 
     if (SDL_Init(SDL_INIT_AUDIO))
     {
-        // UNDONE
-        QMessageBox::critical(this, "SDL init error",
-                              QString("Failed to initialize SDL:\n%1").arg(SDL_GetError()));
+        handleSoundError("SDL init error",
+                         QString("Failed to initialize SDL:\n%1").arg(SDL_GetError()));
         return;
     }
 
@@ -414,9 +424,8 @@ void CRP6Simulator::initSDL()
 
     if (SDL_LoadWAV("../resource/clapping-hands.wav", &wave, &data, &dlen) == NULL)
     {
-        // UNDONE
-        QMessageBox::critical(this, "Audio error",
-                              QString("Failed to load clapping sound:\n%1").arg(SDL_GetError()));
+        handleSoundError("Sound error",
+                         QString("Failed to load clapping sound:\n%1").arg(SDL_GetError()));
         return;
     }
 
@@ -443,9 +452,8 @@ bool CRP6Simulator::openSDLAudio()
 
     if (SDL_OpenAudio(&spec, &retspec))
     {
-        // UNDONE
-        QMessageBox::critical(this, "Audio error",
-                              QString("Failed to open audio device:\n%1").arg(SDL_GetError()));
+        handleSoundError("Sound error",
+                         QString("Failed to open audio device:\n%1").arg(SDL_GetError()));
         return false;
     }
 
@@ -1074,13 +1082,6 @@ QWidget *CRP6Simulator::createIRCOMMTab()
     grid->addWidget(IRCOMMSendButton = new QPushButton("Send"), 1, 6);
     IRCOMMSendButton->setEnabled(false);
     connect(IRCOMMSendButton, SIGNAL(clicked()), SLOT(sendIRCOMM()));
-    // UNDONE
-//    connect(IRCOMMAddressWidget, SIGNAL(returnPressed()), IRCOMMSendButton,
-//            SLOT(click()));
-//    connect(IRCOMMKeyWidget, SIGNAL(returnPressed()), IRCOMMSendButton,
-//            SLOT(click()));
-//    connect(IRCOMMToggleWidget, SIGNAL(returnPressed()), IRCOMMSendButton,
-//            SLOT(click()));
     connect(this, SIGNAL(receivedIRCOMMSendCallback(bool)), IRCOMMSendButton,
             SLOT(setEnabled(bool)));
 
@@ -1460,7 +1461,7 @@ void CRP6Simulator::updateProjectSettings(QSettings &prsettings)
         const bool ret = m32Simulator->loadProjectFile(prsettings);
         prsettings.endGroup();
         if (!ret)
-            return; // UNDONE: Close robot simulator?
+            return;
     }
 }
 
@@ -2522,11 +2523,9 @@ void CRP6Simulator::handleRobotSerialDeviceData()
     if (robotSerialSendLuaCallback == 0)
         return;
 
-    // UNDONE: Ignore data if not running(? callback == 0 in that case)
-
     QByteArray txt = handleSerialDeviceData(robotSerialDevice,
-                                          robotSimulator->getLuaState(),
-                                          robotSerialSendLuaCallback);
+                                            robotSimulator->getLuaState(),
+                                            robotSerialSendLuaCallback);
 
     QTextCharFormat cf(robotSerialOutputWidget->currentCharFormat());
     cf.setForeground(Qt::lightGray);
@@ -2539,11 +2538,9 @@ void CRP6Simulator::handleM32SerialDeviceData()
     if (m32SerialSendLuaCallback == 0)
         return;
 
-    // UNDONE: Ignore data if not running(? callback == 0 in that case)
-
     QByteArray txt = handleSerialDeviceData(m32SerialDevice,
-                                          m32Simulator->getLuaState(),
-                                          m32SerialSendLuaCallback);
+                                            m32Simulator->getLuaState(),
+                                            m32SerialSendLuaCallback);
 
     QTextCharFormat cf(m32SerialOutputWidget->currentCharFormat());
     cf.setForeground(Qt::lightGray);
@@ -2804,28 +2801,59 @@ void CRP6Simulator::editPreferences()
 
 void CRP6Simulator::showAbout()
 {
-    // UNDONE
-    QMessageBox::about(this, "rp6sim", "Hello");
+    QDialog dialog(this);
+    dialog.setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    dialog.setWindowTitle("About");
+    QVBoxLayout *vbox = new QVBoxLayout(&dialog);
+
+
+    QTextBrowser *textw = new QTextBrowser;
+    textw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    textw->setOpenExternalLinks(true);
+    textw->setWordWrapMode(QTextOption::NoWrap);
+    textw->setReadOnly(true);
+    textw->viewport()->setAutoFillBackground(false);
+    textw->setHtml(QString("<strong>%1</strong><br><br>"
+                           "Simulator for the programmable RP6 Robot by <A HREF=\"http://www.arexx.com\">AREXX engineering</A>.<br><br>"
+                           "Project website: <A HREF=\"http://%2\">http://%2</A><br>"
+                           "Current version: %3<br>"
+                           "Author: Rick Helmus (rhelmus AT gmail dot com)<br>")
+                   .arg(QCoreApplication::applicationName())
+                   .arg(QCoreApplication::organizationDomain())
+                   .arg(QCoreApplication::applicationVersion()));
+    vbox->addWidget(textw);
+
+    QDialogButtonBox *bbox = new QDialogButtonBox(QDialogButtonBox::Ok);
+    connect(bbox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+    vbox->addWidget(bbox);
+
+    dialog.resize(450, 100);
+    dialog.exec();
 }
 
 void CRP6Simulator::timedUIUpdate()
 {
-    QVariantHash adcvalues(getADCValues(robotSimulator->getLuaState()));
-    for (QVariantHash::iterator it=adcvalues.begin(); it!=adcvalues.end(); ++it)
+    if (hasRobotSimulator())
     {
-        appendRobotStatusUpdate(QStringList() << "robot" << "ADC" <<
-                                it.key() << it.value().toString());
-        robotWidget->setRobotADCValue(it.key(), it.value().toInt());
+        QVariantHash adcvalues(getADCValues(robotSimulator->getLuaState()));
+        for (QVariantHash::iterator it=adcvalues.begin(); it!=adcvalues.end(); ++it)
+        {
+            appendRobotStatusUpdate(QStringList() << "robot" << "ADC" <<
+                                    it.key() << it.value().toString());
+            robotWidget->setRobotADCValue(it.key(), it.value().toInt());
+        }
     }
 
-    adcvalues = getADCValues(m32Simulator->getLuaState());
-    for (QVariantHash::iterator it=adcvalues.begin(); it!=adcvalues.end(); ++it)
+    if (hasM32Simulator())
     {
-        appendRobotStatusUpdate(QStringList() << "m32" << "ADC" <<
-                                it.key() << it.value().toString());
-        robotWidget->setM32ADCValue(it.key(), it.value().toInt());
+        QVariantHash adcvalues = getADCValues(m32Simulator->getLuaState());
+        for (QVariantHash::iterator it=adcvalues.begin(); it!=adcvalues.end(); ++it)
+        {
+            appendRobotStatusUpdate(QStringList() << "m32" << "ADC" <<
+                                    it.key() << it.value().toString());
+            robotWidget->setM32ADCValue(it.key(), it.value().toInt());
+        }
     }
-
 
 #ifdef USEATOMIC
     const QAtomicInt *ioregisters;
@@ -2849,8 +2877,6 @@ void CRP6Simulator::timedUIUpdate()
     }
 
     IORegisterTableWidget->resizeColumnsToContents();
-
-    // UNDONE: Double check to avoid mutexes?
 
     QMutexLocker loglocker(&instance->logBufferMutex);
     if (!logTextBuffer.isEmpty())
@@ -2973,6 +2999,7 @@ void CRP6Simulator::timedLEDUpdate()
         it.key()->setEnabled(it.value());
 
     robotWidget->update();
+    robotScene->getRobotItem()->update();
     changedLEDs.clear();
 }
 

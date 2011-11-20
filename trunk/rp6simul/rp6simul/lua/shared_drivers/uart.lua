@@ -1,7 +1,5 @@
 local ret = driver(...)
 
--- UNDONE: Receiving (i.e. handling user input)(don't forgot receiverEnabled/enabled!)
-
 description = "Driver for the UART (serial input/output)."
 
 handledIORegisters = {
@@ -120,14 +118,8 @@ end
 
 
 function initPlugin()
-    -- Apply initial UART settings
-    -- UNDONE: Move out of driver
-    avr.setIORegister(avr.IO_UCSRA, bit.set(0, avr.UDRE))
-    avr.setIORegister(avr.IO_UCSRC, bit.set(0, avr.URSEL, avr.UCSZ0, avr.UCSZ1))
-
     -- Update data register even when set with previous value!
     avr.setIORegisterIgnoreEqual(avr.IO_UDR, true)
-
     setSerialSendCallback(sendSerial)
 end
 

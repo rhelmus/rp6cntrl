@@ -94,11 +94,10 @@ namespace {
 
 static int luaPanicCallback(lua_State *l)
 {
-    // UNDONE (might not be a gui thread)
-//    QMessageBox::critical(CRP6Simulator::getInstance(), "Lua error",
-//                          lua_tostring(l, 1));
-    qWarning() << "Lua error:" << lua_tostring(l, -1);
-    Q_ASSERT(false);
+    // This isn't the nicest thing to do, however Lua errors should not occur
+    // anyway... Note that we cannot use a messagebox here since this function
+    // may be called outside the GUI thread.
+    qCritical() << "Lua error:" << lua_tostring(l, -1);
     return 0;
 }
 
@@ -884,9 +883,8 @@ int CSimulator::luaTimerSetTimeOut(lua_State *l)
     CSimulator *instance = NLua::getFromClosure<CSimulator *>(l);
     CAVRTimer *timer = NLua::checkClassData<CAVRTimer>(l, 1, "timer");
 
-    // UNDONE
     if (timer->isEnabled())
-        qFatal("Tried to change timer timeout function when being active.\n");
+        luaL_error(l, "Tried to change timer timeout function when being active.\n");
 
     QMap<CAVRTimer *, STimeOutInfo>::iterator it =
             instance->timeOutMap.find(timer);
@@ -1084,7 +1082,12 @@ void CSimulator::startLua(const char *name)
 {
     const QString p = QDir::toNativeSeparators("lua/main.lua");
     if (luaL_dofile(luaState, qPrintable(p)))
-        NLua::luaError(luaState, true);
+    {
+        const char *msg = lua_tostring(luaState, -1);
+        QMessageBox::critical(CRP6Simulator::getInstance(), "Lua error",
+                              QString("Failed to load main.lua:\n%1").arg(msg));
+        qFatal("Failed to load main.lua: %s", msg);
+    }
 
     lua_getglobal(luaState, "init");
     lua_pushstring(luaState, name);
@@ -1093,18 +1096,13 @@ void CSimulator::startLua(const char *name)
 
 bool CSimulator::loadProjectFile(const QSettings &settings)
 {
-    const QString plugfile = settings.value("plugin").toString();
-    if (!verifyPluginFile(plugfile))
-        return false;
-
-    currentPluginFileName = plugfile;
+    currentPluginFileName = settings.value("plugin").toString();
     currentDriverList = settings.value("drivers").toStringList();
 
     if (currentDriverList.isEmpty())
         QMessageBox::warning(CRP6Simulator::getInstance(), "Empty driverlist",
                              "Project does not have any drivers specified!");
 
-    stopPlugin();
     return true;
 }
 
@@ -1148,11 +1146,8 @@ bool CSimulator::initPlugin()
         return false;
     }
 
-    if (currentPluginFileName.isEmpty())
-    {
-        QMessageBox::critical(CRP6Simulator::getInstance(), "Plugin error", "Project has no RP6 plugin set");
+    if (!verifyPluginFile(currentPluginFileName))
         return false;
-    }
 
     pluginLibrary.setFileName(currentPluginFileName);
 
@@ -1180,6 +1175,26 @@ bool CSimulator::initPlugin()
     pluginMainThread = new CCallPluginMainThread(mainfunc, this);
 
     setplugincb(IORegisterSetCB, IORegisterGetCB, enableISRsCB, this);
+
+    for (int i=0; i<IO_END; ++i)
+    {
+        IORegisterData[i] = 0;
+        IORegisterDataIgnoreEqual[i] = false;
+    }
+
+    // Init some default register values
+    IORegisterData[IO_TWSR] = 0b11111000;
+    IORegisterData[IO_TWDR] = 0b11111111;
+    IORegisterData[IO_TWAR] = 0b11111110;
+    IORegisterData[IO_UCSRA] = 0b00100000;
+    IORegisterData[IO_UCSRC] = 0b10000110;
+
+    ISRsEnabled = false;
+    for (int i=0; i<ISR_END; ++i)
+    {
+        ISRCacheArray[i] = 0;
+        ISRFailedArray[i] = false;
+    }
 
     return true;
 }
@@ -1228,17 +1243,4 @@ void CSimulator::stopPlugin()
 
     lua_getglobal(luaState, "closePlugin");
     lua_call(luaState, 0, 0);
-
-    for (int i=0; i<IO_END; ++i)
-    {
-        IORegisterData[i] = 0;
-        IORegisterDataIgnoreEqual[i] = false;
-    }
-
-    ISRsEnabled = false;
-    for (int i=0; i<ISR_END; ++i)
-    {
-        ISRCacheArray[i] = 0;
-        ISRFailedArray[i] = false;
-    }
 }

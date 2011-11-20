@@ -9,7 +9,6 @@ handledIORegisters = {
 
 function initPlugin()
     -- Init SPSR register: we're always ready
-    -- UNDONE: Not here
     avr.setIORegister(avr.IO_SPSR, bit.set(0, avr.SPIF))
 end
 
