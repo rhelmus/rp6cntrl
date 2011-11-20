@@ -25,9 +25,6 @@ local function handleSound(l)
         level = 200
     end
 
-    updateRobotStatus("MIC", "level", level)
-
-
     if MICInfo.currentSoundLevel < level then
         MICInfo.currentSoundLevel = level
     end

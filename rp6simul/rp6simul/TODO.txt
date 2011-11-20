@@ -3,12 +3,6 @@
 - Error handling; check UNDONE's
 - IO register class: test all operators (addition, subtraction, ... (printf), etc)
 - Check delta for avrtimer when avr thread is running at 100%
-- Fix checkDelay for ioregister class
-    - Settings
-- Check for initial register settings
-    - Applying these outside lua
-- UI ideas
-    - About
 - Check for modal dialogs blocking timers
 - Dir separators for Windows port
 - Test port enumeration on Windows
@@ -41,12 +35,8 @@
 - Destruction: instance may be zero when it shouldn't yet
 - Test/verify atomic register array
 - Test/verify reduced lua locks (if done: remove comments and commented stuff)
-- Auto toggle for IRCOMM sending?
-- Reset ADC after project/plugin load?
 - m32 support:
-    - Improve error checking on starting plugin etc?
     - Extend loadCustomDriverInfo()?
-- autodetect F_CPU?
 - Robot speed: correct?
 - ADC values are not rounded
 - What is EINT1 ADC value?
@@ -58,5 +48,4 @@
 - More menu options (from toolbar)
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
 - BUG: sometimes crashes on exit
-- Disable sound if SDL failed
-- BUG: LEDs etc not refreshed if robot item does not move
+- rp6simul --> rp6sim?

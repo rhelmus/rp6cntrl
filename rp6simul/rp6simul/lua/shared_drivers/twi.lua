@@ -213,15 +213,8 @@ end
 
 
 function initPlugin()
-    -- Initialize TWI IO registers
-    -- UNDONE: Not here
-    avr.setIORegister(avr.IO_TWSR, tonumber(11111000, 2))
-    avr.setIORegister(avr.IO_TWDR, tonumber(11111111, 2))
-    avr.setIORegister(avr.IO_TWAR, tonumber(11111110, 2))
-
     avr.setIORegisterIgnoreEqual(avr.IO_TWDR, true)
     avr.setIORegisterIgnoreEqual(avr.IO_TWCR, true)
-
     avr.setTWIMSGHandler(TWIMSGHandler)
 end
 

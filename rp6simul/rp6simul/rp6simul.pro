@@ -18,6 +18,10 @@ LIBS += -L../qextserialport/build -lqextserialport
 LIBS += -lSDL
 LIBS += -lqwt
 
+!debug {
+    DEFINES += NDEBUG
+}
+
 SOURCES += main.cpp\
         rp6simul.cpp \
     pluginthread.cpp \

@@ -78,16 +78,6 @@ void stackDump(lua_State *l)
     qDebug("---------------\n");  /* end the listing */
 }
 
-void luaError(lua_State *l, bool fatal)
-{
-    // UNDONE
-    const char *errmsg = lua_tostring(l, -1);
-    if (!fatal)
-        qCritical() << "Lua error: " << errmsg << "\n";
-    else
-        qFatal("Lua error: %s\n", errmsg);
-}
-
 void registerFunction(lua_State *l, lua_CFunction func, const char *name,
                       void *d)
 {

@@ -69,7 +69,10 @@ void CAVRClock::run()
     const CTicks finalticks = currentTicks + newticks;
     const CTicks curticks(currentTicks);
 
+#ifndef NDEBUG
     runsPerSec++;
+#endif
+
     currentTicks = finalticks; // May be less, see below
     CAVRTimer *timer;
     int timeouts = 0;
@@ -97,15 +100,18 @@ void CAVRClock::run()
     ticksPerSec += (currentTicks - curticks);
     remainingTicks = finalticks - currentTicks;
 
+#ifndef NDEBUG
     timeOutsPerSec += timeouts;
 
     clock_gettime(CLOCK_MONOTONIC, &curtime);
     totalTimeOutTime += getUSDiff(lastClockTime, curtime);
+#endif
 
     if (totalDeltaTime >= 1000000)
     {
         const double corr = 1000000.0 / totalDeltaTime; // Correction factor
 
+#ifndef NDEBUG
         qDebug() << "totalDeltaTime:" << totalDeltaTime << (void*)this;
         qDebug() << "runsPerSec:" << runsPerSec << (void*)this;
         qDebug() << "AVG delta:" << (totalDeltaTime / runsPerSec) << (void*)this;
@@ -113,13 +119,14 @@ void CAVRClock::run()
         qDebug() << "Frequency (ticks/s) (uncorrected):" << ticksPerSec << (void*)this;
         qDebug() << "Frequency (ticks/s) (corrected):" << (unsigned long)(ticksPerSec.get() * corr) << (void*)this;
         qDebug() << "avg timeout time:" << totalTimeOutTime / runsPerSec << (void*)this;
-        totalDeltaTime = runsPerSec = 0;
+        runsPerSec = 0;
         timeOutsPerSec = 0;
         totalTimeOutTime = 0;
+#endif
 
-        // UNDONE: Move out of debug code
         emit clockSpeed(ticksPerSec.get() * corr);
         ticksPerSec.reset();
+        totalDeltaTime = 0;
     }
 
     // Relieve CPU a bit
@@ -160,8 +167,7 @@ void CAVRClock::enableTimer(CAVRTimer *timer, bool e)
         if (e) // Init timer?
         {
             // UNDONE: Always do this when being enabled?
-            timer->getRefNextTick() =
-                    currentTicks + timer->getTrueCompareValue();
+            timer->getRefNextTick() = currentTicks + timer->getTrueCompareValue();
 #if 0
             const CTicks maxnexttick(currentTicks + timer->getTrueCompareValue());
             if (maxnexttick < timer->getNextTick())

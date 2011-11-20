@@ -318,14 +318,12 @@ function getADCValue(a)
             return 0
         end
         local ret = mincurrent + ((motorInfo.leftPower / maxpower) * currentd)
-        updateRobotStatus("motor", "current", "left", ret)
         return ret
     elseif a == "MCURRENT_R" then
         if motorInfo.rightPower == 0 then
             return 0
         end
         local ret = mincurrent + ((motorInfo.rightPower / maxpower) * currentd)
-        updateRobotStatus("motor", "current", "right", ret)
         return ret
     end
 

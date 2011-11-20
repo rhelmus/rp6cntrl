@@ -10,7 +10,6 @@
 namespace NLua
 {
 void stackDump(lua_State *l);
-void luaError(lua_State *l, bool fatal);
 void registerFunction(lua_State *l, lua_CFunction func, const char *name,
                       void *d=0);
 void registerFunction(lua_State *l, lua_CFunction func, const char *name,

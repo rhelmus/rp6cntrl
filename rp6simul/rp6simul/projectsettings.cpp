@@ -178,30 +178,38 @@ CDriverSelectionWidget::CDriverSelectionWidget(const TDriverInfoList &drlist,
                                                QWidget *parent, Qt::WindowFlags f)
     : QWidget(parent, f), driverInfoList(drlist)
 {
-    // UNDONE: Description?
+    QVBoxLayout *vbox = new QVBoxLayout(this);
 
-    QHBoxLayout *hbox = new QHBoxLayout(this);
+    QLabel *l = new QLabel("Here you can select the drivers that should be used. "
+                           "Most likely you don't want to change this. Note "
+                           "that some drivers must be loaded.");
+    l->setWordWrap(true);
+    l->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    vbox->addWidget(l);
+
+    QHBoxLayout *hbox = new QHBoxLayout;
+    vbox->addLayout(hbox);
 
     hbox->addWidget(driverTreeWidget = new QTreeWidget);
     driverTreeWidget->setHeaderLabels(QStringList() << "Driver" << "Description");
     driverTreeWidget->setRootIsDecorated(false);
 
-    QVBoxLayout *vbox = new QVBoxLayout;
-    hbox->addLayout(vbox);
+    QVBoxLayout *subvbox = new QVBoxLayout;
+    hbox->addLayout(subvbox);
 
-    vbox->addWidget(addDriverButton = new QPushButton("Add driver"));
+    subvbox->addWidget(addDriverButton = new QPushButton("Add driver"));
     QMenu *menu = new QMenu(addDriverButton);
     menu->addSeparator();
     addCustomDriverAction = menu->addAction("Add custom driver...");
     connect(menu, SIGNAL(triggered(QAction*)), this, SLOT(addDriver(QAction*)));
     addDriverButton->setMenu(menu);
 
-    vbox->addWidget(delDriverButton = new QPushButton("Remove driver"));
+    subvbox->addWidget(delDriverButton = new QPushButton("Remove driver"));
     connect(delDriverButton, SIGNAL(clicked()), this, SLOT(delDriver()));
 
     QPushButton *button = new QPushButton("Reset");
     connect(button, SIGNAL(clicked()), this, SLOT(resetDriverTree()));
-    vbox->addWidget(button);
+    subvbox->addWidget(button);
 
     initDrivers();
 }
