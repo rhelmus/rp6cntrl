@@ -27,6 +27,8 @@ local ACSInfo = {
     rightIRSensor = nil
 }
 
+local powerON = false
+
 
 local function updateACSPower(type, data)
     local function getreg(t)
@@ -74,7 +76,7 @@ local function maybeReceivePulse(sensor)
     -- towards the detector. Receiving pulses happens immidiately after they
     -- are sent. Note that in real life pulses travel at the speed of light,
     -- which is close too instant as well :)
-    if math.random() <= chance and ACSInfo.power ~= "off" then
+    if powerON and math.random() <= chance and ACSInfo.power ~= "off" then
         local dist
         if sensor == "left" then
             dist = ACSInfo.leftIRSensor:getHitDistance()
@@ -110,6 +112,8 @@ function handleIOData(type, data)
     end
 
     if type == avr.IO_PORTB then
+        powerON = bit.isSet(data, avr.PB4)
+
         local e = not bit.isSet(data, ACSFlags.ACS_L)
         if e ~= ACSInfo.leftEnabled then
             ACSInfo.leftEnabled = e

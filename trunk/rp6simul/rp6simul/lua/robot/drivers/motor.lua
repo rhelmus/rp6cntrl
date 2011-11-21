@@ -13,6 +13,7 @@ handledIORegisters = {
     avr.IO_OCR1BH,
     avr.IO_ICR1,
     avr.IO_TIMSK,
+    avr.IO_PORTB,
     avr.IO_PORTC
 }
 
@@ -33,6 +34,7 @@ local motorInfo = {
 }
 
 local leftEncTimer, rightEncTimer, encReadoutTimer
+local powerON = false
 
 local function getEffectiveSpeedTimerBase()
     --[[
@@ -220,7 +222,7 @@ function initPlugin()
     leftEncTimer = clock.createTimer()
     leftEncTimer:setTimeOut(function()
         motorInfo.leftEncDriveCounter = motorInfo.leftEncDriveCounter + 1
-        if not robotIsBlocked() then
+        if not robotIsBlocked() and powerON then
             avr.execISR(avr.ISR_INT0_vect)
             motorInfo.leftEncMoveCounter = motorInfo.leftEncMoveCounter + 1
         end
@@ -229,7 +231,7 @@ function initPlugin()
     rightEncTimer = clock.createTimer()
     rightEncTimer:setTimeOut(function()
         motorInfo.rightEncDriveCounter = motorInfo.rightEncDriveCounter + 1
-        if not robotIsBlocked() then
+        if not robotIsBlocked() and powerON then
             avr.execISR(avr.ISR_INT1_vect)
             motorInfo.rightEncMoveCounter = motorInfo.rightEncMoveCounter + 1
         end
@@ -301,6 +303,8 @@ function handleIOData(type, data)
             avr.setIORegister(avr.IO_OCR1B, v)
         elseif type == avr.IO_ICR1 then
             setInputRegister(data)
+        elseif type == avr.IO_PORTB then
+            powerON = bit.isSet(data, avr.PB4)
         elseif type == avr.IO_PORTC then
             setMotorDirection(data)
         end
@@ -313,18 +317,17 @@ function getADCValue(a)
     local mincurrent, maxcurrent = 200, 700
     local currentd = maxcurrent - mincurrent
     local maxpower = 210
+
     if a == "MCURRENT_L" then
-        if motorInfo.leftPower == 0 then
+        if motorInfo.leftPower == 0 or not powerON then
             return 0
         end
-        local ret = mincurrent + ((motorInfo.leftPower / maxpower) * currentd)
-        return ret
+        return mincurrent + ((motorInfo.leftPower / maxpower) * currentd)
     elseif a == "MCURRENT_R" then
-        if motorInfo.rightPower == 0 then
+        if motorInfo.rightPower == 0 or not powerON then
             return 0
         end
-        local ret = mincurrent + ((motorInfo.rightPower / maxpower) * currentd)
-        return ret
+        return mincurrent + ((motorInfo.rightPower / maxpower) * currentd)
     end
 
     -- return nil

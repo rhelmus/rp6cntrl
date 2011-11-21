@@ -119,7 +119,7 @@ function getADCValue(a)
     for _, d in ipairs(driverList) do
         local val = callOptTabFunc(d, "getADCValue", a)
         if val then
-            return val
+            return round(val)
         end
     end
 

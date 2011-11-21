@@ -42,6 +42,10 @@ function selectOne(n, ...)
     return ret
 end
 
+function round(v)
+    return math.floor(v + 0.5)
+end
+
 
 -- Convenience log functions
 function log(s, ...)
