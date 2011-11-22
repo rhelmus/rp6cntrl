@@ -4,7 +4,11 @@
 
 #include <QtGui/QApplication>
 
+#ifdef Q_OS_WIN // SDL fix
+extern "C" int SDL_main(int argc, char *argv[])
+#else
 int main(int argc, char *argv[])
+#endif
 {
 #ifndef Q_OS_WIN
     // Restrict SIGUSR1 to 'main AVR thread'
@@ -28,3 +32,7 @@ int main(int argc, char *argv[])
 
     return a.exec();
 }
+
+#ifdef Q_OS_WIN
+int qMain(int argc, char *argv[]) { return SDL_main(argc, argv); }
+#endif

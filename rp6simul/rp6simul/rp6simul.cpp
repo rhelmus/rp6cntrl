@@ -51,16 +51,10 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
     BaudRateType btype;
     switch (baud)
     {
-    case 50: btype = BAUD50; break;
-    case 75: btype = BAUD75; break;
     case 110: btype = BAUD110; break;
-    case 134: btype = BAUD134; break;
-    case 150: btype = BAUD150; break;
-    case 200: btype = BAUD200; break;
     case 300: btype = BAUD300; break;
     case 600: btype = BAUD600; break;
     case 1200: btype = BAUD1200; break;
-    case 1800: btype = BAUD1800; break;
     case 2400: btype = BAUD2400; break;
     case 4800: btype = BAUD4800; break;
     case 9600: btype = BAUD9600; break;
@@ -69,10 +63,19 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
     case 38400: btype = BAUD38400; break;
     case 56000: btype = BAUD56000; break;
     case 57600: btype = BAUD57600; break;
-    case 76800: btype = BAUD76800; break;
     case 115200: btype = BAUD115200; break;
     case 128000: btype = BAUD128000; break;
     case 256000: btype = BAUD256000; break;
+#ifdef Q_OS_WIN
+#else
+    case 50: btype = BAUD50; break;
+    case 75: btype = BAUD75; break;
+    case 134: btype = BAUD134; break;
+    case 150: btype = BAUD150; break;
+    case 200: btype = BAUD200; break;
+    case 1800: btype = BAUD1800; break;
+    case 76800: btype = BAUD76800; break;
+#endif
     default:
         qWarning() << "Unknown baud rate:" << baud;
         qWarning() << "Defaulting to 38400";
@@ -369,7 +372,8 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     if (settings.value("loadPrevProjectStartup", true).toBool())
     {
         QStringList list = settings.value("recentProjects").toStringList();
-        openProjectFile(list.at(0), true);
+        if (!list.isEmpty())
+            openProjectFile(list.at(0), true);
     }
 }
 

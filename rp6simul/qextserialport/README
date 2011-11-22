@@ -1,4 +1,6 @@
-hg snapshot (ef4af2a2ee3f) from  
-http://code.google.com/p/qextserialport/
+hg snapshot (c0a850c1cb85) from  
+http://code.google.com/r/dbzhang800-qextserialport/
 
 (only src/ subdir)
+
+This clone was used since the original doesn't compile on Windows (and uses an ugly hack to access Qt internal code)
