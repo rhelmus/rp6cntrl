@@ -1,3 +1,5 @@
+#ifndef _WIN32
+
 // From http://www.strudel.org.uk/itoa/
 #include <stdlib.h>
 
@@ -40,3 +42,5 @@ void itoa(int value, char* str, int base) {
 
     strreverse(str,wstr-1);
 }
+
+#endif

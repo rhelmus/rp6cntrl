@@ -31,6 +31,8 @@ void sei(void);
 
 #include "ioregisters.h"
 
+#ifndef _WIN32
 char *itoa(int value, char *str, int radix);
+#endif
 
 #endif
