@@ -234,7 +234,7 @@ CSerialPreferencesWidget::CSerialPreferencesWidget(QWidget *parent,
                                          "19200" << "38400" << "57600" << "115200";
     // Baud rates valid for both POSIX and Windows (according to qextserialport.h)
 
-#if Q_OS_WIN
+#ifdef Q_OS_WIN
     slist << "14400" << "56000" << "128000" << "256000";
 #else
     slist << "50" << "75" << "134" << "150" << "200" << "1800" << "76800";
@@ -244,7 +244,7 @@ CSerialPreferencesWidget::CSerialPreferencesWidget(QWidget *parent,
 
     form->addRow("Parity", parityComboBox = new QComboBox);
     slist = QStringList() << "none" << "odd" << "even" << "space";
-#if Q_OS_WIN
+#ifdef Q_OS_WIN
     slist << "mark";
 #endif
     parityComboBox->addItems(slist);

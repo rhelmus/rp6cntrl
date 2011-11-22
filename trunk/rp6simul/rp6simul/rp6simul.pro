@@ -9,14 +9,11 @@ QT       += core gui
 TARGET = rp6simul
 TEMPLATE = app
 
+include(../qextserialport/qextserialport.pri)
+
 DEFINES += USEATOMIC
-
-INCLUDEPATH += ../shared/ ../qextserialport/
-INCLUDEPATH += /usr/include/qwt
-
-LIBS += -L../qextserialport/build -lqextserialport
+INCLUDEPATH += ../shared/
 LIBS += -lSDL
-LIBS += -lqwt
 
 !debug {
     DEFINES += NDEBUG
@@ -162,10 +159,17 @@ win32 {
         ../lua/lua.hpp
 
     INCLUDEPATH += ../lua
+
+    INCLUDEPATH += ../SDL/include
+    LIBS += -L../SDL/lib
+
+    CONFIG += qwt
 }
 else {
 #    LIBS += -L/mnt/stuff/shared/src/LuaJIT-2.0.0-beta8/prefix/lib -lluajit-5.1
     LIBS += -llua
+    INCLUDEPATH += /usr/include/qwt
+    LIBS += -lqwt
 }
 
 

@@ -1,11 +1,14 @@
 #ifndef RP6SIMUL_H
 #define RP6SIMUL_H
 
-#include <QtGui/QMainWindow>
-
 #include <SDL/SDL.h>
 
+#ifdef Q_OS_WIN
+#undef main
+#endif
+
 #include <QList>
+#include <QMainWindow>
 #include <QMutex>
 #include <QString>
 
