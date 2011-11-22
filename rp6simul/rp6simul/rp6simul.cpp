@@ -58,15 +58,16 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
     case 2400: btype = BAUD2400; break;
     case 4800: btype = BAUD4800; break;
     case 9600: btype = BAUD9600; break;
-    case 14400: btype = BAUD14400; break;
     case 19200: btype = BAUD19200; break;
     case 38400: btype = BAUD38400; break;
-    case 56000: btype = BAUD56000; break;
     case 57600: btype = BAUD57600; break;
     case 115200: btype = BAUD115200; break;
+#ifdef Q_OS_WIN
+    case 14400: btype = BAUD14400; break;
+    case 56000: btype = BAUD56000; break;
     case 128000: btype = BAUD128000; break;
     case 256000: btype = BAUD256000; break;
-#ifdef Q_OS_WIN
+
 #else
     case 50: btype = BAUD50; break;
     case 75: btype = BAUD75; break;
@@ -74,7 +75,9 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
     case 150: btype = BAUD150; break;
     case 200: btype = BAUD200; break;
     case 1800: btype = BAUD1800; break;
+#ifdef B76800
     case 76800: btype = BAUD76800; break;
+#endif
 #endif
     default:
         qWarning() << "Unknown baud rate:" << baud;
@@ -94,8 +97,10 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
         ptype = PAR_EVEN;
     else if (parity == "space")
         ptype = PAR_SPACE;
+#ifdef Q_OS_WIN
     else if (parity == "mark")
         ptype = PAR_MARK;
+#endif
     else
     {
         qWarning() << "Unknown parity:" << parity;
@@ -126,8 +131,10 @@ void updateSerialPassPreferences(QextSerialPort *dev, QSettings &settings)
         stype = STOP_1;
     else if (sbits == "2")
         stype = STOP_2;
+#ifdef Q_OS_WIN
     else if (sbits == "1.5")
         stype = STOP_1_5;
+#endif
     else
     {
         qWarning() << "Unknown amount of stop bits:" << sbits;

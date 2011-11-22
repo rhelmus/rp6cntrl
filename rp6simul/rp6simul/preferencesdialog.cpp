@@ -237,7 +237,10 @@ CSerialPreferencesWidget::CSerialPreferencesWidget(QWidget *parent,
 #ifdef Q_OS_WIN
     slist << "14400" << "56000" << "128000" << "256000";
 #else
-    slist << "50" << "75" << "134" << "150" << "200" << "1800" << "76800";
+    slist << "50" << "75" << "134" << "150" << "200" << "1800";
+#ifdef B76800
+    slist << "76800";
+#endif
 #endif
     qSort(slist.begin(), slist.end(), stringIntLessThan);
     baudRateComboBox->addItems(slist);
