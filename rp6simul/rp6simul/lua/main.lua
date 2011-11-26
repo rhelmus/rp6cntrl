@@ -2,7 +2,7 @@
 os.setlocale("C", "numeric")
 
 
-dofile("lua/utils.lua")
+dofile(getLuaSrcPath("utils.lua"))
 
 
 local simulatorEnv = nil
@@ -17,8 +17,7 @@ local exportedDriverSyms = { }
 -- Local utilities
 
 local function loadSimulator(s)
-    -- UNDONE: Path separators, static path
-    local file = string.format("lua/%s/%s.lua", s, s)
+    local file = getLuaSrcPath(string.format("%s/%s.lua", s, s))
 
     local chunk, stat = loadfile(file)
     if not chunk then
@@ -50,25 +49,28 @@ local function loadDriver(d)
         file = file .. ".lua"
     end
 
+    local path
+
     -- Pick a default directory?
     if not dir then
-        -- UNDONE: Path separators
-        dir = simulatorPath .. "/drivers/"
-        if not fileExists(dir .. file) then
-            dir = "lua/shared_drivers/"
+        path = joinPath(simulatorPath, "drivers", file)
+        if not fileExists(path) then
+            path = getLuaSrcPath("shared_drivers/" .. file)
         end
+    else
+        path = d
     end
 
-    local chunk, stat = loadfile(dir .. file)
+    local chunk, stat = loadfile(path)
     if not chunk then
-        errorLog(string.format("Failed to load driver %s%s (%s)\n", dir, file, stat))
+        errorLog(string.format("Failed to load driver %s (%s)\n", path, stat))
         return nil
     end
 
     local name = file:gsub(".lua", "")
     local stat, driver = pcall(chunk, name)
     if not stat then
-        errorLog(string.format("Failed to execute driver %s%s: %s\n", dir, file, driver))
+        errorLog(string.format("Failed to execute driver %s: %s\n", path, driver))
         return nil
     end
 
@@ -77,7 +79,7 @@ local function loadDriver(d)
         return nil
     end
 
-    log(string.format("Succesfully loaded driver %s (%s)\n", name, dir .. file))
+    log(string.format("Succesfully loaded driver %s (%s)\n", name, path))
 
     return driver
 end
@@ -133,7 +135,7 @@ function init(sim)
     math.randomseed(os.time())
 
     simulatorEnv = loadSimulator(sim)
-    simulatorPath = "lua/" .. sim -- UNDONE
+    simulatorPath = getLuaSrcPath(sim)
 
     callOptTabFunc(simulatorEnv, "init")
 end

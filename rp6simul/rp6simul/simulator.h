@@ -114,6 +114,8 @@ class CSimulator : public QObject
     static void timeOutCallback(CAVRTimer *timer, void *data);
 
     // Lua bindings
+    static int luaGetLuaSrcPath(lua_State *l);
+    static int luaJoinPath(lua_State *l);
     static int luaAvrGetIORegister(lua_State *l);
     static int luaAvrSetIORegister(lua_State *l);
     static int luaAvrSetIORegisterIgnoreEqual(lua_State *l);
