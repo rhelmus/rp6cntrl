@@ -43,3 +43,4 @@
 - BUG: sometimes crashes on exit
 - rp6simul --> rp6sim?
 - Map templates
+- Reduce svg sizes somehow

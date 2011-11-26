@@ -192,9 +192,29 @@ resources.files = ../resource/*.png ../resource/*.jpg ../resource/*.wav ../resou
 resources.path = $${dataDir}/resource
 INSTALLS += resources
 
-luaSrc.files = lua/*
+# Seems every subdirectory has to be specified individually,
+# as we cannot use a defined function here (doesn't seem to be able to
+# change INSTALLS, either by return value or directly), * globbing includes
+# svn files, and specifying each subdirectory manually places the files in the
+# same directory.
+luaSrc.files = lua/*.lua
 luaSrc.path = $${srcDir}/lua
 INSTALLS += luaSrc
+luaSrcShared.files = lua/shared_drivers/*.lua
+luaSrcShared.path = $${srcDir}/lua/shared_drivers
+INSTALLS += luaSrcShared
+luaSrcRobot.files = lua/robot/*.lua
+luaSrcRobot.path = $${srcDir}/lua/robot
+INSTALLS += luaSrcRobot
+luaSrcRobotDrivers.files = lua/robot/drivers/*.lua
+luaSrcRobotDrivers.path = $${srcDir}/lua/robot/drivers
+INSTALLS += luaSrcRobotDrivers
+luaSrcM32.files = lua/m32/*.lua
+luaSrcM32.path = $${srcDir}/lua/m32
+INSTALLS += luaSrcM32
+luaSrcM32Drivers.files = lua/m32/drivers/*.lua
+luaSrcM32Drivers.path = $${srcDir}/lua/m32/drivers
+INSTALLS += luaSrcM32Drivers
 
 mapTemplates.files = ../map_templates/*
 mapTemplates.path = $${dataDir}/map_templates
