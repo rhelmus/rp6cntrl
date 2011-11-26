@@ -263,15 +263,17 @@ parser.add_argument('action', choices=['zip', 'tar', 'src-zip', 'src-tar', 'nixs
 args = parser.parse_args()
 action = args.action
 
-baseDir = 'release/.tmpdst'
+baseDir = os.path.join('release', '.tmpdst')
 
 print 'Installing to temporary prefix...'
-print subprocess.check_output("""
-    cd src && \
-    qmake PREFIX=../%s && \
-    make -j4 && \
-    make install
-    """ % baseDir, shell=True)
+
+if os.name == 'nt':
+    make = 'mingw32-make'
+else:
+    make = 'make'
+
+print subprocess.check_output('cd src && qmake PREFIX=../{0} && {1} -j4 && {1} install'
+    .format(baseDir, make), shell=True)
 
 mkdirOpt('release')
 
@@ -280,14 +282,14 @@ if 'tar' in action or 'zip' in action:
     zfile = None
 
     if 'tar' in action:
-        tfile = tarfile.open('release/rp6simul-bin.tar.gz', 'w:gz')
+        tfile = tarfile.open(os.path.join('release', 'rp6simul-bin.tar.gz'), 'w:gz')
     if 'zip' in action:
-        zfile = zipfile.ZipFile('release/rp6simul-bin.zip', 'w')
+        zfile = zipfile.ZipFile(os.path.join('release', 'rp6simul-bin.zip'), 'w')
 
     stack = [ baseDir ]
     while stack:
         directory = stack.pop()
-        for sfile in glob.glob(directory + '/*'):
+        for sfile in glob.glob(os.path.join(directory, '*')):
             if os.path.isdir(sfile):
                 stack.append(sfile)
             else:
@@ -304,24 +306,24 @@ if 'src-zip' in action or 'src-tar' in action:
     zfile = None
 
     if 'src-tar' in action:
-        tfile = tarfile.open('release/rp6simul-src.tar.gz', 'w:gz')
+        tfile = tarfile.open(os.path.join('release', 'rp6simul-src.tar.gz'), 'w:gz')
     if 'src-zip' in action:
-        zfile = zipfile.ZipFile('release/rp6simul-src.zip', 'w')
+        zfile = zipfile.ZipFile(os.path.join('release', 'rp6simul-src.zip'), 'w')
 
     for dfile in distFiles:
         if os.path.isdir(dfile):
             stack = [ dfile ]
             while stack:
                 directory = stack.pop()
-                for sfile in glob.glob(directory + '/*'):
+                for sfile in glob.glob(os.path.join(directory, '/*')):
                     if os.path.isdir(sfile):
                         stack.append(sfile)
                     else:
-                        if tfile != None: tfile.add(sfile, 'rp6simul/'+sfile)
-                        if zfile != None: zfile.write(sfile, 'rp6simul/'+sfile)
+                        if tfile != None: tfile.add(sfile, os.path.join('rp6simul', sfile))
+                        if zfile != None: zfile.write(sfile, os.path.join('rp6simul', sfile))
         else:
-            if tfile != None: tfile.add(dfile, 'rp6simul/'+dfile)
-            if zfile != None: zfile.write(dfile, 'rp6simul/'+dfile)
+            if tfile != None: tfile.add(dfile, os.path.join('rp6simul', dfile))
+            if zfile != None: zfile.write(dfile, os.path.join('rp6simul', dfile))
 
     if tfile != None: tfile.close()
     if zfile != None: zfile.close()
@@ -329,4 +331,5 @@ if 'src-zip' in action or 'src-tar' in action:
     print "Generated source archive(s) in release/"
 
 
-shutil.rmtree(baseDir)
+if os.path.exists(baseDir):
+    shutil.rmtree(baseDir)
