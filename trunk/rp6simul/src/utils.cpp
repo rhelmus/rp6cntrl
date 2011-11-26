@@ -21,6 +21,8 @@ QString getDataDir()
 {
     if (!initializedOverridedPath)
     {
+        Q_ASSERT(!QCoreApplication::startingUp());
+
         QStringList args(QCoreApplication::arguments());
         int index = args.lastIndexOf("--datadir");
         if (index == -1)
@@ -41,9 +43,15 @@ QString getDataDir()
 
 
 QString getResourcePath(const QString &file)
-{
+{/*
     QDir datapath(getDataDir());
     return QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("resource/"+file)));
+    */
+    QDir datapath(getDataDir());
+    QString ret = QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("resource/"+file)));
+    if (!QFile(ret).exists())
+        qWarning() << ret << "does not exist!";
+    return ret;
 }
 
 QString getLuaSrcPath(const QString &file)
