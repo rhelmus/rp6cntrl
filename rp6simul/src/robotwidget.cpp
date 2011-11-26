@@ -74,13 +74,13 @@ CRobotWidget::CRobotWidget(QWidget *parent) :
     m32Scale(1.0), activeM32Slot(SLOT_END), m32PixmapDirty(false),
     dataPlotClosedSignalMapper(this)
 {
-    const QPixmap p("../resource/rp6-top.png");
+    const QPixmap p(getResourcePath("rp6-top.png"));
     origRobotSize = p.size();
     robotPixmap = p.scaledToWidth(225, Qt::SmoothTransformation);
     widgetMinSize = robotPixmap.size();
     widgetMinSize.rwidth() += (2 * (motorArrowWidth + motorArrowXSpacing));
 
-    origM32Size = QImage("../resource/m32-top.png").size();
+    origM32Size = QImage(getResourcePath("m32-top.png")).size();
     m32Rotations[SLOT_FRONT] = m32Rotations[SLOT_BACK] = 0.0;
 
     setBackground(QBrush()); // Clear background: interferes with drawing
@@ -105,7 +105,8 @@ void CRobotWidget::updateM32Pixmap()
             return;
 
         const float w = robotPixmap.width() * m32Scale;
-        m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+        m32Pixmap = QPixmap(getResourcePath("m32-top.png"))
+                .scaledToWidth(w, Qt::SmoothTransformation);
 
         const QPointF c(m32Pixmap.rect().center());
         QTransform tr;
@@ -120,7 +121,8 @@ void CRobotWidget::updateM32Pixmap()
     {
         // Make it bigger if no robot
         const float w = robotPixmap.width() * 1.5;
-        m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+        m32Pixmap = QPixmap(getResourcePath("m32-top.png"))
+                .scaledToWidth(w, Qt::SmoothTransformation);
         m32PixmapDirty = false;
     }
 }

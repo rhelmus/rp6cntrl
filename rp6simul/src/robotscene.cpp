@@ -4,6 +4,7 @@
 #include "resizablepixmapgraphicsitem.h"
 #include "robotgraphicsitem.h"
 #include "rp6simul.h"
+#include "utils.h"
 
 #include <QtGui>
 
@@ -96,14 +97,14 @@ QList<QGraphicsItem *> CRobotScene::fixedSizeItems;
 
 CRobotScene::CRobotScene(QObject *parent) :
     QGraphicsScene(parent),
-    backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
-                                                             Qt::IgnoreAspectRatio,
-                                                             Qt::SmoothTransformation)),
+    backGroundPixmap(QPixmap(getResourcePath("floor.jpg")).scaled(300, 300,
+                                                                  Qt::IgnoreAspectRatio,
+                                                                  Qt::SmoothTransformation)),
     lightingDirty(false), ambientLight(0.35), shadowQuality(SH_QUALITY_MED),
-    blockPixmap(QPixmap("../resource/wall.jpg").scaled(30, 30,
-                                                       Qt::IgnoreAspectRatio,
-                                                       Qt::SmoothTransformation)),
-    boxPixmap("../resource/cardboard-box.png"), running(false),
+    blockPixmap(QPixmap(getResourcePath("wall.jpg")).scaled(30, 30,
+                                                            Qt::IgnoreAspectRatio,
+                                                            Qt::SmoothTransformation)),
+    boxPixmap(getResourcePath("cardboard-box.png")), running(false),
     robotAdvanceDelay(1000.0 / 33.0), followRobot(false), viewAngle(0.0),
     dragging(false), draggedEnough(false), mouseMode(MODE_POINT),
     lightEditMode(false), mapEdited(false), gridSize(15.0),
@@ -120,9 +121,9 @@ CRobotScene::CRobotScene(QObject *parent) :
     connect(robotGraphicsItem, SIGNAL(robotMoved(const QPointF &, qreal)),
             this, SLOT(updateRobotFollowing()));
 
-    QPixmap pm =
-            QPixmap("../resource/robot-start.png").scaledToHeight(robotGraphicsItem->boundingRect().height(),
-                                                                  Qt::SmoothTransformation);
+    QPixmap pm = QPixmap(getResourcePath("robot-start.png"))
+            .scaledToHeight(robotGraphicsItem->boundingRect().height(),
+                            Qt::SmoothTransformation);
     robotStartGraphicsItem = new CRotatablePixmapGraphicsItem(pm);
     robotStartGraphicsItem->setDeletable(false);
     addItem(robotStartGraphicsItem);

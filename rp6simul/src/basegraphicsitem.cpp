@@ -1,5 +1,6 @@
 #include "basegraphicsitem.h"
 #include "robotscene.h"
+#include "utils.h"
 
 #include <QtGui>
 
@@ -97,12 +98,12 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     QAction *aligna = 0, *dela = 0;
 
     if (isMovable)
-        aligna = menu.addAction(QIcon("../resource/grid-icon.png"),
+        aligna = menu.addAction(QIcon(getResourcePath("grid-icon.png")),
                                 "Align to grid");
 
     if (isDeletable)
     {
-        dela = menu.addAction(QIcon("../resource/delete.png"), "Delete");
+        dela = menu.addAction(QIcon(getResourcePath("delete.png")), "Delete");
         // NOTE: Although the shortcut is set here, real key presses are
         // handled in keyReleaseEvent()
         dela->setShortcut(Qt::Key_Delete);

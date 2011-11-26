@@ -21,7 +21,7 @@ void CRotatablePixmapGraphicsItem::addHandle(CHandleGraphicsItem::EHandlePosFlag
 {
     QGraphicsRectItem *handle = new CHandleGraphicsItem(pos, this);
     handle->hide();
-    handle->setCursor(QPixmap("../resource/rotate.png"));
+    handle->setCursor(QPixmap(getResourcePath("rotate.png")));
     handles[pos] = handle;
 }
 

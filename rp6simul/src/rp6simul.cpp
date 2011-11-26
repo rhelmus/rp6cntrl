@@ -445,7 +445,8 @@ void CRP6Simulator::initSDL()
     Uint8 *data;
     Uint32 dlen;
 
-    if (SDL_LoadWAV("../resource/clapping-hands.wav", &wave, &data, &dlen) == NULL)
+    if (SDL_LoadWAV(qPrintable(getResourcePath("clapping-hands.wav")),
+                    &wave, &data, &dlen) == NULL)
     {
         handleSoundError("Sound error",
                          QString("Failed to load clapping sound:\n%1").arg(SDL_GetError()));
@@ -693,22 +694,22 @@ void CRP6Simulator::setToolBarToolTips()
 void CRP6Simulator::createToolbars()
 {
     QToolBar *toolb = addToolBar("Run");
-    runPluginAction = toolb->addAction(QIcon("../resource/run.png"), "Run",
+    runPluginAction = toolb->addAction(QIcon(getResourcePath("run.png")), "Run",
                                        this, SLOT(runPlugin()));
     runPluginAction->setShortcut(tr("ctrl+R"));
     runPluginAction->setEnabled(false);
 
-    stopPluginAction = toolb->addAction(QIcon("../resource/stop.png"), "Stop",
+    stopPluginAction = toolb->addAction(QIcon(getResourcePath("stop.png")), "Stop",
                                         this, SLOT(stopPlugin()));
     stopPluginAction->setShortcut(tr("esc"));
     stopPluginAction->setEnabled(false);
 
-    resetPluginAction = toolb->addAction(QIcon("../resource/reset.png"), "Reset");
+    resetPluginAction = toolb->addAction(QIcon(getResourcePath("reset.png")), "Reset");
     connect(resetPluginAction, SIGNAL(triggered()), SLOT(stopPlugin()));
     connect(resetPluginAction, SIGNAL(triggered()), SLOT(runPlugin()));
     resetPluginAction->setEnabled(false);
 
-    serialPassAction = toolb->addAction(QIcon("../resource/connect-serial.png"),
+    serialPassAction = toolb->addAction(QIcon(getResourcePath("connect-serial.png")),
                                         "Toggle serial pass through");
     serialPassAction->setCheckable(true);
     connect(serialPassAction, SIGNAL(toggled(bool)),
@@ -721,7 +722,7 @@ void CRP6Simulator::createToolbars()
     connect(signalm, SIGNAL(mapped(int)), SLOT(setHandClapMode(int)));
     toolb->addWidget(handClapButton = new QToolButton);
     handClapButton->setEnabled(false);
-    handClapButton->setIcon(QIcon("../resource/clapping-hands.png"));
+    handClapButton->setIcon(QIcon(getResourcePath("clapping-hands.png")));
     handClapButton->setText("normal");
     handClapButton->setToolTip("Clap hands with selected volume (triggers MIC)");
     handClapButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -761,7 +762,7 @@ void CRP6Simulator::createToolbars()
     robotToolBar = addToolBar("Robot");
     robotToolBar->setEnabled(false);
     QToolButton *tb = new QToolButton;
-    tb->setIcon(QIcon("../resource/dataplot.png"));
+    tb->setIcon(QIcon(getResourcePath("dataplot.png")));
     robotToolBar->addWidget(tb);
     tb->setMenu(dataPlotMenu = new QMenu);
     tb->setPopupMode(QToolButton::InstantPopup);
@@ -790,16 +791,16 @@ void CRP6Simulator::createToolbars()
     connect(editMapActionGroup, SIGNAL(triggered(QAction*)), this,
             SLOT(changeSceneMouseMode(QAction*)));
 
-    a = editMapToolBar->addAction(QIcon("../resource/viewmag_.png"),
+    a = editMapToolBar->addAction(QIcon(getResourcePath("viewmag_.png")),
                                   "Zoom map out", robotScene,
                                   SLOT(zoomSceneOut()));
     a->setShortcut(QKeySequence("-"));
 
-    a = editMapToolBar->addAction(QIcon("../resource/viewmag+.png"), "Zoom map in",
-                                  robotScene, SLOT(zoomSceneIn()));
+    a = editMapToolBar->addAction(QIcon(getResourcePath("viewmag+.png")),
+                                  "Zoom map in", robotScene, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
 
-    a = editMapToolBar->addAction(QIcon("../resource/follow.png"),
+    a = editMapToolBar->addAction(QIcon(getResourcePath("follow.png")),
                                   "Toggle robot following", robotScene,
                                   SLOT(setFollowRobot(bool)));
     connect(robotScene, SIGNAL(robotFollowingChanged(bool)), a,
@@ -810,15 +811,16 @@ void CRP6Simulator::createToolbars()
     editMapToolBar->addSeparator();
 
 
-    a = editMapToolBar->addAction(QIcon("../resource/edit-map.png"), "Edit map settings",
-                                  this, SLOT(editMapSettings()));
+    a = editMapToolBar->addAction(QIcon(getResourcePath("edit-map.png")),
+                                  "Edit map settings", this,
+                                  SLOT(editMapSettings()));
 
     a = editMapToolBar->addAction(QIcon(style()->standardIcon(QStyle::SP_DialogSaveButton)),
                                   "Save map", this, SLOT(saveMap()));
     connect(robotScene, SIGNAL(mapEditedChanged(bool)), a,
             SLOT(setEnabled(bool)));
 
-    a = editMapToolBar->addAction(QIcon("../resource/clear.png"),
+    a = editMapToolBar->addAction(QIcon(getResourcePath("clear.png")),
                                   "Clear map (removes all walls and items)",
                                   robotScene, SLOT(clearMap()));
 
@@ -826,13 +828,13 @@ void CRP6Simulator::createToolbars()
     editMapToolBar->addSeparator();
 
 
-    a = editMapToolBar->addAction(QIcon("../resource/grid-icon.png"),
+    a = editMapToolBar->addAction(QIcon(getResourcePath("grid-icon.png")),
                                   "Toggle grid visibility",
                                   robotScene, SLOT(setGridVisible(bool)));
     a->setCheckable(true);
 
     QAction *lightedita =
-            editMapToolBar->addAction(QIcon("../resource/light-mode.png"),
+            editMapToolBar->addAction(QIcon(getResourcePath("light-mode.png")),
                                       "Toggle light edit mode",
                                       robotScene, SLOT(setLightEditMode(bool)));
     lightedita->setCheckable(true);
@@ -840,25 +842,26 @@ void CRP6Simulator::createToolbars()
 
     editMapToolBar->addSeparator();
 
-    a = editMapActionGroup->addAction(QIcon("../resource/mouse-arrow.png"),
+    a = editMapActionGroup->addAction(QIcon(getResourcePath("mouse-arrow.png")),
                                       "Selection mode");
     a->setCheckable(true);
     a->setChecked(true);
     a->setData(CRobotScene::MODE_POINT);
     editMapToolBar->addAction(a);
 
-    a = editMapActionGroup->addAction(QIcon("../resource/wall.jpg"), "Add wall");
+    a = editMapActionGroup->addAction(QIcon(getResourcePath("wall.jpg")),
+                                      "Add wall");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_WALL);
     editMapToolBar->addAction(a);
 
-    a = editMapActionGroup->addAction(QIcon("../resource/cardboard-box.png"),
+    a = editMapActionGroup->addAction(QIcon(getResourcePath("cardboard-box.png")),
                                       "Add box obstacle");
     a->setCheckable(true);
     a->setData(CRobotScene::MODE_BOX);
     editMapToolBar->addAction(a);
 
-    a = editMapActionGroup->addAction(QIcon("../resource/light-add.png"),
+    a = editMapActionGroup->addAction(QIcon(getResourcePath("light-add.png")),
                                       "Add light source");
     a->setCheckable(true);
     a->setEnabled(false);
@@ -1013,14 +1016,14 @@ QWidget *CRP6Simulator::createLogTab()
     hbox->addLayout(vbox);
 
     vbox->addWidget(logFilterButton = new QToolButton);
-    logFilterButton->setIcon(QIcon("../resource/filter.png"));
+    logFilterButton->setIcon(QIcon(getResourcePath("filter.png")));
     logFilterButton->setToolTip("Filter driver log output");
     logFilterButton->setEnabled(false);
     connect(logFilterButton, SIGNAL(clicked()), SLOT(showLogFilter()));
 
     QToolButton *button = new QToolButton;
     vbox->addWidget(button);
-    button->setIcon(QIcon("../resource/clear.png"));
+    button->setIcon(QIcon(getResourcePath("clear.png")));
     button->setToolTip("Clear log");
     connect(button, SIGNAL(clicked()), logWidget, SLOT(clear()));
 

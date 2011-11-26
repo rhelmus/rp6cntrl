@@ -100,7 +100,8 @@ OTHER_FILES += \
     lua/m32/drivers/exteeprom.lua \
     lua/m32/drivers/piezo.lua \
     lua/m32/drivers/mic.lua \
-    lua/m32/drivers/keypad.lua
+    lua/m32/drivers/keypad.lua \
+    ../release.py
 
 win32 {
     DESTDIR = ../bin_win
@@ -186,7 +187,7 @@ sources.path = $${srcDir}
 INSTALLS += sources
 }
 
-resources.files = ../resource/*.png ../resource/*.wav ../resource/sources.txt
+resources.files = ../resource/*.png ../resource/*.jpg ../resource/*.wav ../resource/sources.txt
 !isEmpty(INCLUDESOURCE):resources.files += ../resource/*.svg
 resources.path = $${dataDir}/resource
 INSTALLS += resources

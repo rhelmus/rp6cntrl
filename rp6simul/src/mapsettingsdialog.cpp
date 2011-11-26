@@ -1,4 +1,5 @@
 #include "mapsettingsdialog.h"
+#include "utils.h"
 
 #include <QtGui>
 
@@ -127,9 +128,9 @@ bool CMapSettingsDialog::getAutoGridSnap() const
 // Background pixmap: keep in sync with CRobotScene
 CMapSettingsPreviewWidget::CMapSettingsPreviewWidget(QWidget *parent)
     : QWidget(parent),
-      backGroundPixmap(QPixmap("../resource/floor.jpg").scaled(300, 300,
-                                                               Qt::IgnoreAspectRatio,
-                                                               Qt::SmoothTransformation)),
+      backGroundPixmap(QPixmap(getResourcePath("floor.jpg"))
+                       .scaled(300, 300, Qt::IgnoreAspectRatio,
+                               Qt::SmoothTransformation)),
       gridSize(0), ambientLight(0)
 {
 }

@@ -64,11 +64,11 @@ CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
     : CRotatablePixmapGraphicsItem(parent), m32Enabled(false), m32Scale(1.0),
       activeM32Slot(SLOT_END), m32PixmapDirty(false), skipFrames(0)
 {
-    QPixmap pm("../resource/rp6-top.png");
+    QPixmap pm(getResourcePath("rp6-top.png"));
     origRobotSize = pm.size();
     setPixmap(pm.scaledToWidth(120, Qt::SmoothTransformation));
 
-    origM32Size = QImage("../resource/m32-top.png").size();
+    origM32Size = QImage(getResourcePath("m32-top.png")).size();
     m32Rotations[SLOT_FRONT] = m32Rotations[SLOT_BACK] = 0.0;
 
     setDeletable(false);
@@ -87,7 +87,7 @@ void CRobotGraphicsItem::updateM32Pixmap()
         return;
 
     const float w = boundingRect().width() * m32Scale;
-    m32Pixmap = QPixmap("../resource/m32-top.png").scaledToWidth(w, Qt::SmoothTransformation);
+    m32Pixmap = QPixmap(getResourcePath("m32-top.png")).scaledToWidth(w, Qt::SmoothTransformation);
 
     const QPointF c(m32Pixmap.rect().center());
     QTransform tr;
