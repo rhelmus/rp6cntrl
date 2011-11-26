@@ -483,6 +483,9 @@ void CSimulator::initLua()
     setLuaIOTypes();
     setLuaAVRConstants();
 
+    NLua::registerFunction(luaState, luaGetLuaSrcPath, "getLuaSrcPath");
+    NLua::registerFunction(luaState, luaJoinPath, "joinPath");
+
     // avr
     NLua::registerFunction(luaState, luaAvrGetIORegister, "getIORegister",
                            "avr", this);
@@ -731,6 +734,31 @@ void CSimulator::timeOutCallback(CAVRTimer *timer, void *data)
         else
             instance->execISR(it->ISRType);
     }
+}
+
+int CSimulator::luaGetLuaSrcPath(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    const char *file = luaL_optstring(l, 1, "");
+    lua_pushstring(l, qPrintable(getLuaSrcPath(file)));
+    return 1;
+}
+
+int CSimulator::luaJoinPath(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const int nargs = lua_gettop(l);
+
+    QString path;
+    for (int i=1; i<=nargs; ++i)
+    {
+        path += "/";
+        path += luaL_checkstring(l, i);
+    }
+
+    lua_pushstring(l, qPrintable(QDir::toNativeSeparators(path)));
+    return 1;
 }
 
 int CSimulator::luaAvrGetIORegister(lua_State *l)
@@ -1080,7 +1108,7 @@ void CSimulator::handleLuaTWIMSG(const QString &msg, const QList<QVariant> &args
 
 void CSimulator::startLua(const char *name)
 {
-    const QString p = QDir::toNativeSeparators("lua/main.lua");
+    const QString p = getLuaSrcPath("main.lua");
     if (luaL_dofile(luaState, qPrintable(p)))
     {
         const char *msg = lua_tostring(luaState, -1);

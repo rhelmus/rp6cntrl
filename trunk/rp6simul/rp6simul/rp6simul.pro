@@ -103,6 +103,8 @@ OTHER_FILES += \
     lua/m32/drivers/keypad.lua
 
 win32 {
+    DESTDIR = ../bin_win
+
     SOURCES += ../lua/lzio.c \
         ../lua/lvm.c \
         ../lua/lundump.c \
@@ -172,31 +174,30 @@ else {
     LIBS += -lqwt
 }
 
+isEmpty(PREFIX): PREFIX=/usr/local
 
+dataDir = $${PREFIX}/share/$${TARGET}
+binDir = $${PREFIX}/bin
+srcDir = $${dataDir}/src
 
+!isEmpty(INCLUDESOURCE) {
+sources.files = $${HEADERS} $${SOURCES} rp6simul.pro
+sources.path = $${srcDir}
+INSTALLS += sources
+}
 
+resources.files = ../resource/*.png ../resource/*.wav ../resource/sources.txt
+!isEmpty(INCLUDESOURCE):resources.files += ../resource/*.svg
+resources.path = $${dataDir}/resource
+INSTALLS += resources
 
+luaSrc.files = lua/*
+luaSrc.path = $${srcDir}/lua
+INSTALLS += luaSrc
 
+mapTemplates.files = ../map_templates/*
+mapTemplates.path = $${dataDir}/map_templates
+INSTALLS += mapTemplates
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+target.path = $${binDir}
+INSTALLS += target

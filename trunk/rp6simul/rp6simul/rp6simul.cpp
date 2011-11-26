@@ -1586,7 +1586,7 @@ bool CRP6Simulator::checkMapChange()
 
 void CRP6Simulator::loadMapTemplatesTree()
 {
-    const QString templpath("../map_templates/"); // UNDONE
+    const QString templpath(getMapTemplatesPath());
     QQueue<QPair<QString, QTreeWidgetItem *> > dirqueue;
 
     dirqueue.enqueue(qMakePair(templpath, (QTreeWidgetItem*)0));

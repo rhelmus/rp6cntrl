@@ -45,7 +45,7 @@ function closePlugin()
 end
 
 
-dofile("lua/robot/properties.lua")
+dofile(getLuaSrcPath("robot/properties.lua"))
 
 
 return ret

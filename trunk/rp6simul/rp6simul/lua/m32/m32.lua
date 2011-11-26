@@ -41,7 +41,7 @@ end
 function closePlugin()
 end
 
-dofile("lua/m32/properties.lua")
+dofile(getLuaSrcPath("m32/properties.lua"))
 
 
 return ret

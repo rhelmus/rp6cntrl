@@ -42,3 +42,4 @@
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
 - BUG: sometimes crashes on exit
 - rp6simul --> rp6sim?
+- Map templates

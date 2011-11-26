@@ -20,6 +20,10 @@ inline unsigned long getUSDiff(const timespec &start, const timespec &end)
             ((end.tv_nsec-start.tv_nsec) / 1000);
 }
 
+QString getResourcePath(const QString &file=QString());
+QString getLuaSrcPath(const QString &file=QString());
+QString getMapTemplatesPath(const QString &file=QString());
+
 bool verifySettingsFile(QSettings &file, bool silent=false);
 void drawLED(QPainter &painter, CLED *led, const QTransform &tr,
              qreal scale);

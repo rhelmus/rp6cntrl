@@ -4,11 +4,60 @@
 #include "rp6simul.h"
 #include "simulator.h"
 
+#include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
 #include <QMessageBox>
 #include <QPainter>
 #include <QSettings>
 #include <QString>
+
+namespace {
+
+bool initializedOverridedPath = false;
+QString overridedDataPath;
+
+QString getDataDir()
+{
+    if (!initializedOverridedPath)
+    {
+        QStringList args(QCoreApplication::arguments());
+        int index = args.lastIndexOf("--datadir");
+        if (index == -1)
+            index = args.lastIndexOf("-d");
+        if ((index != -1) && (args.size() > (index+1)))
+            overridedDataPath = args.at(index + 1);
+        initializedOverridedPath = true;
+    }
+
+    if (!overridedDataPath.isEmpty())
+        return overridedDataPath;
+
+    const QString apppath(QCoreApplication::applicationDirPath());
+    return QString(apppath + "/../share/%1").arg(QCoreApplication::applicationName());
+}
+
+}
+
+
+QString getResourcePath(const QString &file)
+{
+    QDir datapath(getDataDir());
+    return QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("resource/"+file)));
+}
+
+QString getLuaSrcPath(const QString &file)
+{
+    QDir datapath(getDataDir());
+    return QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("src/lua/"+file)));
+}
+
+QString getMapTemplatesPath(const QString &file)
+{
+    QDir datapath(getDataDir());
+    return QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("map_templates/"+file)));
+}
+
 
 bool verifySettingsFile(QSettings &file, bool silent)
 {
