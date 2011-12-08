@@ -57,4 +57,24 @@ EXPORT int getSpeedTimerBase()
     return SPEED_TIMER_BASE;
 }
 
+EXPORT int getACSSendPulsesLeft()
+{
+    return ACS_SEND_PULSES_LEFT;
+}
+
+EXPORT int getACSRecPulsesLeft()
+{
+    return ACS_REC_PULSES_LEFT;
+}
+
+EXPORT int getACSSendPulsesRight()
+{
+    return ACS_SEND_PULSES_RIGHT;
+}
+
+EXPORT int getACSRecPulsesRight()
+{
+    return ACS_REC_PULSES_RIGHT;
+}
+
 #endif // RP6_BUILD

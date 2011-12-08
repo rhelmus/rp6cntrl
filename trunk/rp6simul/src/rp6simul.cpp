@@ -326,21 +326,22 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
 
     updateMainStackedWidget();
 
-    QDockWidget *statdock, *regdock;
+    QDockWidget *statdock;
     addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, ADCDockWidget = createADCDock(),
                   Qt::Vertical);
-    addDockWidget(Qt::LeftDockWidgetArea, regdock = createRegisterDock(),
+    addDockWidget(Qt::LeftDockWidgetArea, IODockWidget = createRegisterDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, extEEPROMDockWidget = createExtEEPROMDock(),
                   Qt::Vertical);
     tabifyDockWidget(statdock, ADCDockWidget);
-    tabifyDockWidget(ADCDockWidget, regdock);
-    tabifyDockWidget(regdock, extEEPROMDockWidget);
+    tabifyDockWidget(ADCDockWidget, IODockWidget);
+    tabifyDockWidget(IODockWidget, extEEPROMDockWidget);
     activateDockTab(this, "Status");
 
     ADCDockWidget->setEnabled(false);
+    IODockWidget->setEnabled(false);
     extEEPROMDockWidget->setEnabled(false);
 
     // Do this after toolbars and dockedwidgets are created, as the
@@ -535,6 +536,7 @@ void CRP6Simulator::registerLuaRobot(lua_State *l)
     NLua::registerFunction(l, luaSetMotorDriveSpeed, "setMotorDriveSpeed");
     NLua::registerFunction(l, luaSetMotorMoveSpeed, "setMotorMoveSpeed");
     NLua::registerFunction(l, luaSetMotorDir, "setMotorDir");
+    NLua::registerFunction(l, luaGetACSProperty, "getACSProperty");
     NLua::registerFunction(l, luaSetIRCOMMSendCallback, "setIRCOMMSendCallback");
     NLua::registerFunction(l, luaSetExtInt1Enabled, "setExtInt1Enabled");
 
@@ -1417,6 +1419,10 @@ void CRP6Simulator::openProjectFile(const QString &file, bool silent)
     if (!verifySettingsFile(prsettings, silent))
         return;
 
+    if (prsettings.value("version", -1) != 1)
+        QMessageBox::warning(CRP6Simulator::getInstance(), "Project version",
+                             "Missing/unsupported project version");
+
     // This function may be called from the constructor, however
     // setWindowFilePath doesn't seem to have any affect in such a case.
     // Therefore, a timer is used to call to make sure this function is called
@@ -1430,6 +1436,7 @@ void CRP6Simulator::openProjectFile(const QString &file, bool silent)
     resetPluginAction->setEnabled(false);
     robotToolBar->setEnabled(true);
     editProjectSettingsAction->setEnabled(true);
+    IODockWidget->setEnabled(true);
 
     currentProjectFile = file;
 
@@ -2359,6 +2366,24 @@ int CRP6Simulator::luaIRSensorDestr(lua_State *l)
     return 0;
 }
 
+int CRP6Simulator::luaGetACSProperty(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+
+    const char *type = luaL_checkstring(l, 1);
+
+    if (!strcmp(type, "sendLeft"))
+        lua_pushnumber(l, instance->robotConfigDefinitions.ACSSendPulsesLeft);
+    else if (!strcmp(type, "recLeft"))
+        lua_pushnumber(l, instance->robotConfigDefinitions.ACSRecPulsesLeft);
+    else if (!strcmp(type, "sendRight"))
+        lua_pushnumber(l, instance->robotConfigDefinitions.ACSSendPulsesRight);
+    else if (!strcmp(type, "recRight"))
+        lua_pushnumber(l, instance->robotConfigDefinitions.ACSRecPulsesRight);
+
+    return 1;
+}
+
 int CRP6Simulator::luaCreateLightSensor(lua_State *l)
 {
     // NLua::CLuaLocker lualocker(l);
@@ -3087,8 +3112,17 @@ void CRP6Simulator::runPlugin()
                 getLibFunc<TGetRotationFactor>(lib, "getRotationFactor");
         TGetTimerSpeedBase speedfunc =
                 getLibFunc<TGetTimerSpeedBase>(lib, "getSpeedTimerBase");
+        TGetACSSendPulsesLeft acssendleft =
+                getLibFunc<TGetACSSendPulsesLeft>(lib, "getACSSendPulsesLeft");
+        TGetACSRecPulsesLeft acsrecleft =
+                getLibFunc<TGetACSRecPulsesLeft>(lib, "getACSRecPulsesLeft");
+        TGetACSSendPulsesRight acssendright =
+                getLibFunc<TGetACSSendPulsesRight>(lib, "getACSSendPulsesRight");
+        TGetACSRecPulsesRight acsrecright =
+                getLibFunc<TGetACSRecPulsesRight>(lib, "getACSRecPulsesRight");
 
-        if (!encfunc || !rotfunc || !speedfunc)
+        if (!encfunc || !rotfunc || !speedfunc || !acssendleft || !acsrecleft ||
+            !acssendright || !acsrecright)
         {
             QMessageBox::critical(this, "Plugin error",
                                   "Could not resolve mandatory symbols.\n"
@@ -3099,6 +3133,10 @@ void CRP6Simulator::runPlugin()
         robotConfigDefinitions.encoderResolution = encfunc();
         robotConfigDefinitions.rotationFactor = rotfunc();
         robotConfigDefinitions.speedTimerBase = speedfunc();
+        robotConfigDefinitions.ACSSendPulsesLeft = acssendleft();
+        robotConfigDefinitions.ACSRecPulsesLeft = acsrecleft();
+        robotConfigDefinitions.ACSSendPulsesRight = acssendright();
+        robotConfigDefinitions.ACSRecPulsesRight = acsrecright();
 
         qDebug() << "config:" << robotConfigDefinitions.encoderResolution <<
                     robotConfigDefinitions.rotationFactor <<
@@ -3138,6 +3176,9 @@ void CRP6Simulator::runPlugin()
 
 void CRP6Simulator::stopPlugin()
 {
+    stopPluginAction->setEnabled(false);
+    resetPluginAction->setEnabled(false);
+
     SDL_PauseAudio(1);
 
     if (robotSerialSendLuaCallback || IRCOMMSendLuaCallback ||
@@ -3200,6 +3241,9 @@ void CRP6Simulator::stopPlugin()
         }
     }
 
+    // Dump any remaining buffered data
+    timedUIUpdate();
+
     robotSimulator->stopPlugin();
     m32Simulator->stopPlugin();
 
@@ -3208,14 +3252,8 @@ void CRP6Simulator::stopPlugin()
     robotScene->stop();
     robotWidget->stop();
 
-    // Dump any remaining buffered data
-    timedUIUpdate();
-    timedLEDUpdate();
-
     editPreferencesAction->setEnabled(true);
     runPluginAction->setEnabled(true);
-    stopPluginAction->setEnabled(false);
-    resetPluginAction->setEnabled(false);
     ADCDockWidget->setEnabled(false);
     logFilterButton->setEnabled(false);
 
@@ -3225,7 +3263,6 @@ void CRP6Simulator::stopPlugin()
     keyPadWidget->setEnabled(false);
 
     robotIsBlocked = false;
-    pluginRunning = false;
 
     foreach (QAction *a, projectActionList)
         a->setEnabled(true);
@@ -3236,6 +3273,8 @@ void CRP6Simulator::stopPlugin()
     for (TDriverLogList::iterator it=m32DriverLogEntries.begin();
          it!=m32DriverLogEntries.end(); ++it)
         it.value().inUse = false;
+
+    pluginRunning = false;
 }
 
 void CRP6Simulator::toggleSerialPass(bool e)

@@ -37,6 +37,7 @@ class CRobotGraphicsItem : public CRotatablePixmapGraphicsItem
     QList<CLED *> m32LEDs;
     bool isBlocked;
     int skipFrames;
+    bool isCustomBlocked;
 
     void updateM32Pixmap(void);
     QPointF mapDeltaPos(qreal x, qreal y) const;
@@ -52,6 +53,8 @@ private slots:
 
 protected:
     void advance(int phase);
+    void initContextMenu(QMenu *menu);
+    bool handleContextMenuAction(QAction *a);
 
 public:
     CRobotGraphicsItem(QGraphicsItem *parent = 0);

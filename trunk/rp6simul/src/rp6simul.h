@@ -68,6 +68,8 @@ struct SRobotConfigDefinitions
 {
     float encoderResolution;
     int rotationFactor, speedTimerBase;
+    float ACSSendPulsesLeft, ACSRecPulsesLeft;
+    float ACSSendPulsesRight, ACSRecPulsesRight;
 };
 
 typedef QList<SDriverInfo> TDriverInfoList;
@@ -144,7 +146,7 @@ class CRP6Simulator : public QMainWindow
     QTreeWidget *mapSelectorTreeWidget;
     QTreeWidgetItem *mapTemplatesTreeItem;
     QTreeWidgetItem *mapHistoryTreeItem;
-    QDockWidget *ADCDockWidget, *extEEPROMDockWidget;
+    QDockWidget *ADCDockWidget, *IODockWidget, *extEEPROMDockWidget;
     QTableWidget *robotADCTableWidget, *m32ADCTableWidget;
     QComboBox *IORegisterTableSelector;
     QTableWidget *IORegisterTableWidget;
@@ -269,6 +271,7 @@ class CRP6Simulator : public QMainWindow
     static int luaCreateIRSensor(lua_State *l);
     static int luaIRSensorGetHitDistance(lua_State *l);
     static int luaIRSensorDestr(lua_State *l);
+    static int luaGetACSProperty(lua_State *l);
     static int luaCreateLightSensor(lua_State *l);
     static int luaLightSensorGetLight(lua_State *l);
     static int luaLightSensorDestr(lua_State *l);

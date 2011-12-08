@@ -62,7 +62,8 @@ float getRobotFrameSpeed(int motorspeed, float frametime,
 
 CRobotGraphicsItem::CRobotGraphicsItem(QGraphicsItem *parent)
     : CRotatablePixmapGraphicsItem(parent), m32Enabled(false), m32Scale(1.0),
-      activeM32Slot(SLOT_END), m32PixmapDirty(false), skipFrames(0)
+      activeM32Slot(SLOT_END), m32PixmapDirty(false), isBlocked(false),
+      skipFrames(0), isCustomBlocked(false)
 {
     QPixmap pm(getResourcePath("rp6-top.png"));
     origRobotSize = pm.size();
@@ -145,8 +146,8 @@ void CRobotGraphicsItem::tryMove()
       on this length and holds the amount of counts per degree * 100.
     */
 
-    // Don't move if selected
-    if (isSelected())
+    // Don't move if selected or blocked by context menu
+    if (isSelected() || isCustomBlocked)
         return;
 
     const CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
@@ -359,6 +360,28 @@ void CRobotGraphicsItem::advance(int phase)
     }
 }
 
+void CRobotGraphicsItem::initContextMenu(QMenu *menu)
+{
+    QAction *a = menu->addAction("Lock robot");
+    a->setData("lockrobot");
+    a->setCheckable(true);
+    a->setChecked(isCustomBlocked);
+
+    menu->addSeparator();
+
+    CRotatablePixmapGraphicsItem::initContextMenu(menu);
+}
+
+bool CRobotGraphicsItem::handleContextMenuAction(QAction *a)
+{
+    if (a->data().toString() != "lockrobot")
+        return CRotatablePixmapGraphicsItem::handleContextMenuAction(a);
+
+    isCustomBlocked = a->isChecked();
+
+    return true;
+}
+
 void CRobotGraphicsItem::paint(QPainter *painter,
                                const QStyleOptionGraphicsItem *option,
                                QWidget *widget)
@@ -427,6 +450,7 @@ void CRobotGraphicsItem::stop()
 {
     motorSpeed.clear();
     motorDirection.clear();
+    isBlocked = isCustomBlocked = false;
     update();
 }
 

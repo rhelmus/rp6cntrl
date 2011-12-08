@@ -93,6 +93,11 @@ typedef void (*TSetPluginCallbacks)(TIORegisterSetCB, TIORegisterGetCB,
 typedef float (*TGetEncoderResolution)(void);
 typedef int (*TGetRotationFactor)(void);
 typedef int (*TGetTimerSpeedBase)(void);
+typedef int (*TGetACSSendPulsesLeft)(void);
+typedef int (*TGetACSRecPulsesLeft)(void);
+typedef int (*TGetACSSendPulsesRight)(void);
+typedef int (*TGetACSRecPulsesRight)(void);
+
 #ifdef GLUE
 } // end namespace
 #endif

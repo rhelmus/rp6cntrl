@@ -21,10 +21,22 @@ local ACSFlags = {
 
 local ACSInfo = {
     power = "off",
-    leftEnabled = false,
-    rightEnabled = false,
-    leftIRSensor = nil,
-    rightIRSensor = nil
+
+    left = {
+        type = "left",
+        enabled = false,
+        IRSensor = nil,
+        noPulseTime = 0,
+        checkNoiseDelay = 0,
+    },
+
+    right = {
+        type = "right",
+        enabled = false,
+        IRSensor = nil,
+        noPulseTime = 0,
+        checkNoiseDelay = 0,
+    },
 }
 
 local powerON = false
@@ -71,38 +83,73 @@ local function updateACSPower(type, data)
 end
 
 local function maybeReceivePulse(sensor)
-    local chance = 0.05 -- UNDONE
     -- Simulate that only a fraction of send pulses are bounced back
     -- towards the detector. Receiving pulses happens immidiately after they
     -- are sent. Note that in real life pulses travel at the speed of light,
     -- which is close too instant as well :)
-    if powerON and math.random() <= chance and ACSInfo.power ~= "off" then
-        local dist
-        if sensor == "left" then
-            dist = ACSInfo.leftIRSensor:getHitDistance()
-        else
-            dist = ACSInfo.rightIRSensor:getHitDistance()
-        end
-        log(string.format("dist: %d\n", dist))
-        if dist <= properties.ACSLeft.distance[ACSInfo.power] then
-            -- Execute ISR used by RP6 lib to detect IR pulses
-            avr.execISR(avr.ISR_INT2_vect)
+
+    local curtimems = clock.getTimeMS()
+
+    if curtimems < sensor.noPulseTime then
+        return
+    end
+
+    local chance
+
+    -- Fraction of pulses that are minimally necessary to trigger
+    -- collision detection
+    if sensor.type == "left" then
+        chance = getACSProperty("recLeft") / getACSProperty("sendLeft")
+    else
+        chance = getACSProperty("recRight") / getACSProperty("sendRight")
+    end
+
+    -- When looking for collisions, the RP6 lib code performs 4 'bursts'
+    -- and collects the _total_ amount of signals back. Thus, unlike the config
+    -- header suggests, the threshold is actually for all the 4 bursts
+    -- However, to make the chance high enough for 100% hits, we increase it
+    -- a little bit further.
+    chance = chance / 4 * 2
+
+    if powerON and ACSInfo.power ~= "off" then
+        local dist = sensor.IRSensor:getHitDistance()
+
+        local maxrange = properties.ACSLeft.distance[ACSInfo.power]
+        if dist <= maxrange then
+            log(string.format("ACS dist (%s): %d\n", sensor.type, dist * properties.cmPerPixel))
+
+            -- Add noise when near max
+            local frdist = dist / maxrange
+            if frdist >= 0.9 and sensor.checkNoiseDelay < curtimems then
+                local delay = 36 -- UNDONE
+                if math.random() < (frdist / 3) then
+                    sensor.noPulseTime = curtimems + delay
+                    chance = 0
+                else
+                    sensor.checkNoiseDelay = curtimems + delay
+                end
+            end
+
+            if math.random() <= chance then
+                -- Execute ISR used by RP6 lib to detect IR pulses
+                avr.execISR(avr.ISR_INT2_vect)
+            end
         end
     end
 end
 
 
 function initPlugin()
-    ACSInfo.leftIRSensor = createIRSensor(properties.ACSLeft.pos,
-                                          properties.ACSLeft.color,
-                                          properties.ACSLeft.radius,
-                                          properties.ACSLeft.angle,
-                                          properties.ACSLeft.distance.high)
-    ACSInfo.rightIRSensor = createIRSensor(properties.ACSRight.pos,
-                                           properties.ACSRight.color,
-                                           properties.ACSRight.radius,
-                                           properties.ACSRight.angle,
-                                           properties.ACSRight.distance.high)
+    ACSInfo.left.IRSensor = createIRSensor(properties.ACSLeft.pos,
+                                           properties.ACSLeft.color,
+                                           properties.ACSLeft.radius,
+                                           properties.ACSLeft.angle,
+                                           properties.ACSLeft.distance.high)
+    ACSInfo.right.IRSensor = createIRSensor(properties.ACSRight.pos,
+                                            properties.ACSRight.color,
+                                            properties.ACSRight.radius,
+                                            properties.ACSRight.angle,
+                                            properties.ACSRight.distance.high)
 end
 
 function handleIOData(type, data)
@@ -115,20 +162,20 @@ function handleIOData(type, data)
         powerON = bit.isSet(data, avr.PB4)
 
         local e = not bit.isSet(data, ACSFlags.ACS_L)
-        if e ~= ACSInfo.leftEnabled then
-            ACSInfo.leftEnabled = e
+        if e ~= ACSInfo.left.enabled then
+            ACSInfo.left.enabled = e
 --            log(string.format("Left channel %s\n", (e and "enabled") or "disabled"))
             if not e then
-                maybeReceivePulse("left")
+                maybeReceivePulse(ACSInfo.left)
             end
         end
     elseif type == avr.IO_PORTC then
         local e = not bit.isSet(data, ACSFlags.ACS_R)
-        if e ~= ACSInfo.rightEnabled then
-            ACSInfo.rightEnabled = e
+        if e ~= ACSInfo.right.enabled then
+            ACSInfo.right.enabled = e
 --            log(string.format("Right channel %s\n", (e and "enabled") or "disabled"))
             if not e then
-                maybeReceivePulse("right")
+                maybeReceivePulse(ACSInfo.right)
             end
         end
     end

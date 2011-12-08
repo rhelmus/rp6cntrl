@@ -22,6 +22,9 @@ class CBaseGraphicsItem : public QGraphicsObject
     virtual qreal getZValue(void) const { return 0.0; }
 
 protected:
+    virtual void initContextMenu(QMenu *) { }
+    virtual bool handleContextMenuAction(QAction *) { return false; }
+
     bool getSnapsToGrid(void) const { return snapsToGrid; }
 
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
