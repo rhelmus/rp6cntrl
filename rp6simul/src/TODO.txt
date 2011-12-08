@@ -1,35 +1,15 @@
-- General IO: Check for overflows (reintroduce 8/16 bit separation?)
-- UART/SPI: Set ready flag when ready (instead of always enabled)
-- Check for modal dialogs blocking timers
-- Dir separators for Windows port
-- Test port enumeration on Windows
-- Map:
-    - Map selector etc: check if valid file type?
-- Check version on project loading
-- Use qRound for float/double --> int conversions
-- Stacked main widget: list recent projects if none loaded?
+- Dir separators for Windows port - Finished?
+- Fix port enumeration on Windows
 - IR transmitter for robot widget and property
-- check leds: colors, positions
-- move UI Lua function to separate package?
-- robot context menu:
-    - option to lock robot
-    - reset angle
-    - turn robot by XX degrees
 - patch RP6Lib
     - C++ support
     - no anonymous unions (gives compile errors + no duplicate variables)
     - Check changes made on kubuntu
     - ...
-- BUG: lua timer destroyed after CSimulator is
-- robot widget: show motor speeds?
 - acs: min hit distance?
-- Destruction: instance may be zero when it shouldn't yet
 - Test/verify atomic register array
 - Test/verify reduced lua locks (if done: remove comments and commented stuff)
-- m32 support:
-    - Extend loadCustomDriverInfo()?
 - Robot speed: correct?
-- ADC values are not rounded
 - What is EINT1 ADC value?
 - Battery
 - Randomization
@@ -43,4 +23,17 @@
 - BUG: sometimes crashes on exit
 - rp6simul --> rp6sim?
 - Map templates
-- Reduce svg sizes somehow
+- Release: add license text file for about
+- Call stopPlugin from window close
+- Store geometry?
+
+
+LATER
+- UART/SPI: Set ready flag when ready (instead of always enabled)
+- Stacked main widget: list recent projects if none loaded?
+- move UI Lua function to separate package?
+- robot widget: show motor speeds?
+- Extend loadCustomDriverInfo() to use m32 luaState?
+- General IO: Check for overflows (reintroduce 8/16 bit separation?)
+- Nicer project/map version checking
+- Black box: does not reflect IR

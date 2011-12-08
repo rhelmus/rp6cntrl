@@ -97,6 +97,8 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     QMenu menu;
     QAction *aligna = 0, *dela = 0;
 
+    initContextMenu(&menu);
+
     if (isMovable)
         aligna = menu.addAction(QIcon(getResourcePath("grid-icon.png")),
                                 "Align to grid");
@@ -114,22 +116,25 @@ void CBaseGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 
     QAction *a = menu.exec(event->screenPos());
 
-    if (a) // Need to check as variables may 0 as well.
+    if (a) // Need to check as action variables may 0 as well.
     {
-        if (a == aligna)
+        if (!handleContextMenuAction(a))
         {
-            CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
-            Q_ASSERT(rscene);
-            const QPointF opos(pos());
-            const QPointF npos(rscene->alignPosToGrid(pos()));
-            if (opos != npos)
+            if (a == aligna)
             {
-                setPos(npos);
-                emit posChanged(opos);
+                CRobotScene *rscene = qobject_cast<CRobotScene *>(scene());
+                Q_ASSERT(rscene);
+                const QPointF opos(pos());
+                const QPointF npos(rscene->alignPosToGrid(pos()));
+                if (opos != npos)
+                {
+                    setPos(npos);
+                    emit posChanged(opos);
+                }
             }
+            else if (a == dela)
+                removeMe();
         }
-        else if (a == dela)
-            removeMe();
     }
 
     QGraphicsItem::contextMenuEvent(event);

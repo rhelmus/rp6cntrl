@@ -57,13 +57,52 @@ void CRotatablePixmapGraphicsItem::adjustHandles()
     }
 }
 
-void CRotatablePixmapGraphicsItem::paint(QPainter *painter,
-                                         const QStyleOptionGraphicsItem *option,
-                                         QWidget *widget)
+void CRotatablePixmapGraphicsItem::initContextMenu(QMenu *menu)
 {
-    CBaseGraphicsItem::paint(painter, option, widget);
-    painter->setRenderHint(QPainter::SmoothPixmapTransform);
-    painter->drawPixmap(boundRect.toRect(), pixmap);
+    QAction *a = menu->addAction(QIcon(getResourcePath("rotate.png")),
+                                 "Rotate 90 degrees left");
+    a->setData("rotleft");
+
+    a = menu->addAction(QIcon(getResourcePath("rotate.png")),
+                        "Rotate 90 degrees right");
+    a->setData("rotright");
+
+    a = menu->addAction(QIcon(getResourcePath("rotate.png")),
+                        "Rotate 180 degrees");
+    a->setData("rot180");
+
+    a = menu->addAction(QIcon(getResourcePath("rotate.png")),
+                        "Reset rotation");
+    a->setData("resetrot");
+
+    menu->addSeparator();
+}
+
+bool CRotatablePixmapGraphicsItem::handleContextMenuAction(QAction *a)
+{
+    const QString d(a->data().toString());
+
+    if (d.isEmpty())
+        return false;
+
+    qreal angle;
+    const qreal olda = rotation();
+
+    if (d == "rotleft")
+        angle = olda - 90;
+    else if (d == "rotright")
+        angle = olda + 90;
+    else if (d == "rot180")
+        angle = olda + 180;
+    else if (d == "resetrot")
+        angle = 0;
+    else
+        return false;
+
+    setRotation(angle);
+    emit rotationChanged(olda);
+
+    return true;
 }
 
 bool CRotatablePixmapGraphicsItem::sceneEventFilter(QGraphicsItem *watched,
@@ -111,6 +150,15 @@ QVariant CRotatablePixmapGraphicsItem::itemChange(GraphicsItemChange change,
     }
 
     return CBaseGraphicsItem::itemChange(change, value);
+}
+
+void CRotatablePixmapGraphicsItem::paint(QPainter *painter,
+                                         const QStyleOptionGraphicsItem *option,
+                                         QWidget *widget)
+{
+    CBaseGraphicsItem::paint(painter, option, widget);
+    painter->setRenderHint(QPainter::SmoothPixmapTransform);
+    painter->drawPixmap(boundRect.toRect(), pixmap);
 }
 
 QPainterPath CRotatablePixmapGraphicsItem::shape() const

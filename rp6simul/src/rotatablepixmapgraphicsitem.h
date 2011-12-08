@@ -21,8 +21,8 @@ class CRotatablePixmapGraphicsItem : public CBaseGraphicsItem
     void adjustHandles(void);
 
 protected:
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
-               QWidget *widget);
+    void initContextMenu(QMenu *menu);
+    bool handleContextMenuAction(QAction *a);
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
     QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
@@ -30,6 +30,8 @@ public:
     CRotatablePixmapGraphicsItem(const QPixmap &pm, QGraphicsItem *parent = 0);
     CRotatablePixmapGraphicsItem(QGraphicsItem *parent = 0);
 
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+               QWidget *widget);
     QRectF boundingRect(void) const { return boundRect; }
     QPainterPath shape(void) const;
 

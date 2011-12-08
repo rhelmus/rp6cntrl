@@ -65,7 +65,7 @@ properties =
         pos = { 169, 62 },
         radius = 11,
         color = darkblue,
-        angle = 357, -- UNDONE
+        angle = 357,
         distance = ACSDistances
     },
     ACSRight =
@@ -73,7 +73,7 @@ properties =
         pos = { 454, 60 },
         radius = 11,
         color = darkblue,
-        angle = 3, -- UNDONE
+        angle = 3,
         distance = ACSDistances
     },
 

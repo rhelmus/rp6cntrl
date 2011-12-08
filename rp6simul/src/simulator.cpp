@@ -562,6 +562,7 @@ void CSimulator::terminatePluginMainThread()
         prgdialog.setMinimumDuration(250);
         prgdialog.setValue(0);
         prgdialog.setCancelButton(0); // No canceling
+        prgdialog.setModal(true);
 
         prgdialog.setLabelText("Asking RP6 plugin nicely to quit...");
         quitPlugin = true;
