@@ -2196,6 +2196,8 @@ int CRP6Simulator::luaLEDDestr(lua_State *l)
         instance->robotWidget->removeM32LED(led);
     }
 
+    instance->changedLEDs.remove(led);
+
     delete led;
     return 0;
 }
@@ -3241,14 +3243,12 @@ void CRP6Simulator::stopPlugin()
         }
     }
 
-    // Dump any remaining buffered data
-    timedUIUpdate();
-
     robotSimulator->stopPlugin();
     m32Simulator->stopPlugin();
 
     pluginUpdateUITimer->stop();
     pluginUpdateLEDsTimer->stop();
+    timedUIUpdate(); // Dump any remaining buffered data
     robotScene->stop();
     robotWidget->stop();
 

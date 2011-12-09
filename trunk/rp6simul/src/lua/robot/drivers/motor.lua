@@ -25,10 +25,15 @@ local motorInfo = {
     inputRegister = 0,
     leftPower = 0,
     rightPower = 0,
+    leftDirection = "FWD",
+    rightDirection = "FWD",
     leftEncDriveCounter = 0,
     rightEncDriveCounter = 0,
     leftEncMoveCounter = 0,
     rightEncMoveCounter = 0,
+    leftReadOutError = 1,
+    rightReadOutError = 1,
+    readOutCounter = nil,
     leftDistance = 0,
     rightDistance = 0,
 }
@@ -193,11 +198,11 @@ local function setInputRegister(data)
 end
 
 local function setMotorDirection(data)
-    local ldir = (bit.isSet(data, avr.PINC2) and "BWD") or "FWD"
-    local rdir = (bit.isSet(data, avr.PINC3) and "BWD") or "FWD"
-    updateRobotStatus("motor", "direction", "left", ldir)
-    updateRobotStatus("motor", "direction", "right", rdir)
-    setMotorDir(ldir, rdir)
+    motorInfo.leftDirection = (bit.isSet(data, avr.PINC2) and "BWD") or "FWD"
+    motorInfo.rightDirection = (bit.isSet(data, avr.PINC3) and "BWD") or "FWD"
+    updateRobotStatus("motor", "direction", "left", motorInfo.leftDirection)
+    updateRobotStatus("motor", "direction", "right", motorInfo.rightDirection)
+    setMotorDir(motorInfo.leftDirection, motorInfo.rightDirection)
 end
 
 
@@ -239,7 +244,37 @@ function initPlugin()
 
     encReadoutTimer = clock.createTimer()
     encReadoutTimer:setTimeOut(function()
+        -- Update error every ~1 sec
+        if motorInfo.readOutCounter == nil or motorInfo.readOutCounter >= 5 then
+            motorInfo.readOutCounter = 0
+
+            -- UNDONE
+            local ls = motorInfo.leftEncDriveCounter
+            local rs = motorInfo.rightEncDriveCounter
+            if motorInfo.leftDirection == "BWD" then
+                ls = -ls
+            end
+            if motorInfo.rightDirection == "BWD" then
+                rs = -rs
+            end
+
+            local delta = math.abs(ls - rs)
+            local noiserange = delta / 500
+            local minnoise = -noiserange
+            local maxnoise = noiserange * (1 - (delta / 500))
+
+            if minnoise == maxnoise then
+                motorInfo.leftReadOutError, motorInfo.rightReadOutError = 1, 1
+            else
+                motorInfo.leftReadOutError = 1 + (math.random(minnoise*100, maxnoise*100) / 100)
+                motorInfo.rightReadOutError = 1 + (math.random(minnoise*100, maxnoise*100) / 100)
+            end
+        end
+
+        motorInfo.readOutCounter = motorInfo.readOutCounter + 1
+
         local drivespeed = motorInfo.leftEncDriveCounter
+        drivespeed = drivespeed * motorInfo.leftReadOutError
         local movespeed = motorInfo.leftEncMoveCounter
         motorInfo.leftDistance = motorInfo.leftDistance + movespeed
         motorInfo.leftEncDriveCounter = 0
@@ -250,6 +285,7 @@ function initPlugin()
         updateRobotStatus("motor", "distance", "left", motorInfo.leftDistance)
 
         drivespeed = motorInfo.rightEncDriveCounter
+        drivespeed = drivespeed * motorInfo.rightReadOutError
         movespeed = motorInfo.rightEncMoveCounter
         motorInfo.rightDistance = motorInfo.rightDistance + movespeed
         motorInfo.rightEncDriveCounter = 0

@@ -27,7 +27,9 @@ local ACSInfo = {
         enabled = false,
         IRSensor = nil,
         noPulseTime = 0,
-        checkNoiseDelay = 0,
+        pulseFraction = nil,
+        pulsesSend = 0,
+        pulsesReceived = 0,
     },
 
     right = {
@@ -35,7 +37,9 @@ local ACSInfo = {
         enabled = false,
         IRSensor = nil,
         noPulseTime = 0,
-        checkNoiseDelay = 0,
+        pulseFraction = nil,
+        pulsesSend = 0,
+        pulsesReceived = 0,
     },
 }
 
@@ -82,26 +86,15 @@ local function updateACSPower(type, data)
     end
 end
 
-local function maybeReceivePulse(sensor)
-    -- Simulate that only a fraction of send pulses are bounced back
-    -- towards the detector. Receiving pulses happens immidiately after they
-    -- are sent. Note that in real life pulses travel at the speed of light,
-    -- which is close too instant as well :)
-
-    local curtimems = clock.getTimeMS()
-
-    if curtimems < sensor.noPulseTime then
-        return
-    end
-
-    local chance
+function getPulseFraction(sensor, dist, range)
+    local ret
 
     -- Fraction of pulses that are minimally necessary to trigger
     -- collision detection
     if sensor.type == "left" then
-        chance = getACSProperty("recLeft") / getACSProperty("sendLeft")
+        ret = getACSProperty("recLeft") / getACSProperty("sendLeft")
     else
-        chance = getACSProperty("recRight") / getACSProperty("sendRight")
+        ret = getACSProperty("recRight") / getACSProperty("sendRight")
     end
 
     -- When looking for collisions, the RP6 lib code performs 4 'bursts'
@@ -109,32 +102,51 @@ local function maybeReceivePulse(sensor)
     -- header suggests, the threshold is actually for all the 4 bursts
     -- However, to make the chance high enough for 100% hits, we increase it
     -- a little bit further.
-    chance = chance / 4 * 2
+    ret = ret / 4 * 2
 
-    if powerON and ACSInfo.power ~= "off" then
-        local dist = sensor.IRSensor:getHitDistance()
+    if (dist / range) > 0.9 then
+        -- Randomize to simulate scatter when near maximum range
+        ret = (math.random(-300 * ret, 300 * ret) / 100)
+    end
 
-        local maxrange = properties.ACSLeft.distance[ACSInfo.power]
-        if dist <= maxrange then
-            log(string.format("ACS dist (%s): %d\n", sensor.type, dist * properties.cmPerPixel))
+    return ret
+end
 
-            -- Add noise when near max
-            local frdist = dist / maxrange
-            if frdist >= 0.9 and sensor.checkNoiseDelay < curtimems then
-                local delay = 36 -- UNDONE
-                if math.random() < (frdist / 3) then
-                    sensor.noPulseTime = curtimems + delay
-                    chance = 0
-                else
-                    sensor.checkNoiseDelay = curtimems + delay
-                end
-            end
+local function maybeReceivePulse(sensor)
+    -- Simulate that only a fraction of send pulses are bounced back
+    -- towards the detector. Receiving pulses happens immidiately after they
+    -- are sent. Note that in real life pulses travel at the speed of light,
+    -- which is close too instant as well :)
 
-            if math.random() <= chance then
-                -- Execute ISR used by RP6 lib to detect IR pulses
-                avr.execISR(avr.ISR_INT2_vect)
-            end
-        end
+    if not powerON or ACSInfo.power == "off" then
+        return
+    end
+
+    local curtimems = clock.getTimeMS()
+    local dist = sensor.IRSensor:getHitDistance()
+    local maxrange = properties.ACSLeft.distance[ACSInfo.power]
+
+    if dist > maxrange then
+        return
+    end
+
+    if sensor.pulseFraction == nil then
+        sensor.pulseFraction = getPulseFraction(sensor, dist, maxrange)
+    end
+
+    sensor.pulsesSend = sensor.pulsesSend + 1
+
+    -- Recalculate fraction every 100 pulses
+    if sensor.pulsesSend >= 100 then
+        log("Received/Send ratio:", sensor.pulsesReceived / sensor.pulsesSend, "\n")
+        sensor.pulsesSend, sensor.pulsesReceived = 0, 0
+        sensor.pulseFraction = getPulseFraction(sensor, dist, maxrange)
+        log("pulseFraction:", sensor.pulseFraction, "\n")
+    elseif sensor.pulsesReceived < (sensor.pulseFraction * 100) and
+           sensor.noPulseTime <= curtimems then
+        avr.execISR(avr.ISR_INT2_vect)
+        sensor.pulsesReceived = sensor.pulsesReceived + 1
+        sensor.noPulseTime = curtimems + 1
     end
 end
 
