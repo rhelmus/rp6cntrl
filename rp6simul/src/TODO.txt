@@ -17,7 +17,6 @@
     - Motors
     - Light Sensors
     - MIC
-    - ACS
 - More menu options (from toolbar)
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
 - BUG: sometimes crashes on exit
@@ -26,6 +25,10 @@
 - Release: add license text file for about
 - Call stopPlugin from window close
 - Store geometry?
+- Remove debug code
+    - Disable qDebug()
+    - Remove spinboxes+shortcuts map view
+    - tracelines
 
 
 LATER

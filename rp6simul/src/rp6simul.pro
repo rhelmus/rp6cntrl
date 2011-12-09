@@ -104,8 +104,6 @@ OTHER_FILES += \
     ../release.py
 
 win32 {
-    DESTDIR = ../bin_win
-
     SOURCES += ../lua/lzio.c \
         ../lua/lvm.c \
         ../lua/lundump.c \
