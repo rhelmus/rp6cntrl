@@ -101,7 +101,8 @@ OTHER_FILES += \
     lua/m32/drivers/piezo.lua \
     lua/m32/drivers/mic.lua \
     lua/m32/drivers/keypad.lua \
-    ../release.py
+    ../release.py \
+    lua/robot/drivers/battery.lua
 
 win32 {
     SOURCES += ../lua/lzio.c \
@@ -217,6 +218,10 @@ INSTALLS += luaSrcM32Drivers
 mapTemplates.files = ../map_templates/*
 mapTemplates.path = $${dataDir}/map_templates
 INSTALLS += mapTemplates
+
+COPYING.files = ../COPYING
+COPYING.path = $${dataDir}
+INSTALLS += COPYING
 
 target.path = $${binDir}
 INSTALLS += target

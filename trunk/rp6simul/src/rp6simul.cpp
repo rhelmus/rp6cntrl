@@ -2912,7 +2912,7 @@ void CRP6Simulator::showAbout()
 
     QPlainTextEdit *plaintextw = new QPlainTextEdit;
     plaintextw->setReadOnly(true);
-    QFile file("../COPYING");
+    QFile file(getDataPath("COPYING"));
     if (file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         while (!file.atEnd())
@@ -3698,7 +3698,10 @@ void CRP6Simulator::debugSetRobotRightPower(int power)
 void CRP6Simulator::closeEvent(QCloseEvent *event)
 {
     if (checkMapChange())
+    {
+        stopPlugin();
         event->accept();
+    }
     else
         event->ignore();
 }

@@ -20,6 +20,7 @@ inline unsigned long getUSDiff(const timespec &start, const timespec &end)
             ((end.tv_nsec-start.tv_nsec) / 1000);
 }
 
+QString getDataPath(const QString &file);
 QString getResourcePath(const QString &file=QString());
 QString getLuaSrcPath(const QString &file=QString());
 QString getMapTemplatesPath(const QString &file=QString());

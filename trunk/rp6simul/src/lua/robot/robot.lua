@@ -4,6 +4,7 @@ driverList =
 {
     { name = "acs", default  = true },
     { name = "adc", default  = true },
+    { name = "battery", default  = true },
     { name = "bumper", default  = true },
     { name = "extint1", default  = true },
     { name = "ircomm", default  = true },
