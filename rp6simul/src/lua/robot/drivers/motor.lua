@@ -29,6 +29,8 @@ local motorInfo = {
     rightDirection = "FWD",
     leftEncDriveCounter = 0,
     rightEncDriveCounter = 0,
+    leftTotalEncDriveCounter = 0,
+    rightTotalEncDriveCounter = 0,
     leftEncMoveCounter = 0,
     rightEncMoveCounter = 0,
     leftReadOutError = 1,
@@ -205,6 +207,47 @@ local function setMotorDirection(data)
     setMotorDir(motorInfo.leftDirection, motorInfo.rightDirection)
 end
 
+local function getEncoderFactor()
+    local factors =
+    {
+        { delta = 120, factor = 0.985 },
+        { delta = 140, factor = 0.97 },
+        { delta = 160, factor = 0.94 },
+        { delta = 200, factor = 0.92 },
+        { delta = 220, factor = 0.9 },
+        { delta = 260, factor = 0.9 },
+        { delta = 300, factor = 0.85 },
+        { delta = 320, factor = 0.82 },
+        { delta = 340, factor = 0.79 },
+        { delta = 360, factor = 0.75 },
+        { delta = 380, factor = 0.807 },
+        { delta = 400, factor = 0.78 },
+    }
+
+    local lp, rp = motorInfo.leftPower, motorInfo.rightPower
+    if motorInfo.leftDirection == "BWD" then
+        lp = -lp
+    end
+    if motorInfo.rightDirection == "BWD" then
+        rp = -rp
+    end
+    local delta = math.abs(lp - rp)
+
+    for i, entry in ipairs(factors) do
+        if delta <= entry.delta then
+            return entry.factor
+        elseif i == #factors then
+            return entry.factor
+        elseif delta < factors[i+1].delta then
+            local dy = factors[i+1].factor - entry.factor
+            local dx = factors[i+1].delta - entry.delta
+            local slope = dy / dx
+            log("delta:", delta, slope, entry.delta, factors[i+1].delta, entry.factor + ((delta - entry.delta) * slope), "\n")
+            return entry.factor + ((delta - entry.delta) * slope)
+        end
+    end
+end
+
 
 function initPlugin()
     --[[
@@ -226,7 +269,9 @@ function initPlugin()
 
     leftEncTimer = clock.createTimer()
     leftEncTimer:setTimeOut(function()
-        motorInfo.leftEncDriveCounter = motorInfo.leftEncDriveCounter + 1
+        if math.random() <= getEncoderFactor() then
+            motorInfo.leftEncDriveCounter = motorInfo.leftEncDriveCounter + 1
+        end
         if not robotIsBlocked() and powerON then
             avr.execISR(avr.ISR_INT0_vect)
             motorInfo.leftEncMoveCounter = motorInfo.leftEncMoveCounter + 1
@@ -235,7 +280,9 @@ function initPlugin()
 
     rightEncTimer = clock.createTimer()
     rightEncTimer:setTimeOut(function()
-        motorInfo.rightEncDriveCounter = motorInfo.rightEncDriveCounter + 1
+        if math.random() <= getEncoderFactor() then
+            motorInfo.rightEncDriveCounter = motorInfo.rightEncDriveCounter + 1
+        end
         if not robotIsBlocked() and powerON then
             avr.execISR(avr.ISR_INT1_vect)
             motorInfo.rightEncMoveCounter = motorInfo.rightEncMoveCounter + 1
@@ -245,36 +292,44 @@ function initPlugin()
     encReadoutTimer = clock.createTimer()
     encReadoutTimer:setTimeOut(function()
         -- Update error every ~1 sec
-        if motorInfo.readOutCounter == nil or motorInfo.readOutCounter >= 5 then
+        if motorInfo.readOutCounter == nil or motorInfo.readOutCounter >= 3 then
             motorInfo.readOutCounter = 0
+--[[
+            -- UNDONE: 3
+            local avgls = motorInfo.leftTotalEncDriveCounter / 3
+            local avgrs = motorInfo.rightTotalEncDriveCounter / 3
+            motorInfo.leftTotalEncDriveCounter = 0
+            motorInfo.rightTotalEncDriveCounter = 0
 
-            -- UNDONE
-            local ls = motorInfo.leftEncDriveCounter
-            local rs = motorInfo.rightEncDriveCounter
             if motorInfo.leftDirection == "BWD" then
-                ls = -ls
+                avgls = -avgls
             end
             if motorInfo.rightDirection == "BWD" then
-                rs = -rs
+                avgrs = -avgrs
             end
 
-            local delta = math.abs(ls - rs)
-            local noiserange = delta / 500
-            local minnoise = -noiserange
-            local maxnoise = noiserange * (1 - (delta / 500))
+            local delta = math.abs(avgls - avgrs)
+            local minnoise = -0.0009253131*delta+0.0610912343
+            log("delta/minnoise:", delta, minnoise, "\n")
+            local maxnoise = 1337 * (1 - (delta / 500))
 
-            if minnoise == maxnoise then
+            if true or minnoise == maxnoise then
                 motorInfo.leftReadOutError, motorInfo.rightReadOutError = 1, 1
             else
-                motorInfo.leftReadOutError = 1 + (math.random(minnoise*100, maxnoise*100) / 100)
-                motorInfo.rightReadOutError = 1 + (math.random(minnoise*100, maxnoise*100) / 100)
+--                minnoise, maxnoise = -0.18, -0.24
+                motorInfo.leftReadOutError = 1 * 0.7 --+ minnoise -- (math.random(minnoise*100, maxnoise*100) / 100)
+                motorInfo.rightReadOutError = 1 * 0.7 --+ minnoise -- (math.random(minnoise*100, maxnoise*100) / 100)
             end
+            --]]
+            motorInfo.leftReadOutError = 1 --+ (math.random(-5, 5) / 100)
+            motorInfo.rightReadOutError = 1-- + (math.random(-5, 5) / 100)
         end
 
         motorInfo.readOutCounter = motorInfo.readOutCounter + 1
 
         local drivespeed = motorInfo.leftEncDriveCounter
         drivespeed = drivespeed * motorInfo.leftReadOutError
+        motorInfo.leftTotalEncDriveCounter = motorInfo.leftTotalEncDriveCounter + motorInfo.leftEncDriveCounter
         local movespeed = motorInfo.leftEncMoveCounter
         motorInfo.leftDistance = motorInfo.leftDistance + movespeed
         motorInfo.leftEncDriveCounter = 0
@@ -286,6 +341,7 @@ function initPlugin()
 
         drivespeed = motorInfo.rightEncDriveCounter
         drivespeed = drivespeed * motorInfo.rightReadOutError
+        motorInfo.rightTotalEncDriveCounter = motorInfo.rightTotalEncDriveCounter + motorInfo.rightEncDriveCounter
         movespeed = motorInfo.rightEncMoveCounter
         motorInfo.rightDistance = motorInfo.rightDistance + movespeed
         motorInfo.rightEncDriveCounter = 0
