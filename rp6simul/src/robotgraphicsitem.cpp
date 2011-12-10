@@ -178,8 +178,6 @@ void CRobotGraphicsItem::tryMove()
       Therefore a positive bias (ie. turn too far) can clearly be seen when
       rotation is simulated (without any artificial deviations).
     */
-    // UNDONE: Somehow correct for positive bias caused by low speed update
-    //         frequency of RP6 library code?
     const float rotspeed = (lspeed - rspeed) / 2.0;
     float degspeed = 0.0;
     if (rotspeed != 0.0)

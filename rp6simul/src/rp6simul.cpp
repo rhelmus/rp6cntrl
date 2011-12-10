@@ -314,20 +314,19 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
 
     resize(850, 600);
 
-    QSplitter *splitter = new QSplitter(Qt::Vertical, this);
-    setCentralWidget(splitter);
+    setCentralWidget(mainSplitter = new QSplitter(Qt::Vertical, this));
 
-    splitter->addWidget(createMainWidget());
-    splitter->addWidget(bottomTabWidget = createBottomTabWidget());
-    splitter->setSizes(QList<int>() << 600 << 300);
+    mainSplitter->addWidget(createMainWidget());
+    mainSplitter->addWidget(bottomTabWidget = createBottomTabWidget());
+    mainSplitter->setSizes(QList<int>() << 600 << 300);
 
     createMenus();
     createToolbars();
 
     updateMainStackedWidget();
 
-    QDockWidget *statdock;
-    addDockWidget(Qt::LeftDockWidgetArea, statdock = createStatusDock(),
+    QDockWidget *maindock;
+    addDockWidget(Qt::LeftDockWidgetArea, maindock = createMainDock(),
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, ADCDockWidget = createADCDock(),
                   Qt::Vertical);
@@ -335,10 +334,10 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
                   Qt::Vertical);
     addDockWidget(Qt::LeftDockWidgetArea, extEEPROMDockWidget = createExtEEPROMDock(),
                   Qt::Vertical);
-    tabifyDockWidget(statdock, ADCDockWidget);
+    tabifyDockWidget(maindock, ADCDockWidget);
     tabifyDockWidget(ADCDockWidget, IODockWidget);
     tabifyDockWidget(IODockWidget, extEEPROMDockWidget);
-    activateDockTab(this, "Status");
+    activateDockTab(this, "Main");
 
     ADCDockWidget->setEnabled(false);
     IODockWidget->setEnabled(false);
@@ -375,6 +374,14 @@ CRP6Simulator::CRP6Simulator(QWidget *parent) :
     initSimulators();
 
     QSettings settings;
+    if (settings.value("restoreGeometry", true).toBool())
+        restoreGeometry(settings.value("mainGeometry").toByteArray());
+    if (settings.value("restoreState", true).toBool())
+    {
+        restoreState(settings.value("mainState").toByteArray());
+        mainSplitter->restoreState(settings.value("mainSplitterState").toByteArray());
+    }
+
     updatePreferences(settings);
 
     if (settings.value("loadPrevProjectStartup", true).toBool())
@@ -696,6 +703,8 @@ void CRP6Simulator::setToolBarToolTips()
 void CRP6Simulator::createToolbars()
 {
     QToolBar *toolb = addToolBar("Run");
+    toolb->setObjectName("runToolBar");
+
     runPluginAction = toolb->addAction(QIcon(getResourcePath("run.png")), "Run",
                                        this, SLOT(runPlugin()));
     runPluginAction->setShortcut(tr("ctrl+R"));
@@ -762,6 +771,7 @@ void CRP6Simulator::createToolbars()
 
 
     robotToolBar = addToolBar("Robot");
+    robotToolBar->setObjectName("robotToolBar");
     robotToolBar->setEnabled(false);
     QToolButton *tb = new QToolButton;
     tb->setIcon(QIcon(getResourcePath("dataplot.png")));
@@ -787,6 +797,7 @@ void CRP6Simulator::createToolbars()
 
 
     addToolBar(editMapToolBar = new QToolBar("Edit map"));
+    editMapToolBar->setObjectName("editMapToolBar");
     editMapToolBar->setEnabled(false);
 
     editMapActionGroup = new QActionGroup(this);
@@ -1122,9 +1133,10 @@ QWidget *CRP6Simulator::createIRCOMMTab()
     return ret;
 }
 
-QDockWidget *CRP6Simulator::createStatusDock()
+QDockWidget *CRP6Simulator::createMainDock()
 {
-    QDockWidget *ret = new QDockWidget("Status", this);
+    QDockWidget *ret = new QDockWidget("Main", this);
+    ret->setObjectName("mainDock");
     ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
     QWidget *w = new QWidget;
@@ -1148,6 +1160,11 @@ QDockWidget *CRP6Simulator::createStatusDock()
     mapSelectorTreeWidget->setHeaderHidden(true);
     mapSelectorTreeWidget->setSelectionMode(QTreeWidget::SingleSelection);
     mapSelectorTreeWidget->setEnabled(false);
+
+    // See http://developer.qt.nokia.com/faq/answer/how_can_i_ensure_that_a_horizontal_scrollbar_and_not_an_ellipse_shows_up_wh
+    mapSelectorTreeWidget->header()->setResizeMode(0, QHeaderView::ResizeToContents);
+    mapSelectorTreeWidget->header()->setStretchLastSection(false);
+
     connect(mapSelectorTreeWidget, SIGNAL(itemActivated(QTreeWidgetItem*,int)),
             SLOT(mapSelectorItemActivated(QTreeWidgetItem*)));
 
@@ -1166,6 +1183,7 @@ QDockWidget *CRP6Simulator::createStatusDock()
 QDockWidget *CRP6Simulator::createADCDock()
 {
     QDockWidget *ret = new QDockWidget("ADC", this);
+    ret->setObjectName("ADCDock");
     ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
     QWidget *w = new QWidget;
@@ -1217,6 +1235,7 @@ QDockWidget *CRP6Simulator::createRegisterDock()
     extern const char *IORegisterStringArray[IO_END];
 
     QDockWidget *ret = new QDockWidget("Registers", this);
+    ret->setObjectName("registerDock");
     ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
     QWidget *w = new QWidget;
@@ -1249,6 +1268,7 @@ QDockWidget *CRP6Simulator::createRegisterDock()
 QDockWidget *CRP6Simulator::createExtEEPROMDock()
 {
     QDockWidget *ret = new QDockWidget("Ext. EEPROM", this);
+    ret->setObjectName("extEEPROMDock");
     ret->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
     QWidget *w = new QWidget;
@@ -2782,7 +2802,7 @@ void CRP6Simulator::newMap()
         qreal size;
         switch (sizebox->currentIndex())
         {
-        case 0: size = 500.0; break;
+        case 0: size = 750.0; break;
         default:
         case 1: size = 1500.0; break;
         case 2: size = 3000.0; break;
@@ -2790,6 +2810,7 @@ void CRP6Simulator::newMap()
 
         robotScene->newMap(s, QSizeF(size, size));
         s.sync();
+        currentMapFile.clear(); // Force reload
         loadMapFile(path, false);
         break;
     }
@@ -3418,7 +3439,8 @@ void CRP6Simulator::editMapSettings()
 
     if (dialog.exec() == QDialog::Accepted)
     {
-        robotScene->setMapSize(dialog.getMapSize());
+        if (dialog.getMapSize() != robotScene->sceneRect().size())
+            robotScene->setMapSize(dialog.getMapSize());
         qDebug() << "Ambient light changed:" << (robotScene->getAmbientLight() != dialog.getAmbientLight()) << robotScene->getAmbientLight() << dialog.getAmbientLight();
         robotScene->setAmbientLight(dialog.getAmbientLight());
         robotScene->setShadowQuality(dialog.getShadowQuality());
@@ -3701,6 +3723,11 @@ void CRP6Simulator::closeEvent(QCloseEvent *event)
     {
         stopPlugin();
         event->accept();
+        QSettings settings;
+        settings.setValue("mainGeometry", saveGeometry());
+        settings.setValue("mainState", saveState());
+        settings.setValue("mainSplitterState", mainSplitter->saveState());
+        QMainWindow::closeEvent(event);
     }
     else
         event->ignore();

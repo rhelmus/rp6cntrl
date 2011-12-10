@@ -717,7 +717,7 @@ void CRobotScene::setMapSize(const QSizeF &size, bool force)
                 continue; // Skip static walls
 
             QRectF r(it->mapRectToScene(it->boundingRect()));
-            if (!newsrect.contains(r)) // Not fully contained?
+            if (!newsrect.contains(r.center()))
             {
                 if (!asked)
                 {
@@ -805,7 +805,7 @@ QPointF CRobotScene::alignPosToGrid(QPointF pos) const
 
 void CRobotScene::newMap(QSettings &settings, const QSizeF &size)
 {
-    // NOTE: Only values without proper default are written
+    // NOTE: Only values without proper defaults are written
 
     settings.beginGroup("map");
 
@@ -924,8 +924,11 @@ void CRobotScene::loadMap(QSettings &settings)
         addBox(QRectF(s.pos, s.size));
     }
 
+    QRectF r(robotStartGraphicsItem->mapRectToScene(robotStartGraphicsItem->boundingRect()));
+    r.moveCenter(sceneRect().center());
+    const QPointF defstartpos(r.topLeft());
     QPointF startpos(settings.value("robotStartPosition",
-                                    sceneRect().center()).toPointF());
+                                    defstartpos).toPointF());
     qreal startrot = settings.value("robotStartRotation", 0.0).toReal();
     robotStartGraphicsItem->setPos(startpos);
     robotStartGraphicsItem->setRotation(startrot);

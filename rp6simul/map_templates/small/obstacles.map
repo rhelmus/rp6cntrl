@@ -1,0 +1,13 @@
+[map]
+version=1
+mapSize=@Variant(\0\0\0\x16@\x87p\0\0\0\0\0@\x87p\0\0\0\0\0)
+ambientLight=@Variant(\0\0\0\x87?\x86\x66\x66)
+gridSize=@Variant(\0\0\0\x87\x41p\0\0)
+autoGrid=true
+lights=@Invalid()
+shadowQuality=1
+walls=@Invalid()
+boxes=@Variant(\0\0\0\x7f\0\0\0\x10SObjectSettings\0@b\xc1\xa1\xca\xc0\x83\x12@ZR\xcbSP\t/@h{\xe5\f^\xb3\x13@d\xa3PH\x16\xf0\a), @Variant(\0\0\0\x7f\0\0\0\x10SObjectSettings\0@|%Q\xfQ\xac\x9f@o\xeb`\x17\x97\xcc>@hjb\xe0\x9f\xe8M@d\xb3#\xf6\x7fM\xbf)
+robotStartPosition=@Variant(\0\0\0\x1a@r\xcf\x19\xc3\x8b\x4\xac@~\xf5\xd5\x32\x61|\x1c)
+robotStartRotation=0
+scale=0.620921323059155

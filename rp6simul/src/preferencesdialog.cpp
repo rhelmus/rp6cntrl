@@ -54,6 +54,10 @@ QWidget *CPreferencesDialog::createGeneralTab()
 
     form->addRow("Load last project on program start",
                  loadPrevProjectCheckBox = new QCheckBox);
+    form->addRow("Restore main window geometry",
+                 restoreGeometryCheckBox = new QCheckBox);
+    form->addRow("Restore main window state (toolbars, docks etc)",
+                 restoreStateCheckBox = new QCheckBox);
 
     return ret;
 }
@@ -143,6 +147,8 @@ void CPreferencesDialog::loadPreferences(QSettings &settings)
     defaultProjectDirPathInput->setPath(settings.value("defaultProjectDir",
                                                        QDir::homePath()).toString());
     loadPrevProjectCheckBox->setChecked(settings.value("loadPrevProjectStartup", true).toBool());
+    restoreGeometryCheckBox->setChecked(settings.value("restoreGeometry", true).toBool());
+    restoreStateCheckBox->setChecked(settings.value("restoreState", true).toBool());
 
     soundGroupBox->setChecked(settings.value("soundEnabled", true).toBool());
     piezoVolumeSlider->setValue(settings.value("piezoVolume", 75).toInt());
@@ -167,6 +173,8 @@ void CPreferencesDialog::savePreferences(QSettings &settings)
     settings.setValue("defaultProjectDir", defaultProjectDirPathInput->getPath());
     settings.setValue("loadPrevProjectStartup",
                       loadPrevProjectCheckBox->isChecked());
+    settings.setValue("restoreGeometry", restoreGeometryCheckBox->isChecked());
+    settings.setValue("restoreState", restoreStateCheckBox->isChecked());
 
     settings.setValue("soundEnabled", soundGroupBox->isChecked());
     settings.setValue("piezoVolume", piezoVolumeSlider->value());
