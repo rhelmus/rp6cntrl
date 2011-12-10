@@ -41,12 +41,14 @@ QString getDataDir()
 
 }
 
+QString getDataPath(const QString &file)
+{
+    QDir datapath(getDataDir());
+    return QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath(file)));
+}
 
 QString getResourcePath(const QString &file)
-{/*
-    QDir datapath(getDataDir());
-    return QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("resource/"+file)));
-    */
+{
     QDir datapath(getDataDir());
     QString ret = QDir::toNativeSeparators(QDir::cleanPath(datapath.absoluteFilePath("resource/"+file)));
     if (!QFile(ret).exists())

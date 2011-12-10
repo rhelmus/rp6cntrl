@@ -12,6 +12,8 @@ local MICInfo =
     currentSoundLevel = 0,
 }
 
+local noiseFunction
+
 
 local function handleSound(l)
     local level
@@ -33,6 +35,7 @@ end
 
 
 function initPlugin()
+    noiseFunction = makeADCNoiseFunction(50, 200, -1, 1)
     setSoundCallback(handleSound)
 end
 
@@ -44,7 +47,7 @@ end
 
 function getADCValue(a)
     if a == "MIC" then
-        return MICInfo.currentSoundLevel
+        return MICInfo.currentSoundLevel + noiseFunction()
     end
 
     -- return nil
