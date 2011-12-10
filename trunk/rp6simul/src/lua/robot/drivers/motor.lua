@@ -37,6 +37,7 @@ local motorInfo = {
 
 local leftEncTimer, rightEncTimer, encReadoutTimer
 local powerON = false
+local leftCurrentNoiseFunction, rightCurrentNoiseFunction
 
 local function getEffectiveSpeedTimerBase()
     --[[
@@ -325,6 +326,9 @@ function initPlugin()
 
     -- See top
     encReadoutTimer:setCompareValue(8 * 99 * 11 * (getSpeedTimerBase()+2))
+
+    leftCurrentNoiseFunction = makeADCNoiseFunction(50, 100, -5, 5)
+    rightCurrentNoiseFunction = makeADCNoiseFunction(50, 100, -5, 5)
 end
 
 function handleIOData(type, data)
@@ -382,15 +386,19 @@ function getADCValue(a)
     local maxpower = 210
 
     if a == "MCURRENT_L" then
-        if motorInfo.leftPower == 0 or not powerON then
-            return 0
+        local ret = 0
+        if motorInfo.leftPower > 0 and powerON then
+            return mincurrent + ((motorInfo.leftPower / maxpower) * currentd)
         end
-        return mincurrent + ((motorInfo.leftPower / maxpower) * currentd)
+        ret = ret + leftCurrentNoiseFunction()
+        return bound(0, ret, 1023)
     elseif a == "MCURRENT_R" then
-        if motorInfo.rightPower == 0 or not powerON then
+        local ret = 0
+        if motorInfo.rightPower > 0 and powerON then
             return 0
         end
-        return mincurrent + ((motorInfo.rightPower / maxpower) * currentd)
+        ret = ret + rightCurrentNoiseFunction()
+        return bound(0, ret, 1023)
     end
 
     -- return nil

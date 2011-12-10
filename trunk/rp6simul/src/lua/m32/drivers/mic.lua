@@ -17,15 +17,15 @@ local noiseFunction
 
 local function handleSound(l)
     local level
-    -- UNDONE: Randomize?
-    -- UNDONE: Levels OK?
     if l == "soft" then
-        level = 40
-    elseif l == "normal" then
-        level = 100
-    elseif l == "loud" then
         level = 200
+    elseif l == "normal" then
+        level = 500
+    elseif l == "loud" then
+        level = 900
     end
+
+    level = level + math.random(-100, 100)
 
     if MICInfo.currentSoundLevel < level then
         MICInfo.currentSoundLevel = level
@@ -35,7 +35,7 @@ end
 
 
 function initPlugin()
-    noiseFunction = makeADCNoiseFunction(50, 200, -1, 1)
+    noiseFunction = makeADCNoiseFunction(50, 200, -10, 10)
     setSoundCallback(handleSound)
 end
 
@@ -47,7 +47,7 @@ end
 
 function getADCValue(a)
     if a == "MIC" then
-        return MICInfo.currentSoundLevel + noiseFunction()
+        return bound(0, MICInfo.currentSoundLevel + noiseFunction(), 1023)
     end
 
     -- return nil

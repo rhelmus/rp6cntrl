@@ -1,6 +1,4 @@
-- Dir separators for Windows port - Finished?
 - Fix port enumeration on Windows
-- IR transmitter for robot widget and property
 - patch RP6Lib
     - C++ support
     - no anonymous unions (gives compile errors + no duplicate variables)
@@ -8,17 +6,15 @@
     - ...
 - Test/verify atomic register array
 - Test/verify reduced lua locks (if done: remove comments and commented stuff)
-- Robot speed: correct?
 - Serial port pass through: are settings important for virtual ports? add dts/rts settings?
 - BUG: sometimes crashes on exit
 - rp6simul --> rp6sim?
-- Map templates
-- Store geometry?
 - Remove debug code
     - Disable qDebug()
     - Remove spinboxes+shortcuts map view
     - tracelines
-- Check MIC levels, randomize them
+- Disable follow mode if not active
+    - Re-enable auto
 
 
 LATER
@@ -31,3 +27,4 @@ LATER
 - Nicer project/map version checking
 - Black box: does not reflect IR
 - acs: min hit distance?
+- IR transmitter for robot widget and property?

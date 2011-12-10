@@ -48,6 +48,7 @@ class CLED;
 class CProjectWizard;
 class CRobotWidget;
 class CSimulator;
+class QSplitter;
 
 struct SDriverInfo
 {
@@ -112,6 +113,7 @@ class CRP6Simulator : public QMainWindow
     SRobotConfigDefinitions robotConfigDefinitions;
     bool pluginRunning;
 
+    QSplitter *mainSplitter;
     QList<QAction *> projectActionList, mapMenuActionList;
     QMenu *recentProjectsMenu;
     QAction *saveMapAsAction, *editProjectSettingsAction, *editPreferencesAction;
@@ -212,7 +214,7 @@ class CRP6Simulator : public QMainWindow
     QWidget *createSerialRobotTab(void);
     QWidget *createSerialM32Tab(void);
     QWidget *createIRCOMMTab(void);
-    QDockWidget *createStatusDock(void);
+    QDockWidget *createMainDock(void);
     QDockWidget *createADCDock(void);
     QDockWidget *createRegisterDock(void);
     QDockWidget *createExtEEPROMDock(void);

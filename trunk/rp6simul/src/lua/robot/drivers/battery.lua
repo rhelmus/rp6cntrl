@@ -6,7 +6,7 @@ local noiseFunction
 
 
 function initPlugin()
-    noiseFunction = makeADCNoiseFunction(50, 200, -5, 5)
+    noiseFunction = makeADCNoiseFunction(100, 200, -2, 2)
 end
 
 function getADCValue(a)

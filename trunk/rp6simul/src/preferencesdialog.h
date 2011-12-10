@@ -19,6 +19,7 @@ class CPreferencesDialog : public QDialog
 
     CPathInput *defaultProjectDirPathInput;
     QCheckBox *loadPrevProjectCheckBox;
+    QCheckBox *restoreGeometryCheckBox, *restoreStateCheckBox;
     QGroupBox *soundGroupBox;
     QSlider *piezoVolumeSlider;
     QGroupBox *robotSerialGroupBox, *m32SerialGroupBox;
