@@ -29,13 +29,8 @@ local motorInfo = {
     rightDirection = "FWD",
     leftEncDriveCounter = 0,
     rightEncDriveCounter = 0,
-    leftTotalEncDriveCounter = 0,
-    rightTotalEncDriveCounter = 0,
     leftEncMoveCounter = 0,
     rightEncMoveCounter = 0,
-    leftReadOutError = 1,
-    rightReadOutError = 1,
-    readOutCounter = nil,
     leftDistance = 0,
     rightDistance = 0,
 }
@@ -208,6 +203,17 @@ local function setMotorDirection(data)
 end
 
 local function getEncoderFactor()
+    -- This function is used to somewhat compensate the inaacuracies introduced
+    -- by the RP6 library (see CRobotGraphicsItem::tryMove()). Especially at
+    -- high speeds (>120), the robot will most likely move to far when
+    -- rotating. To compensate, the rotation speed, or the delta between both
+    -- motor speeds, is used to introduce a little correction factor. This factor
+    -- is used to limit the acutual movement a bit (note that this does _not_
+    -- influence ISR calls, so the RP6 library thinks everything is unaltered).
+    -- I couldn't find a nice relation between delta and correction factor,
+    -- therefore I made a lookup table with experimental results. This is
+    -- certainly not ideal, but at 'normal' speeds rotation is fairly OK
+
     local factors =
     {
         { delta = 120, factor = 0.985 },
@@ -225,6 +231,11 @@ local function getEncoderFactor()
     }
 
     local lp, rp = motorInfo.leftPower, motorInfo.rightPower
+
+    if motorInfo.leftDirection == motorInfo.rightDirection then
+        return 1 -- Only correct for rotation
+    end
+
     if motorInfo.leftDirection == "BWD" then
         lp = -lp
     end
@@ -291,45 +302,7 @@ function initPlugin()
 
     encReadoutTimer = clock.createTimer()
     encReadoutTimer:setTimeOut(function()
-        -- Update error every ~1 sec
-        if motorInfo.readOutCounter == nil or motorInfo.readOutCounter >= 3 then
-            motorInfo.readOutCounter = 0
---[[
-            -- UNDONE: 3
-            local avgls = motorInfo.leftTotalEncDriveCounter / 3
-            local avgrs = motorInfo.rightTotalEncDriveCounter / 3
-            motorInfo.leftTotalEncDriveCounter = 0
-            motorInfo.rightTotalEncDriveCounter = 0
-
-            if motorInfo.leftDirection == "BWD" then
-                avgls = -avgls
-            end
-            if motorInfo.rightDirection == "BWD" then
-                avgrs = -avgrs
-            end
-
-            local delta = math.abs(avgls - avgrs)
-            local minnoise = -0.0009253131*delta+0.0610912343
-            log("delta/minnoise:", delta, minnoise, "\n")
-            local maxnoise = 1337 * (1 - (delta / 500))
-
-            if true or minnoise == maxnoise then
-                motorInfo.leftReadOutError, motorInfo.rightReadOutError = 1, 1
-            else
---                minnoise, maxnoise = -0.18, -0.24
-                motorInfo.leftReadOutError = 1 * 0.7 --+ minnoise -- (math.random(minnoise*100, maxnoise*100) / 100)
-                motorInfo.rightReadOutError = 1 * 0.7 --+ minnoise -- (math.random(minnoise*100, maxnoise*100) / 100)
-            end
-            --]]
-            motorInfo.leftReadOutError = 1 --+ (math.random(-5, 5) / 100)
-            motorInfo.rightReadOutError = 1-- + (math.random(-5, 5) / 100)
-        end
-
-        motorInfo.readOutCounter = motorInfo.readOutCounter + 1
-
         local drivespeed = motorInfo.leftEncDriveCounter
-        drivespeed = drivespeed * motorInfo.leftReadOutError
-        motorInfo.leftTotalEncDriveCounter = motorInfo.leftTotalEncDriveCounter + motorInfo.leftEncDriveCounter
         local movespeed = motorInfo.leftEncMoveCounter
         motorInfo.leftDistance = motorInfo.leftDistance + movespeed
         motorInfo.leftEncDriveCounter = 0
@@ -340,8 +313,6 @@ function initPlugin()
         updateRobotStatus("motor", "distance", "left", motorInfo.leftDistance)
 
         drivespeed = motorInfo.rightEncDriveCounter
-        drivespeed = drivespeed * motorInfo.rightReadOutError
-        motorInfo.rightTotalEncDriveCounter = motorInfo.rightTotalEncDriveCounter + motorInfo.rightEncDriveCounter
         movespeed = motorInfo.rightEncMoveCounter
         motorInfo.rightDistance = motorInfo.rightDistance + movespeed
         motorInfo.rightEncDriveCounter = 0
