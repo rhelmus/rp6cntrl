@@ -1164,16 +1164,6 @@ void CSimulator::execISR(EISRTypes type)
 
 bool CSimulator::initPlugin()
 {
-    if (pluginLibrary.isLoaded() && !pluginLibrary.unload())
-    {
-        QMessageBox::critical(CRP6Simulator::getInstance(), "Unload plugin error",
-                              "Could not unload plugin file!\n"
-                              "This may result in undefined behaviour "
-                              "when simulation is started. It is best "
-                              "to restart the application.");
-        return false;
-    }
-
     if (!verifyPluginFile(currentPluginFileName))
         return false;
 
@@ -1262,6 +1252,15 @@ void CSimulator::stopPlugin()
     // Wait untill clock is really stopped.
     while (AVRClock->isActive())
         ;
+
+    if (pluginLibrary.isLoaded() && !pluginLibrary.unload())
+    {
+        QMessageBox::critical(CRP6Simulator::getInstance(), "Unload plugin error",
+                              "Could not unload plugin file!\n"
+                              "This may result in undefined behaviour "
+                              "when simulation is started. It is best "
+                              "to restart the application.");
+    }
 
     if (luaTWIHandler != 0)
     {

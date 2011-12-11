@@ -813,12 +813,14 @@ void CRP6Simulator::createToolbars()
                                   "Zoom map in", robotScene, SLOT(zoomSceneIn()));
     a->setShortcut(QKeySequence("+"));
 
-    a = editMapToolBar->addAction(QIcon(getResourcePath("follow.png")),
-                                  "Toggle robot following", robotScene,
-                                  SLOT(setFollowRobot(bool)));
-    connect(robotScene, SIGNAL(robotFollowingChanged(bool)), a,
+    followRobotAction =
+            editMapToolBar->addAction(QIcon(getResourcePath("follow.png")),
+                                      "Toggle robot following",
+                                      robotScene, SLOT(setFollowRobot(bool)));
+    connect(robotScene, SIGNAL(robotFollowingChanged(bool)), followRobotAction,
             SLOT(setChecked(bool)));
-    a->setCheckable(true);
+    followRobotAction->setCheckable(true);
+    followRobotAction->setEnabled(false);
 
 
     editMapToolBar->addSeparator();
@@ -982,25 +984,6 @@ QWidget *CRP6Simulator::createRobotSceneWidget()
                                  QPainter::SmoothPixmapTransform);
     graphicsView->setMouseTracking(true);
     hbox->addWidget(graphicsView);
-
-    vbox = new QVBoxLayout;
-    hbox->addLayout(vbox);
-
-    QSpinBox *spinbox = new QSpinBox;
-    connect(spinbox, SIGNAL(valueChanged(int)), this,
-            SLOT(debugSetRobotLeftPower(int)));
-    spinbox->setRange(-210, 210);
-    new QShortcut(QKeySequence("Q"), spinbox, SLOT(stepDown()));
-    new QShortcut(QKeySequence("W"), spinbox, SLOT(stepUp()));
-    vbox->addWidget(spinbox);
-
-    spinbox = new QSpinBox;
-    connect(spinbox, SIGNAL(valueChanged(int)), this,
-            SLOT(debugSetRobotRightPower(int)));
-    spinbox->setRange(-210, 210);
-    new QShortcut(QKeySequence("A"), spinbox, SLOT(stepDown()));
-    new QShortcut(QKeySequence("S"), spinbox, SLOT(stepUp()));
-    vbox->addWidget(spinbox);
 
     return mapStackedWidget;
 }
@@ -3194,6 +3177,10 @@ void CRP6Simulator::runPlugin()
     foreach (QAction *a, projectActionList)
         a->setEnabled(false);
 
+    followRobotAction->setEnabled(true);
+    if (followRobotAction->isChecked())
+        robotScene->setFollowRobot(true);
+
     pluginRunning = true;
 }
 
@@ -3287,6 +3274,10 @@ void CRP6Simulator::stopPlugin()
 
     foreach (QAction *a, projectActionList)
         a->setEnabled(true);
+
+    followRobotAction->setEnabled(false);
+    if (followRobotAction->isChecked())
+        robotScene->setFollowRobot(false);
 
     for (TDriverLogList::iterator it=robotDriverLogEntries.begin();
          it!=robotDriverLogEntries.end(); ++it)
@@ -3697,24 +3688,6 @@ void CRP6Simulator::sendIRCOMM()
             arg(IRCOMMKeyWidget->value()).
             arg(IRCOMMToggleWidget->isChecked());
     IRCOMMOutputWidget->appendHtml(getLogOutput(LOG_LOG, text));
-}
-
-void CRP6Simulator::debugSetRobotLeftPower(int power)
-{
-    robotScene->getRobotItem()->setMotorSpeed(MOTOR_LEFT, abs(power));
-    if (power >= 0)
-        robotScene->getRobotItem()->setMotorDirection(MOTOR_LEFT, MOTORDIR_FWD);
-    else
-        robotScene->getRobotItem()->setMotorDirection(MOTOR_LEFT, MOTORDIR_BWD);
-}
-
-void CRP6Simulator::debugSetRobotRightPower(int power)
-{
-    robotScene->getRobotItem()->setMotorSpeed(MOTOR_RIGHT, abs(power));
-    if (power >= 0)
-        robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_FWD);
-    else
-        robotScene->getRobotItem()->setMotorDirection(MOTOR_RIGHT, MOTORDIR_BWD);
 }
 
 void CRP6Simulator::closeEvent(QCloseEvent *event)

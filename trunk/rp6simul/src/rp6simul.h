@@ -125,6 +125,7 @@ class CRP6Simulator : public QMainWindow
     QMenu *dataPlotMenu;
     QToolBar *editMapToolBar;
     QActionGroup *editMapActionGroup;
+    QAction *followRobotAction;
     QStackedWidget *mainStackedWidget;
     QTabWidget *projectTabWidget;
     QStackedWidget *mapStackedWidget;
@@ -335,8 +336,6 @@ private slots:
     void sendRobotSerialText(void);
     void sendM32SerialText(void);
     void sendIRCOMM(void);
-    void debugSetRobotLeftPower(int power);
-    void debugSetRobotRightPower(int power);
 
 protected:
     void closeEvent(QCloseEvent *event);

@@ -11,10 +11,8 @@
 - rp6simul --> rp6sim?
 - Remove debug code
     - Disable qDebug()
-    - Remove spinboxes+shortcuts map view
     - tracelines
-- Disable follow mode if not active
-    - Re-enable auto
+- Windows: check if overwriting plugin dll works after plugin has stopped
 
 
 LATER
