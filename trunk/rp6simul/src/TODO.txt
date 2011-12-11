@@ -13,6 +13,7 @@
     - Disable qDebug()
     - tracelines
 - Windows: check if overwriting plugin dll works after plugin has stopped
+- Windows: sleep() disrupts
 
 
 LATER

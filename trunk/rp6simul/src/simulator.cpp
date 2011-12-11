@@ -485,6 +485,8 @@ void CSimulator::initLua()
 
     NLua::registerFunction(luaState, luaGetLuaSrcPath, "getLuaSrcPath");
     NLua::registerFunction(luaState, luaJoinPath, "joinPath");
+    NLua::registerFunction(luaState, luaBaseName, "baseName");
+    NLua::registerFunction(luaState, luaDirName, "dirName");
 
     // avr
     NLua::registerFunction(luaState, luaAvrGetIORegister, "getIORegister",
@@ -754,11 +756,28 @@ int CSimulator::luaJoinPath(lua_State *l)
     QString path;
     for (int i=1; i<=nargs; ++i)
     {
-        path += "/";
+        if (i > 1)
+            path += "/";
         path += luaL_checkstring(l, i);
     }
 
     lua_pushstring(l, qPrintable(QDir::toNativeSeparators(path)));
+    return 1;
+}
+
+int CSimulator::luaBaseName(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    const char *file = luaL_checkstring(l, 1);
+    lua_pushstring(l, qPrintable(QFileInfo(file).fileName()));
+    return 1;
+}
+
+int CSimulator::luaDirName(lua_State *l)
+{
+    // NLua::CLuaLocker lualocker(l);
+    const char *file = luaL_checkstring(l, 1);
+    lua_pushstring(l, qPrintable(QFileInfo(file).dir().path()));
     return 1;
 }
 

@@ -52,7 +52,7 @@ local function loadDriver(d)
     local path
 
     -- Pick a default directory?
-    if not dir then
+    if #dir == 0 or dir == "." then
         path = joinPath(simulatorPath, "drivers", file)
         if not fileExists(path) then
             path = getLuaSrcPath("shared_drivers/" .. file)

@@ -37,11 +37,11 @@ public:
     CIORegister &operator&=(TIORegisterData d) { set(get() & d); return *this; }
     CIORegister &operator^=(TIORegisterData d) { set(get() ^ d); return *this; }
     CIORegister &operator++(void) { set(get() + 1); return *this; }
-    CIORegister operator++(int)
-    { CIORegister ret = *this; set(ret + 1); return ret; }
+    TIORegisterData operator++(int)
+    { TIORegisterData ret = get(); set(ret + 1); return ret; }
     CIORegister &operator--(void) { set(get() - 1); return *this; }
-    CIORegister operator--(int)
-    { CIORegister ret = *this; set(ret - 1); return ret; }
+    TIORegisterData operator--(int)
+    { TIORegisterData ret = *this; set(ret - 1); return ret; }
 };
 
 }
