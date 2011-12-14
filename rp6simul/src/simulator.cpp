@@ -541,7 +541,11 @@ void CSimulator::initAVRClock()
     AVRClockThread = new QThread(this);
     connect(AVRClockThread, SIGNAL(finished()), AVRClock, SLOT(stop()));
     AVRClock->moveToThread(AVRClockThread);
+#ifdef Q_OS_WIN
+    AVRClockThread->start(QThread::HighPriority);
+#else
     AVRClockThread->start();
+#endif
 }
 
 void CSimulator::terminateAVRClock()
@@ -657,7 +661,8 @@ void CSimulator::checkPluginThreadDelay()
             {
                 lastPluginDelay = ts;
 #ifdef Q_OS_WIN
-                usleep(1);
+//                usleep(1);
+                QThread::yieldCurrentThread();
 #else
                 ts.tv_sec = 0; ts.tv_nsec = 1000;
                 nanosleep(&ts, 0);

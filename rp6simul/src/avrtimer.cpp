@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <QDebug>
+#include <QThread>
 #include <QTimer>
 
 
@@ -102,6 +103,7 @@ void CAVRClock::run()
 
 #ifndef NDEBUG
     timeOutsPerSec += timeouts;
+    remainingTicksPerSec += remainingTicks;
 
     clock_gettime(CLOCK_MONOTONIC, &curtime);
     totalTimeOutTime += getUSDiff(lastClockTime, curtime);
@@ -119,9 +121,11 @@ void CAVRClock::run()
         qDebug() << "Frequency (ticks/s) (uncorrected):" << ticksPerSec << (void*)this;
         qDebug() << "Frequency (ticks/s) (corrected):" << (unsigned long)(ticksPerSec.get() * corr) << (void*)this;
         qDebug() << "avg timeout time:" << totalTimeOutTime / runsPerSec << (void*)this;
+        qDebug() << "avg remaining ticks:" << (unsigned long)(remainingTicksPerSec.get() / runsPerSec) << (void*)this;
         runsPerSec = 0;
         timeOutsPerSec = 0;
         totalTimeOutTime = 0;
+        remainingTicksPerSec.reset();
 #endif
 
         emit clockSpeed(ticksPerSec.get() * corr);
@@ -133,7 +137,8 @@ void CAVRClock::run()
     if (sleepTime)
     {
 #ifdef Q_OS_WIN
-        usleep(sleepTime);
+//        usleep(sleepTime);
+        QThread::yieldCurrentThread();
 #else
         timespec ts = { 0, sleepTime * 1000 };
         nanosleep(&ts, 0);
@@ -188,6 +193,7 @@ void CAVRClock::start()
 {
     currentTicks.reset();
     remainingTicks.reset();
+    remainingTicksPerSec.reset();
     initClockTime = true;
     emit startTimer();
 }
