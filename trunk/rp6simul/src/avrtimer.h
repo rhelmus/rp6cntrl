@@ -201,7 +201,7 @@ private:
     unsigned long targetClockSpeed;
     int maxTimeOutsCycle, sleepTime; // sleep time in microseconds
     TTimerList timerList;
-    CTicks currentTicks, remainingTicks;
+    CTicks currentTicks, remainingTicks, remainingTicksPerSec;
     QTimer *clockTimer;
     timespec lastClockTime;
     bool initClockTime;
