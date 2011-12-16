@@ -167,8 +167,16 @@ void CProjectSettingsDialog::saveSettings(CProjectSettings &settings)
 void CProjectSettingsDialog::accept()
 {
     // Verify settings
-    if (!verifyPluginFile(robotPluginInput->getPath()) ||
-        !verifyPluginFile(m32PluginInput->getPath()))
+
+    ESimulator simulator =
+            static_cast<ESimulator>(simulatorButtonGroup->checkedId());
+    const bool hasrobot = ((simulator == SIMULATOR_ROBOT) ||
+                           (simulator == SIMULATOR_ROBOTM32));
+    const bool hasm32 = ((simulator == SIMULATOR_M32) ||
+                         (simulator == SIMULATOR_ROBOTM32));
+
+    if ((hasrobot && !verifyPluginFile(robotPluginInput->getPath())) ||
+        (hasm32 && !verifyPluginFile(m32PluginInput->getPath())))
         return;
 
     QDialog::accept();
