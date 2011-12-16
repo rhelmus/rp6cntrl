@@ -45,7 +45,12 @@ end
 
 local function updateFreq()
     -- Factor two: piezo timer is set as toggle
-    local freq = properties.clockSpeed / (2*piezoInfo.prescaler*(piezoInfo.pitch+1))
+    local freq
+    if piezoInfo.pitch ~= 0 and piezoInfo.prescaler ~= 0 then
+        freq = properties.clockSpeed / (2*piezoInfo.prescaler*(piezoInfo.pitch+1))
+    else
+        freq = 0
+    end
     setBeeperFrequency(piezoInfo.pitch, freq)
     updateRobotStatus("piezo", "pitch", piezoInfo.pitch)
     updateRobotStatus("piezo", "frequency", freq)
